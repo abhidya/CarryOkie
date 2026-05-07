@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 const checks = [];
+const REPO_BASE = '/CarryOkie';
 function loadBootstrap(page){
   const html = fs.readFileSync(`${page}/index.html`, 'utf8');
-  const match = html.match(/<script>(.*?)<\/script>/);
+  const match = html.match(/<script>([^<]*location\.replace[\s\S]*?)<\/script>/);
   return match?.[1] || '';
 }
-function runBootstrap(page, { hostname='abhidya.github.io', pathname=`/CarryOkie/${page}/`, search='', hash='' } = {}){
+function runBootstrap(page, { hostname='abhidya.github.io', pathname=`${REPO_BASE}/${page}/`, search='', hash='' } = {}){
   const script = loadBootstrap(page);
   let redirectedTo = null;
   const location = {
@@ -73,9 +74,9 @@ const protectedCatalog = JSON.parse(fs.readFileSync('public/protected/catalog.js
 checks.push(['protected catalog has songs', protectedCatalog.songs?.length > 0]);
 checks.push(['public songs folder removed', !fs.existsSync('public/songs')]);
 for (const page of ['host', 'player', 'receiver', 'debug']) {
-  checks.push([`${page} source redirects GitHub Pages traffic to dist`, runBootstrap(page, { pathname:`/CarryOkie/${page}/`, search:'?room=BLUECAT', hash:'#join' }) === `https://abhidya.github.io/CarryOkie/dist/${page}/?room=BLUECAT#join`]);
+  checks.push([`${page} source redirects GitHub Pages traffic to dist`, runBootstrap(page, { pathname:`${REPO_BASE}/${page}/`, search:'?room=BLUECAT', hash:'#join' }) === `https://abhidya.github.io${REPO_BASE}/dist/${page}/?room=BLUECAT#join`]);
   checks.push([`${page} source does not redirect local dev`, runBootstrap(page, { hostname:'localhost', pathname:`/${page}/` }) === null]);
-  checks.push([`${page} dist path does not loop`, runBootstrap(page, { pathname:`/CarryOkie/dist/${page}/` }) === null]);
+  checks.push([`${page} dist path does not loop`, runBootstrap(page, { pathname:`${REPO_BASE}/dist/${page}/` }) === null]);
 }
 const distHtml = ['dist/host/index.html','dist/player/index.html','dist/receiver/index.html','dist/debug/index.html'].map(f=>fs.existsSync(f)?fs.readFileSync(f,'utf8'):'').join('\n');
 checks.push(['dist never serves TypeScript module scripts', !distHtml.includes('src/main.ts') && !distHtml.includes('.ts"')]);
