@@ -1,0 +1,12 @@
+public/
+node_modules/
+.venv/
+.idea/
+downloads/
+coverage/
+*.part
+.idea/
+.sisyphus/
+.DS_Store
+links.txt
+coverage/*

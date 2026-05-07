@@ -1,0 +1,218 @@
+{
+  "source": "design.md Section 19 MVP acceptance criteria",
+  "summary": {
+    "total": 22,
+    "automated_full": 15,
+    "automated_partial": 5,
+    "manual_hardware_required": 2,
+    "not_started": 0
+  },
+  "criteria": [
+    {
+      "id": 1,
+      "requirement": "Static app deploys to GitHub Pages",
+      "level": "automated_full",
+      "evidence": [
+        "scripts/build.mjs",
+        "scripts/static.test.mjs"
+      ]
+    },
+    {
+      "id": 2,
+      "requirement": "Host opens /host on desktop/Android Chrome",
+      "level": "automated_full",
+      "evidence": [
+        "host/index.html",
+        "src/main.js",
+        "static route tests"
+      ],
+      "manual": "Open in Chrome on target device."
+    },
+    {
+      "id": 3,
+      "requirement": "Host starts Cast session to Chromecast",
+      "level": "automated_partial",
+      "evidence": [
+        "scripts/cast_ui.test.mjs fake Cast SDK"
+      ],
+      "manual": "Real Chromecast discovery/session on same Wi-Fi."
+    },
+    {
+      "id": 4,
+      "requirement": "TV loads /receiver and plays demo backing video/audio",
+      "level": "manual_hardware_required",
+      "evidence": [
+        "receiver/index.html",
+        "src/cast.js loadMedia tests"
+      ],
+      "manual": "Real Chromecast/Google TV playback."
+    },
+    {
+      "id": 5,
+      "requirement": "TV shows room code and QR",
+      "level": "automated_partial",
+      "evidence": [
+        "src/receiver page static checks",
+        "src/qr.js tests"
+      ],
+      "manual": "Visual check on TV."
+    },
+    {
+      "id": 6,
+      "requirement": "Participant pairs with host using QR/link only, no server",
+      "level": "automated_partial",
+      "evidence": [
+        "scripts/sync_and_webrtc.test.mjs fake manual offer/answer",
+        "src/qr.js",
+        "src/signaling.js"
+      ],
+      "manual": "Real two-browser QR/link pairing."
+    },
+    {
+      "id": 7,
+      "requirement": "Manual offer/answer wait for complete ICE",
+      "level": "automated_full",
+      "evidence": [
+        "scripts/use_cases.test.mjs",
+        "scripts/sync_and_webrtc.test.mjs"
+      ]
+    },
+    {
+      "id": 8,
+      "requirement": "Host and participant establish WebRTC DataChannel",
+      "level": "automated_full",
+      "evidence": [
+        "PeerNode tests",
+        "manual offer/answer fake RTCPeerConnection",
+        "scripts/sync_and_webrtc.test.mjs"
+      ]
+    },
+    {
+      "id": 9,
+      "requirement": "Third phone joins using peer-assisted signaling relay",
+      "level": "automated_partial",
+      "evidence": [
+        "relay forwarding tests in coverage_extended"
+      ],
+      "manual": "Real 3-browser mesh."
+    },
+    {
+      "id": 10,
+      "requirement": "Queue request flows participant \u2192 host \u2192 all peers",
+      "level": "automated_full",
+      "evidence": [
+        "scripts/use_cases.test.mjs",
+        "scripts/static.test.mjs"
+      ]
+    },
+    {
+      "id": 11,
+      "requirement": "Host assigns singer",
+      "level": "automated_full",
+      "evidence": [
+        "assignSingers tests",
+        "static UI tests"
+      ]
+    },
+    {
+      "id": 12,
+      "requirement": "Singer enables mic with explicit permission",
+      "level": "automated_full",
+      "evidence": [
+        "PhoneAudio tests",
+        "getUserMedia code path",
+        "push-to-sing + headphones checks"
+      ]
+    },
+    {
+      "id": 13,
+      "requirement": "Listener phone hears singer mic over WebRTC",
+      "level": "manual_hardware_required",
+      "evidence": [
+        "addLocalStream/addRemoteStream code paths"
+      ],
+      "manual": "Two physical devices/speakers/headphones."
+    },
+    {
+      "id": 14,
+      "requirement": "Singer does not hear own mic by default",
+      "level": "automated_full",
+      "evidence": [
+        "audio invariant tests",
+        "localMonitorGain default 0"
+      ]
+    },
+    {
+      "id": 15,
+      "requirement": "TV never receives live mic audio",
+      "level": "automated_full",
+      "evidence": [
+        "receiver no WebRTC/getUserMedia tests",
+        "cast separation tests"
+      ]
+    },
+    {
+      "id": 16,
+      "requirement": "TV continues to show lyrics/video/backing track",
+      "level": "automated_partial",
+      "evidence": [
+        "receiver/cast static tests",
+        "media catalog tests"
+      ],
+      "manual": "Real Cast playback."
+    },
+    {
+      "id": 17,
+      "requirement": "Phones mirror lyrics from host playback state",
+      "level": "automated_full",
+      "evidence": [
+        "src/sync.js",
+        "scripts/sync_and_webrtc.test.mjs"
+      ]
+    },
+    {
+      "id": 18,
+      "requirement": "Spotify is not used",
+      "level": "automated_full",
+      "evidence": [
+        "catalog/source grep static tests"
+      ]
+    },
+    {
+      "id": 19,
+      "requirement": "Room capped to 5 players and 5 active singers",
+      "level": "automated_full",
+      "evidence": [
+        "state tests",
+        "MAX_SINGERS = 5"
+      ]
+    },
+    {
+      "id": 20,
+      "requirement": "Strict mode configures public STUN and displays ICE failure errors",
+      "level": "automated_full",
+      "evidence": [
+        "rtcConfig tests",
+        "ICE error guidance tests"
+      ]
+    },
+    {
+      "id": 21,
+      "requirement": "Phones derive lyric timing from actual Cast media status",
+      "level": "automated_full",
+      "evidence": [
+        "Cast currentTime tests",
+        "sync derivation tests"
+      ]
+    },
+    {
+      "id": 22,
+      "requirement": "Active singers get headphone / push-to-sing / TV-bleed warnings",
+      "level": "automated_full",
+      "evidence": [
+        "audio safety tests",
+        "UI static tests"
+      ]
+    }
+  ]
+}
