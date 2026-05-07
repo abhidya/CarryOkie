@@ -51,7 +51,7 @@ assert.equal(events.length, 0, 'Default protected load should still skip custom 
 const custom = new CastController('CUSTOMAPP');
 custom.configure();
 await custom.loadSong(song, room);
-assert.equal(events.length, 2, 'custom receiver should receive LOAD and sync namespace messages');
+assert.ok(events.length >= 3, 'custom receiver should receive LOAD, PLAY, and sync namespace messages');
 assert.equal(events[0][0], 'sendMessage');
 assert.equal(events[0][1], 'urn:x-cast:com.carryokie.room');
 

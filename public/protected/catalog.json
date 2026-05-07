@@ -1,0 +1,643 @@
+{
+  "generatedAt": "2026-05-07T09:38:42.246Z",
+  "sources": [
+    "public/songs",
+    "downloads/mp4"
+  ],
+  "songs": [
+    {
+      "songId": "yt_K2qERDVrs60",
+      "title": "10s Karaoke Songs Vol. 1",
+      "artist": "Unknown",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "K2qERDVrs60",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/a23114b92c4c20a866615ced68f0eea1.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "ZwyF/AJamaqlU1z4",
+        "tagBytesAppended": 16,
+        "plainSha256": "e9b6aed5623d20af796a85a5930c084001c19fab27ac29da00337cc22584f13c",
+        "plainByteLength": 55914123
+      },
+      "defaultCastMediaUrl": "/public/cast/media/3c4cc138842943ea539b27a5b7b05b99.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_ESFpBNreCvc",
+      "title": "20s Karaoke Songs Vol. 1",
+      "artist": "Unknown",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "ESFpBNreCvc",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/1a9cadbb903eaa74430885324050ef2c.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "zUvaVHGEte78SMLA",
+        "tagBytesAppended": 16,
+        "plainSha256": "9920fa02605e9384274ee707949b4cb6f4b7fd683afc0e57da0635ecac00205f",
+        "plainByteLength": 50341890
+      },
+      "defaultCastMediaUrl": "/public/cast/media/3a16ac9a69e153ca1147299fce3cd297.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_XWl1c4FBlb0",
+      "title": "A Horse with No Name (Karaoke Version)",
+      "artist": "America",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "XWl1c4FBlb0",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/b9eb252ee96b9cb27ad9f8c9b5b9b1ba.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "hSCVHylzY99u4jds",
+        "tagBytesAppended": 16,
+        "plainSha256": "c00df8856ed4b680f41ee0c04bb33d6953ec4ea5a7b68bae9080148b862536fa",
+        "plainByteLength": 9612752
+      },
+      "defaultCastMediaUrl": "/public/cast/media/acb276eaa5b6c8d92270cb480fe38b1c.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_JazPkUNFMzQ",
+      "title": "Choka Choka (Karaoke Version)",
+      "artist": "Anitta Shakira",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "JazPkUNFMzQ",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/f7b3b05bf08fda0a79f9e224b8cc4857.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "Gqg07L/vFDU3f6PJ",
+        "tagBytesAppended": 16,
+        "plainSha256": "db182285e8c6adfde04c133ab02e5348f41c00abc30a06e32c6eec7229002302",
+        "plainByteLength": 9399653
+      },
+      "defaultCastMediaUrl": "/public/cast/media/ecb8ce90438c5c15fe290de159791f76.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_294mIgoQofY",
+      "title": "Bad Angel with LISA (Karaoke Version)",
+      "artist": "Anyma",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "294mIgoQofY",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/0dff186e98d18f3873b719407aa7bfc5.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "8dGQ2J+FgF9gfwO6",
+        "tagBytesAppended": 16,
+        "plainSha256": "4d019f3fed238d0c383b3f8ef8ec39e6be88781b736cfd1d0461bf8d11cd9ba3",
+        "plainByteLength": 8804653
+      },
+      "defaultCastMediaUrl": "/public/cast/media/fc77eb041d26d0caff79c03f397edd0d.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_JkbP0QJbtuw",
+      "title": "Aliens (Karaoke Version)",
+      "artist": "BTS",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "JkbP0QJbtuw",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/e9f8942b358e74f0f6ecef4262c5f3f1.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "O4SOlrK+v0eoGG7r",
+        "tagBytesAppended": 16,
+        "plainSha256": "cd259864dedd16522866e7a54a11de7acbe0c4726f66e58495205ffa952a3028",
+        "plainByteLength": 10159327
+      },
+      "defaultCastMediaUrl": "/public/cast/media/1dc9d03f8c0e1ef4076085ed9f29bf8f.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_1Ec91sG_1bc",
+      "title": "Motion Party (Karaoke Version)",
+      "artist": "BossMan Dlow",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "1Ec91sG_1bc",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/9c525f723a5b7c5ab910985a11001d00.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "5Zw6Q+jKjDtixxSt",
+        "tagBytesAppended": 16,
+        "plainSha256": "859af2c0fa974e043e0341aaa2fb4eefcd3f2960a51ddb58a5d7c520bf1a19bc",
+        "plainByteLength": 8157073
+      },
+      "defaultCastMediaUrl": "/public/cast/media/a3fc6d0c2c3c01931b243e1b6b99e18d.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_0iWfy7zQUjI",
+      "title": "Dynamite (Karaoke Version)",
+      "artist": "China Anne McClain",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "0iWfy7zQUjI",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/c58a399b3532dd5849ee33e3319c4b68.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "PZ5mvkWgkQgJT2s/",
+        "tagBytesAppended": 16,
+        "plainSha256": "3c9b04ad6c302dc931b07fa98b11e7785b3a052b6b03ae3b445876a1abb2e360",
+        "plainByteLength": 10478116
+      },
+      "defaultCastMediaUrl": "/public/cast/media/d1b177f15d2c2d6380c0c43309c14c4d.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_xoydrubaA3M",
+      "title": "Country Boy s Dream Girl (Karaoke Version)",
+      "artist": "Ella Langley",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "xoydrubaA3M",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/221ca42c27468ca252ab4df0b57c9598.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "l8CAdPrQCZibzZtr",
+        "tagBytesAppended": 16,
+        "plainSha256": "cec40a659467e2f8917debd63e6962d374353175535ea4dd40b303d097aef4e0",
+        "plainByteLength": 7918428
+      },
+      "defaultCastMediaUrl": "/public/cast/media/f54ca6463044042acce3e99b91324330.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_il8cIwT3JZ4",
+      "title": "I Can t Help Myself Sugar Pie Honey Bunch (Karaoke Version)",
+      "artist": "Four Tops",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "il8cIwT3JZ4",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/17787accc9d6f604413d3730ef6e9603.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "E6ZeCoRoBpQSi6gV",
+        "tagBytesAppended": 16,
+        "plainSha256": "da6cf8a5ceff3f8cd846d9d6ecba3a7b15f9644450ca7b2b2e05422b827be0fe",
+        "plainByteLength": 7175808
+      },
+      "defaultCastMediaUrl": "/public/cast/media/699d96c99227a1db4e810b852e21ca21.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_odBbVNdoC98",
+      "title": "Beauty Pageant (Karaoke Version)",
+      "artist": "Holly Humberstone",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "odBbVNdoC98",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/f63c3bd6dccbc00f6be567921b3be46f.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "7vTRPIxU7C8wGI91",
+        "tagBytesAppended": 16,
+        "plainSha256": "09f1a7e5a72162f29b34f707bca551db3ac875e5fbdf9fb22bede5f266c29c47",
+        "plainByteLength": 10749106
+      },
+      "defaultCastMediaUrl": "/public/cast/media/028828ca1d19060e75b76b8f85a7e84c.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_3SUIA3nYm90",
+      "title": "Cruel World (Karaoke Version)",
+      "artist": "Holly Humberstone",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "3SUIA3nYm90",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/ca561d97c90607d6d031d1a0f816ac3c.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "MhM7HlUHfKdtjJGS",
+        "tagBytesAppended": 16,
+        "plainSha256": "d229e21d57bf2c98734a9489dc2a0e673b51e276e7ebc6d1385eea87ce693de4",
+        "plainByteLength": 11798871
+      },
+      "defaultCastMediaUrl": "/public/cast/media/1fea74eb38becf85f7ebae7ea052012d.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_DgYM635t7a4",
+      "title": "Back and Forth feat. Missy Elliott (Karaoke Version)",
+      "artist": "Kehlani",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "DgYM635t7a4",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/5a831a26718929c4498cac03ddc4b04e.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "N6CTg/nwLxGnteHJ",
+        "tagBytesAppended": 16,
+        "plainSha256": "3c5dc1147bfbf003bff346d8bd08c1ade2275a5bd35dda7fd2e35abb74b1cff2",
+        "plainByteLength": 8271207
+      },
+      "defaultCastMediaUrl": "/public/cast/media/93e20ba5af76651ea3810dde8ed45c6b.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_hKxx81aiMRY",
+      "title": "Alright (Karaoke Version)",
+      "artist": "Kendrick Lamar",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "hKxx81aiMRY",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/015ceba28c4e51c4d7aa5338f39c17aa.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "RJejC1Q9PgQHzJtA",
+        "tagBytesAppended": 16,
+        "plainSha256": "bd18135afd454f18afe53057478d738d22cc229eff96313cc62924db363c1ef3",
+        "plainByteLength": 18238845
+      },
+      "defaultCastMediaUrl": "/public/cast/media/cdf8aa5093749d16646303224272f9d5.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_4OPGJsrDFNk",
+      "title": "Eins Zwei Drei (Karaoke Version)",
+      "artist": "LOOK MUM NO COMPUTER",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "4OPGJsrDFNk",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/c477637c3f82c78ff2de31c97a880fda.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "XAQ5ZELAcbx94a6X",
+        "tagBytesAppended": 16,
+        "plainSha256": "1a7dfc21053608a2027d8f9d081ffa6c6286659033f26993137ee3440f57b23b",
+        "plainByteLength": 11028952
+      },
+      "defaultCastMediaUrl": "/public/cast/media/c78cea14b1d099d09fef6e72601cd589.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_jI_v_AmFYIQ",
+      "title": "RUNWAY (Karaoke Version)",
+      "artist": "Lady Gaga Doechii",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "jI_v_AmFYIQ",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/1f2f9bd8d3ce7fd42bc0056ac8cd27ec.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "KWOHHiuIMJKZ2ICA",
+        "tagBytesAppended": 16,
+        "plainSha256": "0df84f74fbac7518f28d9dfff3a95943c4005fde51769346477bce8297131a15",
+        "plainByteLength": 7528985
+      },
+      "defaultCastMediaUrl": "/public/cast/media/3fee6030b10a8f6379ac617308d930f6.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_7bSGt85ts2s",
+      "title": "Madwoman (Karaoke Version)",
+      "artist": "Laufey",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "7bSGt85ts2s",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/55268252e65ed640290459fa6ec6ae38.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "/a7QuWz3LPb0/w5Z",
+        "tagBytesAppended": 16,
+        "plainSha256": "e142c007643f866bf962ce1f65db7e7ef8a7d63fef0e18b8c6a1d8e8c994b869",
+        "plainByteLength": 10560371
+      },
+      "defaultCastMediaUrl": "/public/cast/media/49e0f32886026ba41467dc8a3f75766c.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_325yMKa8AWg",
+      "title": "What You Saying (Karaoke Version)",
+      "artist": "Lil Uzi Vert",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "325yMKa8AWg",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/9e0d797925b43b45e5367800b2b9c208.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "B4Kzb+ilQ1jkh04X",
+        "tagBytesAppended": 16,
+        "plainSha256": "2449cfe63d02526e9a837c124e80c526ceee6bf6a623b80c093bf89e03753de5",
+        "plainByteLength": 9096816
+      },
+      "defaultCastMediaUrl": "/public/cast/media/5924281def9cfd94d5505720f27ec14c.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_aI-uWId1px0",
+      "title": "Liekinheitin (Karaoke Version)",
+      "artist": "Linda Lampenius",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "aI-uWId1px0",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/d7abf0d9cd9b787bc6f4059297edada8.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "Qn/8Dw8akXZinJvl",
+        "tagBytesAppended": 16,
+        "plainSha256": "ac2b2ecb845e7984d140159ec51903f51501242c856d32a548d7d5f695c96567",
+        "plainByteLength": 6662085
+      },
+      "defaultCastMediaUrl": "/public/cast/media/4a7100ce96edb87debb1f4158add2fa6.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_YLVx6-KZRhc",
+      "title": "UNO (Karaoke Version)",
+      "artist": "Little Big",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "YLVx6-KZRhc",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/bccc46634b6799ef3c1face79fde3890.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "NCituobpRqpOLVOJ",
+        "tagBytesAppended": 16,
+        "plainSha256": "8581108326db948f6c798f58f336b632ea9ff7a90d9fbb70f85d7e0c52bc026a",
+        "plainByteLength": 8495351
+      },
+      "defaultCastMediaUrl": "/public/cast/media/ac7a0af902b517e5cec3708ec98497aa.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_Nq038_ZfPLk",
+      "title": "Days Like These (Karaoke Version)",
+      "artist": "Luke Combs",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "Nq038_ZfPLk",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/d1d529b745f43397c1d2d6f508e4a12e.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "0Sy/F2F5UPhIKM3Z",
+        "tagBytesAppended": 16,
+        "plainSha256": "f82ab8f08fe1dadf5699a8020523f038bf0427f4a195a4cc9fe2b217ed95de32",
+        "plainByteLength": 10597493
+      },
+      "defaultCastMediaUrl": "/public/cast/media/d24ab6df396fad5b42da68f7d45d7627.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_y-raj0ox27E",
+      "title": "Lucky Again (Karaoke Version)",
+      "artist": "Lykke Li",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "y-raj0ox27E",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/ab81fc2cc590e51c7e2274e5c862e6be.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "TSoez0clpTz/Xc8d",
+        "tagBytesAppended": 16,
+        "plainSha256": "2b10ba86d5879b63587536c2f48de97447636f0d9f1a5dd51da141104e3fac8f",
+        "plainByteLength": 8591476
+      },
+      "defaultCastMediaUrl": "/public/cast/media/4748b1c99445a7c5e6150b3d8dbcee86.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_AoPPdInwzNM",
+      "title": "My Mess (Karaoke Version)",
+      "artist": "Myles Smith",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "AoPPdInwzNM",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/9ac7419d9bc2ab0c2912ead602fea622.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "d+iVzTjUbwqxMrmE",
+        "tagBytesAppended": 16,
+        "plainSha256": "c575fee595004b29808e7e95a28a2cffcb56eaaa110fa9b5087f40c63be1380b",
+        "plainByteLength": 10018275
+      },
+      "defaultCastMediaUrl": "/public/cast/media/aa988ce62201abd9e4f9ac2a5a45ac37.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_n28qUIUeB0k",
+      "title": "drop dead (Karaoke Version)",
+      "artist": "Olivia Rodrigo",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "n28qUIUeB0k",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/88d88cb1a862520b7321379f8fbbcf4d.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "egDM5WVBtHG6DZN2",
+        "tagBytesAppended": 16,
+        "plainSha256": "ade29b15873573a054c4a6a4652418d77298b823ce017ff566e9d31b571c9444",
+        "plainByteLength": 12122056
+      },
+      "defaultCastMediaUrl": "/public/cast/media/da43875ae191b658f558532a85701cf3.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_6eOW06jcnOY",
+      "title": "Fire (Karaoke Version)",
+      "artist": "Sarah Engels",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "6eOW06jcnOY",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/ca3c018a0eb98febb8f98aad4bf20811.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "mttbypiHWikXR7Bg",
+        "tagBytesAppended": 16,
+        "plainSha256": "621b45b0f67ee77399ba57f943bc4b461fd86d1ddc4d9463da9dfa516cae2438",
+        "plainByteLength": 6954388
+      },
+      "defaultCastMediaUrl": "/public/cast/media/1d09d83965fb0f08ac428946ad22ddc5.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_xZj-mM0sdLY",
+      "title": "Every Little Thing She Does Is Magic (Karaoke Version)",
+      "artist": "The Police",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "xZj-mM0sdLY",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/ca05414d9642b4b352515f0990bf85f2.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "wyFyPAhtcWM/VnQv",
+        "tagBytesAppended": 16,
+        "plainSha256": "8682290b47a83d998fa8cf6b3801de00fc730874d8c288769b68bb57dcd790fd",
+        "plainByteLength": 9796496
+      },
+      "defaultCastMediaUrl": "/public/cast/media/333afee3c3a05bc0ba5ec38747a42475.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_WJ6lVtnoVAA",
+      "title": "Happy Together (Karaoke Version)",
+      "artist": "The Turtles",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "WJ6lVtnoVAA",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/50a28eb2ab2209394529d1a879fefd7b.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "C+G81r5fVSm31ruV",
+        "tagBytesAppended": 16,
+        "plainSha256": "095232bf403017a12b9e5bda059c0adeb9fa93828e158f8239da5a28ad5417f2",
+        "plainByteLength": 6671875
+      },
+      "defaultCastMediaUrl": "/public/cast/media/20ab0b94e1e005dcc20cc0d4b34e6f9d.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_MMZeQclVY3E",
+      "title": "Ends of the Earth (Karaoke Version)",
+      "artist": "Ty Myers",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "MMZeQclVY3E",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/6a226d9b845eb79f9242799dde02ec0c.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "R5VYhf17I2NIGMn5",
+        "tagBytesAppended": 16,
+        "plainSha256": "d1de62ad6ab103cc38a006be3c4724b5510bbf29e712438af77615cb1a449179",
+        "plainByteLength": 12492896
+      },
+      "defaultCastMediaUrl": "/public/cast/media/be2bd90dbbcae310a819d7df0e080bb5.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_moMMDARu414",
+      "title": "Dancing Lasha Tumbai (Karaoke Version)",
+      "artist": "Verka Serduchka",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "moMMDARu414",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/8f26f5b10a05e769a16e49c6b2f03337.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "qa6y7oO4KkTTlIkL",
+        "tagBytesAppended": 16,
+        "plainSha256": "aa901169a8774f235b06c2e36230d1c4fce97b58253ee0714594e475dbb4b118",
+        "plainByteLength": 6809882
+      },
+      "defaultCastMediaUrl": "/public/cast/media/33b64b8bdb464c6030356ca5aaaea759.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    },
+    {
+      "songId": "yt_3n30lTB2o8Y",
+      "title": "Just the Way You Are Sing King Soundcheck (Karaoke Version)",
+      "artist": "Why is THIS 2002 Song Everywhere Milky",
+      "durationMs": null,
+      "isLyricVideo": true,
+      "source": "downloads/mp4",
+      "sourceVideoId": "3n30lTB2o8Y",
+      "licenseInfo": "user-provided/locally imported media; verify rights before deployment",
+      "encryptedMedia": {
+        "url": "/public/protected/media/4968695cefb90a4cffb4d2df63392465.bin",
+        "mimeType": "video/mp4",
+        "algorithm": "AES-256-GCM",
+        "iv": "5Wi6TwZqLDjNpoZ+",
+        "tagBytesAppended": 16,
+        "plainSha256": "e140046e64636d2fcf91c65042ce1c1f7a7e4d684cb49f7920092eb8a218a233",
+        "plainByteLength": 48191306
+      },
+      "defaultCastMediaUrl": "/public/cast/media/bb0e35d624239d52282aa517988476b4.mp4",
+      "defaultCastMediaMimeType": "video/mp4"
+    }
+  ],
+  "defaultCastExport": {
+    "generatedAt": "2026-05-07T09:38:42.246Z",
+    "note": "Clear MP4 compatibility cache for Chromecast Default Media Receiver. Encrypted browser path remains in public/protected/media."
+  }
+}
