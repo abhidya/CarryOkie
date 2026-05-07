@@ -1,5 +1,29 @@
 import fs from 'node:fs';
+import vm from 'node:vm';
 const checks = [];
+const REPO_BASE = '/CarryOkie';
+const GH_PAGES_HOSTNAME = 'abhidya.github.io';
+const REPO_BASE_NO_SLASH = REPO_BASE.replace(/^\//, '');
+function loadBootstrap(page){
+  const html = fs.readFileSync(`${page}/index.html`, 'utf8');
+  const match = html.match(/<script data-gh-pages-bootstrap>(.*?)<\/script>/s);
+  if (!match) throw new Error(`Missing gh-pages bootstrap script in ${page}/index.html`);
+  return match[1];
+}
+function runBootstrap(page, { hostname=GH_PAGES_HOSTNAME, pathname=`${REPO_BASE}/${page}/`, search='', hash='' } = {}){
+  const script = loadBootstrap(page);
+  let redirectedTo = null;
+  const location = {
+    hostname,
+    pathname,
+    search,
+    hash,
+    origin: `https://${hostname}`,
+    replace(url){ redirectedTo = url; },
+  };
+  vm.runInNewContext(script, { location });
+  return redirectedTo;
+}
 const webrtc = fs.readFileSync('src/webrtc.ts','utf8');
 checks.push(['public STUN configured', webrtc.includes('stun:stun.l.google.com:19302')]);
 checks.push(['manual waits complete ICE', webrtc.includes('waitForIceComplete') && webrtc.includes('iceGatheringState') && webrtc.includes('complete')]);
@@ -53,6 +77,13 @@ checks.push(['PeerRelaySignalingAdapter exists', signaling.includes('class PeerR
 const protectedCatalog = JSON.parse(fs.readFileSync('public/protected/catalog.json','utf8'));
 checks.push(['protected catalog has songs', protectedCatalog.songs?.length > 0]);
 checks.push(['public songs folder removed', !fs.existsSync('public/songs')]);
+for (const page of ['host', 'player', 'receiver', 'debug']) {
+  checks.push([`${page} source redirects GitHub Pages traffic to dist`, runBootstrap(page, { pathname:`${REPO_BASE}/${page}/`, search:'?room=BLUECAT', hash:'#join' }) === `https://${GH_PAGES_HOSTNAME}${REPO_BASE}/dist/${page}/?room=BLUECAT#join`]);
+  checks.push([`${page} source redirects without trailing slash`, runBootstrap(page, { pathname:`${REPO_BASE}/${page}`, search:'?room=BLUECAT' }) === `https://${GH_PAGES_HOSTNAME}${REPO_BASE}/dist/${page}/?room=BLUECAT`]);
+  checks.push([`${page} source redirects with repeated slashes`, runBootstrap(page, { pathname:`//${REPO_BASE_NO_SLASH}///${page}//` }) === `https://${GH_PAGES_HOSTNAME}${REPO_BASE}/dist/${page}/`]);
+  checks.push([`${page} source does not redirect local dev`, runBootstrap(page, { hostname:'localhost', pathname:`/${page}/` }) === null]);
+  checks.push([`${page} dist path does not loop`, runBootstrap(page, { pathname:`${REPO_BASE}/dist/${page}/` }) === null]);
+}
 const distHtml = ['dist/host/index.html','dist/player/index.html','dist/receiver/index.html','dist/debug/index.html'].map(f=>fs.existsSync(f)?fs.readFileSync(f,'utf8'):'').join('\n');
 checks.push(['dist never serves TypeScript module scripts', !distHtml.includes('src/main.ts') && !distHtml.includes('.ts"')]);
 let failed = 0;
