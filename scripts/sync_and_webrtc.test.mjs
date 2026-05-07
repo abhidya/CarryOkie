@@ -12,7 +12,7 @@ class FakePc extends EventTarget {
   async createAnswer() { return { type:'answer', sdp:'v=0\r\na=rtpmap:111 opus/48000/2\r\na=candidate:2 1 udp 1 10.0.0.2 9 typ host\r\n' }; }
   async setLocalDescription(desc) { this.localDescription = desc; this.iceGatheringState = 'complete'; this.signalingState = 'have-local-description'; this.dispatchEvent(new Event('icegatheringstatechange')); }
   async setRemoteDescription(desc) { this.remoteDescription = desc; this.signalingState = 'stable'; }
-  addTrack(track, stream) { this.addedTrack = { track, stream }; }
+  addTrack(track, stream) { this.addedTracks = this.addedTracks || []; this.addedTracks.push({ track, stream }); }
 }
 
 test('clock-offset formula matches design.md ping/pong math', () => {
@@ -55,6 +55,37 @@ test('manual WebRTC offer-answer flow uses complete ICE payloads', async () => {
   } finally {
     globalThis.RTCPeerConnection = old;
   }
+});
+
+
+test('local mic stream is added to all current and future peer connections', () => {
+  const old = globalThis.RTCPeerConnection;
+  globalThis.RTCPeerConnection = FakePc;
+  try {
+    const node = new PeerNode('singer');
+    const first = node.makeConnection('host', { initiator:true });
+    const track = { kind:'audio', id:'mic-track', enabled:true };
+    const stream = { id:'mic-stream', getTracks(){ return [track]; } };
+    node.addLocalStream(stream);
+    assert.equal(first.pc.addedTracks.length, 1);
+    assert.equal(first.pc.addedTracks[0].track, track);
+
+    const later = node.makeConnection('listener', { initiator:true });
+    assert.equal(later.pc.addedTracks.length, 1, 'future peers should receive already-published mic tracks');
+    assert.equal(later.pc.addedTracks[0].stream, stream);
+  } finally {
+    globalThis.RTCPeerConnection = old;
+  }
+});
+
+test('mic enabled notification broadcasts to every open DataChannel', () => {
+  const node = new PeerNode('singer');
+  const sent = [];
+  node.peers.set('host', { dc:{ readyState:'open', send:data => sent.push(['host', JSON.parse(data)]) } });
+  node.peers.set('listener', { dc:{ readyState:'open', send:data => sent.push(['listener', JSON.parse(data)]) } });
+  node.broadcast({ type:RPC.MIC_ENABLED, playerId:'p2' });
+  assert.deepEqual(sent.map(([id]) => id), ['host', 'listener']);
+  assert.equal(sent.every(([, msg]) => msg.type === RPC.MIC_ENABLED && msg.playerId === 'p2'), true);
 });
 
 test('failed ICE emits no-TURN network guidance', () => {

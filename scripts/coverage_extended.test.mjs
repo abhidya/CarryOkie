@@ -41,6 +41,35 @@ test('relay helper rejects unsupported relay types', () => {
   assert.throws(() => node.relaySignal('ROOM_HELLO','a','b',{}), /Unsupported relay type/);
 });
 
+
+test('phone mic input requests echo-cancelled audio and mute toggles tracks', async () => {
+  const oldAudioContext = globalThis.AudioContext;
+  const oldNavigator = globalThis.navigator;
+  const calls = [];
+  const track = { enabled:true };
+  const stream = { getAudioTracks(){ return [track]; } };
+  globalThis.AudioContext = class {
+    constructor(){ this.destination = {}; }
+    createGain(){ return { gain:{ value:0 }, connect(){} }; }
+    createMediaStreamSource(){ return { connect(){} }; }
+    createScriptProcessor(){ return { connect(){}, onaudioprocess:null }; }
+  };
+  Object.defineProperty(globalThis, 'navigator', { configurable:true, value:{ mediaDevices:{ async getUserMedia(constraints){ calls.push(constraints); return stream; } } } });
+  try {
+    const audio = new PhoneAudio(() => {});
+    const got = await audio.requestMic({ headphonesConfirmed:true });
+    assert.equal(got, stream);
+    assert.deepEqual(calls[0], { audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true }, video:false });
+    audio.setMicMuted(true);
+    assert.equal(track.enabled, false);
+    audio.setMicMuted(false);
+    assert.equal(track.enabled, true);
+  } finally {
+    globalThis.AudioContext = oldAudioContext;
+    Object.defineProperty(globalThis, 'navigator', { configurable:true, value:oldNavigator });
+  }
+});
+
 test('mic publishing requires headphones or push-to-sing before getUserMedia', async () => {
   const audio = new PhoneAudio(() => {});
   await assert.rejects(() => audio.requestMic(), /TV backing track bleed risk/);

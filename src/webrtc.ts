@@ -25,8 +25,9 @@ export class PeerNode extends EventTarget {
   localPeerId: string;
   peers: Map<string, PeerEdge>;
   clockOffsetMs: number;
+  localStreams: MediaStream[];
 
-  constructor(localPeerId: string) { super(); this.localPeerId = localPeerId; this.peers = new Map(); this.clockOffsetMs = 0; }
+  constructor(localPeerId: string) { super(); this.localPeerId = localPeerId; this.peers = new Map(); this.clockOffsetMs = 0; this.localStreams = []; }
   makeConnection(remotePeerId: string, {manual = true, initiator = false}: {manual?: boolean; initiator?: boolean} = {}): PeerEdge {
     assertWebRtcSupported();
     const pc = new RTCPeerConnection(rtcConfig);
@@ -36,6 +37,7 @@ export class PeerNode extends EventTarget {
     pc.ontrack = ev => { this.emit('track', {remotePeerId, stream:ev.streams[0], track:ev.track}); if(ev.streams[0]) this.emit('duet', {remotePeerId, stream:ev.streams[0]}); };
     pc.ondatachannel = ev => this.attachChannel(edge, ev.channel);
     if (initiator) this.attachChannel(edge, pc.createDataChannel('room-rpc', {ordered:true}));
+    this.localStreams.forEach(stream => stream.getTracks().forEach(t => pc.addTrack(t, stream)));
     this.peers.set(remotePeerId, edge); return edge;
   }
   attachChannel(edge: PeerEdge, dc: RTCDataChannel): void {
@@ -83,7 +85,7 @@ export class PeerNode extends EventTarget {
     if (!edge) throw new Error('No pending offer for this answer.');
     await edge.pc.setRemoteDescription(payload.description as RTCSessionDescriptionInit); return payload;
   }
-  addLocalStream(stream: MediaStream): void { for (const edge of this.peers.values()) stream.getTracks().forEach(t => edge.pc.addTrack(t, stream)); }
+  addLocalStream(stream: MediaStream): void { if (!this.localStreams.includes(stream)) this.localStreams.push(stream); for (const edge of this.peers.values()) stream.getTracks().forEach(t => edge.pc.addTrack(t, stream)); }
   emit(type: string, detail: object): void { this.dispatchEvent(new CustomEvent(type, {detail})); }
 }
 export function waitForIceComplete(pc: RTCPeerConnection, timeoutMs = 12000): Promise<void> {
