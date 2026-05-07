@@ -1,5 +1,24 @@
 import fs from 'node:fs';
 const checks = [];
+function loadBootstrap(page){
+  const html = fs.readFileSync(`${page}/index.html`, 'utf8');
+  const match = html.match(/<script>(.*?)<\/script>/);
+  return match?.[1] || '';
+}
+function runBootstrap(page, { hostname='abhidya.github.io', pathname=`/CarryOkie/${page}/`, search='', hash='' } = {}){
+  const script = loadBootstrap(page);
+  let redirectedTo = null;
+  const location = {
+    hostname,
+    pathname,
+    search,
+    hash,
+    origin: `https://${hostname}`,
+    replace(url){ redirectedTo = url; },
+  };
+  new Function('location', script)(location);
+  return redirectedTo;
+}
 const webrtc = fs.readFileSync('src/webrtc.ts','utf8');
 checks.push(['public STUN configured', webrtc.includes('stun:stun.l.google.com:19302')]);
 checks.push(['manual waits complete ICE', webrtc.includes('waitForIceComplete') && webrtc.includes('iceGatheringState') && webrtc.includes('complete')]);
@@ -54,8 +73,9 @@ const protectedCatalog = JSON.parse(fs.readFileSync('public/protected/catalog.js
 checks.push(['protected catalog has songs', protectedCatalog.songs?.length > 0]);
 checks.push(['public songs folder removed', !fs.existsSync('public/songs')]);
 for (const page of ['host', 'player', 'receiver', 'debug']) {
-  const sourceHtml = fs.readFileSync(`${page}/index.html`, 'utf8');
-  checks.push([`${page} source redirects GitHub Pages traffic to dist`, sourceHtml.includes("host.endsWith('github.io')") && sourceHtml.includes("parts.includes('dist')") && sourceHtml.includes("'dist',page,''].join('/')")]);
+  checks.push([`${page} source redirects GitHub Pages traffic to dist`, runBootstrap(page, { pathname:`/CarryOkie/${page}/`, search:'?room=BLUECAT', hash:'#join' }) === `https://abhidya.github.io/CarryOkie/dist/${page}/?room=BLUECAT#join`]);
+  checks.push([`${page} source does not redirect local dev`, runBootstrap(page, { hostname:'localhost', pathname:`/${page}/` }) === null]);
+  checks.push([`${page} dist path does not loop`, runBootstrap(page, { pathname:`/CarryOkie/dist/${page}/` }) === null]);
 }
 const distHtml = ['dist/host/index.html','dist/player/index.html','dist/receiver/index.html','dist/debug/index.html'].map(f=>fs.existsSync(f)?fs.readFileSync(f,'utf8'):'').join('\n');
 checks.push(['dist never serves TypeScript module scripts', !distHtml.includes('src/main.ts') && !distHtml.includes('.ts"')]);
