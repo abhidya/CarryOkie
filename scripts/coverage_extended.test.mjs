@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { QR_MAX_TEXT_BYTES, qrMatrix, qrSvg } from '../src/qr.ts';
-import { encodeSignalPayload } from '../src/signaling.ts';
+import { encodeSignalPayload, renderPayloadCard, scanQrInto } from '../src/signaling.ts';
 import { PeerNode, RPC } from '../src/webrtc.ts';
 import { PhoneAudio } from '../src/audio.ts';
 
@@ -130,6 +130,167 @@ test('phone mic publishes filtered WebAudio stream and PeerNode routes filtered 
     Object.defineProperty(globalThis, 'navigator', { configurable:true, value:oldNavigator });
   }
 });
+
+
+test('phone backing monitor creates, reuses, retargets, and pauses audio element', async () => {
+  const oldAudioContext = globalThis.AudioContext;
+  const oldAudio = globalThis.Audio;
+  const played = [];
+  const paused = [];
+  const connected = [];
+  globalThis.Audio = class {
+    constructor(src){ this.src = src; this.loop = null; this.crossOrigin = null; played.push(['new', src]); }
+    async play(){ played.push(['play', this.src]); }
+    pause(){ paused.push(this.src); }
+  };
+  globalThis.AudioContext = class {
+    constructor(){ this.destination = { name:'dest' }; }
+    createGain(){ return { name:'gain', gain:{ value:0 }, connect(target){ connected.push(['gain', target?.name || 'dest']); } }; }
+    createMediaStreamSource(){ return { connect(){} }; }
+    createMediaElementSource(audio){ return { name:'mediaSource', connect(target){ connected.push([audio.src, target?.name || 'target']); } }; }
+  };
+  try {
+    const audio = new PhoneAudio(() => {});
+    await assert.rejects(() => audio.startBackingMonitor('/a.mp4'), /Use headphones/);
+    const first = await audio.startBackingMonitor('/a.mp4', { headphonesConfirmed:true });
+    assert.equal(first.src, '/a.mp4');
+    assert.equal(first.crossOrigin, 'anonymous');
+    assert.equal(audio.backingGain.gain.value, 0.35);
+    const second = await audio.startBackingMonitor('/b.mp4', { headphonesConfirmed:true });
+    assert.equal(second, first);
+    assert.equal(first.src, '/b.mp4');
+    audio.pauseBackingMonitor();
+    assert.deepEqual(paused, ['/b.mp4']);
+    assert.ok(connected.some(([from]) => from === '/a.mp4'));
+  } finally {
+    globalThis.AudioContext = oldAudioContext;
+    globalThis.Audio = oldAudio;
+  }
+});
+
+test('wake lock uses native API, video fallback, and cleanup paths', async () => {
+  const oldNavigator = globalThis.navigator;
+  const oldDocument = globalThis.document;
+  const released = [];
+  Object.defineProperty(globalThis, 'navigator', { configurable:true, value:{ wakeLock:{ async request(kind){ return { kind, release(){ released.push(kind); } }; } } } });
+  try {
+    const audio = new PhoneAudio(() => {});
+    assert.equal(await audio.tryWakeLock(), 'active');
+    audio.stopWakeLock();
+    assert.deepEqual(released, ['screen']);
+  } finally {
+    Object.defineProperty(globalThis, 'navigator', { configurable:true, value:oldNavigator });
+  }
+  const video = { loop:false, muted:false, style:{ cssText:'' }, src:'', async play(){}, pause(){ this.paused = true; }, remove(){ this.removed = true; } };
+  Object.defineProperty(globalThis, 'navigator', { configurable:true, value:{} });
+  globalThis.document = { createElement(tag){ assert.equal(tag, 'video'); return video; }, body:{ appendChild(el){ assert.equal(el, video); } } };
+  try {
+    const audio = new PhoneAudio(() => {});
+    assert.equal(await audio.tryWakeLock(), 'video-fallback');
+    assert.equal(video.loop, true);
+    assert.equal(video.muted, true);
+    audio.stopWakeLock();
+    assert.equal(video.paused, true);
+    assert.equal(video.removed, true);
+  } finally {
+    Object.defineProperty(globalThis, 'navigator', { configurable:true, value:oldNavigator });
+    globalThis.document = oldDocument;
+  }
+});
+
+test('noise gate mutes low RMS and passes loud input', async () => {
+  const oldAudioContext = globalThis.AudioContext;
+  const oldNavigator = globalThis.navigator;
+  const logs = [];
+  const track = { enabled:true };
+  const stream = { getAudioTracks(){ return [track]; }, getTracks(){ return [track]; } };
+  let processor;
+  globalThis.AudioContext = class {
+    constructor(){ this.destination = {}; }
+    createGain(){ return { gain:{ value:0 }, connect(){} }; }
+    createMediaStreamSource(){ return { connect(){} }; }
+    createScriptProcessor(){ processor = { connect(){}, onaudioprocess:null }; return processor; }
+  };
+  Object.defineProperty(globalThis, 'navigator', { configurable:true, value:{ mediaDevices:{ async getUserMedia(){ return stream; } } } });
+  try {
+    const audio = new PhoneAudio(m => logs.push(m));
+    audio.setGateEnabled(true, 0.5);
+    await audio.requestMic({ headphonesConfirmed:true });
+    assert.ok(processor.onaudioprocess);
+    const lowOut = [9,9,9];
+    processor.onaudioprocess({ inputBuffer:{ getChannelData(){ return [0.01,0.01,0.01]; } }, outputBuffer:{ getChannelData(){ return lowOut; } } });
+    assert.deepEqual(lowOut, [0,0,0]);
+    const loudOut = [0,0,0];
+    processor.onaudioprocess({ inputBuffer:{ getChannelData(){ return [1,0.5,-1]; } }, outputBuffer:{ getChannelData(){ return loudOut; } } });
+    assert.deepEqual(loudOut, [1,0.5,-1]);
+    assert.match(logs.join('\n'), /Noise gate enabled/);
+  } finally {
+    globalThis.AudioContext = oldAudioContext;
+    Object.defineProperty(globalThis, 'navigator', { configurable:true, value:oldNavigator });
+  }
+});
+
+test('duet monitoring connects and disconnects peer-specific gain', async () => {
+  const oldAudioContext = globalThis.AudioContext;
+  const links = [];
+  const disconnects = [];
+  globalThis.AudioContext = class {
+    constructor(){ this.destination = { name:'dest' }; }
+    createGain(){ return { name:'gain', gain:{ value:0 }, connect(target){ links.push(target?.name || 'target'); }, disconnect(){ disconnects.push('gain'); } }; }
+    createMediaStreamSource(){ return { connect(target){ links.push(target?.name || 'duetGain'); } }; }
+  };
+  try {
+    const audio = new PhoneAudio(() => {});
+    await audio.init();
+    audio.enableDuetMonitoring('p2', true);
+    assert.equal(audio.duetMonitorGains.has('p2'), true);
+    audio.connectDuetStream({}, 'p2');
+    audio.enableDuetMonitoring('p2', false);
+    assert.equal(audio.duetMonitorGains.has('p2'), false);
+    assert.deepEqual(disconnects, ['gain']);
+  } finally { globalThis.AudioContext = oldAudioContext; }
+});
+
+test('payload card buttons navigate QR chunks and copy/share link', async () => {
+  const oldNavigator = globalThis.navigator;
+  const copied = [];
+  const shared = [];
+  Object.defineProperty(globalThis, 'navigator', { configurable:true, value:{ clipboard:{ writeText(text){ copied.push(text); } }, async share(payload){ shared.push(payload); } } });
+  try {
+    const elements = new Map();
+    const target = {
+      set innerHTML(_html){ for (const key of ['[data-single-qr]','[data-qr-count]','[data-prev]','[data-next]','[data-copy]','[data-share]']) elements.set(key, { innerHTML:'', textContent:'', disabled:false, onclick:null }); },
+      get innerHTML(){ return ''; },
+      querySelector(selector){ return elements.get(selector) || null; }
+    };
+    renderPayloadCard(target, { url:'https://x/#signal=abc', token:'abc', chunks:['one','two'] }, 'Test payload');
+    assert.equal(target.querySelector('[data-qr-count]').textContent, 'QR 1/2');
+    target.querySelector('[data-next]').onclick();
+    assert.equal(target.querySelector('[data-qr-count]').textContent, 'QR 2/2');
+    target.querySelector('[data-prev]').onclick();
+    assert.equal(target.querySelector('[data-qr-count]').textContent, 'QR 1/2');
+    await target.querySelector('[data-copy]').onclick();
+    await target.querySelector('[data-share]').onclick();
+    assert.deepEqual(copied, ['https://x/#signal=abc']);
+    assert.equal(shared[0].text, 'https://x/#signal=abc');
+  } finally { Object.defineProperty(globalThis, 'navigator', { configurable:true, value:oldNavigator }); }
+});
+
+test('QR scanner reports unsupported browser and insecure media errors', async () => {
+  const oldNavigator = globalThis.navigator;
+  const oldDetector = globalThis.BarcodeDetector;
+  try {
+    delete globalThis.BarcodeDetector;
+    await assert.rejects(() => scanQrInto({}), /BarcodeDetector/);
+    globalThis.BarcodeDetector = class {};
+    Object.defineProperty(globalThis, 'navigator', { configurable:true, value:{} });
+    await assert.rejects(() => scanQrInto({}), /camera permission and HTTPS/);
+  } finally {
+    if (oldDetector) globalThis.BarcodeDetector = oldDetector; else delete globalThis.BarcodeDetector;
+    Object.defineProperty(globalThis, 'navigator', { configurable:true, value:oldNavigator });
+  }
+});
+
 
 test('mic publishing requires headphones or push-to-sing before getUserMedia', async () => {
   const audio = new PhoneAudio(() => {});
