@@ -53,8 +53,9 @@ checks.push(['host handles PLAYER_LEFT on disconnect', app.includes('handlePlaye
 checks.push(['participant locks room on host disconnect', app.includes('handlePeerClosed') && app.includes('lockHostLost(room)') && app.includes('isHostEdge')]);
 checks.push(['host tracks MIC_ENABLED from players', app.includes('msg.type===RPC.MIC_ENABLED') && app.includes('micState')]);
 checks.push(['host has reject/remove queue controls', app.includes('rejectQueue') && app.includes('removeQueueItem') && app.includes('class="rejectItem"')]);
-checks.push(['phones can see and self-update titled queue', app.includes("<h2>Queue</h2>${queueHtml(room,'phone')}") && app.includes('QUEUE_UPDATE_REQUEST') && app.includes('Add me as singer') && app.includes('songTitle(q.songId)')]);
+checks.push(['phones can see and self-update titled queue', app.includes("queueHtml(room,'phone')") && app.includes('QUEUE_UPDATE_REQUEST') && app.includes('Add me as singer') && app.includes('songTitle(q.songId)')]);
 checks.push(['phone mic exposes voice filter presets', app.includes('id="voicePreset"') && app.includes('Autotune-style polish') && fs.readFileSync('src/audio.ts','utf8').includes('setVoicePreset') && fs.readFileSync('src/audio.ts','utf8').includes('DynamicsCompressor')]);
+checks.push(['phone UI is mobile-first and touch sized', app.includes('phone-screen') && app.includes('phone-hero') && fs.readFileSync('src/styles.css','utf8').includes('iPhone') === false && fs.readFileSync('src/styles.css','utf8').includes('min-height:var(--tap)') && fs.readFileSync('src/styles.css','utf8').includes('@media (max-width: 520px)')]);
 checks.push(['player has reconnect UI', app.includes('reconnectPair') && app.includes('forgetRoom')]);
 checks.push(['debug page exposes connection diagnostics', app.includes('Connection diagnostics') && app.includes('dataChannelPeerIds') && app.includes('clockOffsetMs') && app.includes('micPermission')]);
 const cast = fs.readFileSync('src/cast.ts','utf8');
