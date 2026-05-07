@@ -1,9 +1,10 @@
 import fs from 'node:fs';
+import vm from 'node:vm';
 const checks = [];
 const REPO_BASE = '/CarryOkie';
 function loadBootstrap(page){
   const html = fs.readFileSync(`${page}/index.html`, 'utf8');
-  const match = html.match(/<script>([^<]*location\.replace[\s\S]*?)<\/script>/);
+  const match = html.match(/<script data-gh-pages-bootstrap>([\s\S]*?)<\/script>/);
   return match?.[1] || '';
 }
 function runBootstrap(page, { hostname='abhidya.github.io', pathname=`${REPO_BASE}/${page}/`, search='', hash='' } = {}){
@@ -17,7 +18,7 @@ function runBootstrap(page, { hostname='abhidya.github.io', pathname=`${REPO_BAS
     origin: `https://${hostname}`,
     replace(url){ redirectedTo = url; },
   };
-  new Function('location', script)(location);
+  vm.runInNewContext(script, { location });
   return redirectedTo;
 }
 const webrtc = fs.readFileSync('src/webrtc.ts','utf8');
