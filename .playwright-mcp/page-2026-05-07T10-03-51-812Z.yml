@@ -1,0 +1,18 @@
+- main [ref=e3]:
+  - heading "Debug" [level=1] [ref=e5]
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - heading "Local state" [level=2] [ref=e8]
+      - button "Refresh" [ref=e9] [cursor=pointer]
+      - generic [ref=e10]: "{ \"room\": { \"roomId\": \"9b227d8d-16b5-4f2c-97f5-d3e45689ae63\", \"roomCode\": \"MINTKITE\", \"hostPeerId\": \"6bcf8ef6-2552-453c-b471-8556139cb27f\", \"hostPlayerId\": \"b8d65d6a-4027-48e3-9ce5-4943f69955f0\", \"createdAt\": 1778148220285, \"playerCount\": 1, \"maxPlayers\": 5, \"currentSongId\": \"song_002\", \"currentQueueItemId\": null, \"playbackState\": { \"songId\": \"song_002\", \"status\": \"idle\", \"startedAtHostMs\": null, \"pausedAtSongMs\": 0, \"seekOffsetMs\": 0, \"playbackRate\": 1, \"lastUpdatedAtHostMs\": 1778148220285, \"tvMediaTimeMs\": 0, \"tvMediaTimeSampledAtHostMs\": null, \"syncDegraded\": true }, \"players\": [ { \"peerId\": \"6bcf8ef6-2552-453c-b471-8556139cb27f\", \"playerId\": \"b8d65d6a-4027-48e3-9ce5-4943f69955f0\", \"playerNumber\": 1, \"displayName\": \"Host\", \"role\": \"host\", \"isHost\": true, \"isSingerForCurrentSong\": false, \"micState\": { \"permissionState\": \"prompt\", \"enabled\": false, \"muted\": true, \"publishing\": false, \"receivingPeerIds\": [], \"remoteGain\": 1, \"localMonitorGain\": 0, \"backingGain\": 0, \"masterGain\": 1 }, \"monitorState\": { \"headphonesConfirmed\": false, \"phoneSpeakerOutputAck\": false, \"keepAwake\": \"unknown\" }, \"connectionState\": \"new\", \"lastSeenAt\": 1778148220285 } ], \"queue\": [], \"castState\": { \"available\": false, \"connected\": false, \"receiverReady\": false, \"currentMediaLoaded\": false, \"lastCommandAt\": null, \"lastReceiverAckAt\": null, \"error\": null }, \"meshState\": { \"edges\": {}, \"failures\": [] }, \"limits\": { \"maxPlayers\": 5, \"maxSingers\": 5 } }, \"player\": { \"peerId\": \"6bcf8ef6-2552-453c-b471-8556139cb27f\", \"playerId\": \"b8d65d6a-4027-48e3-9ce5-4943f69955f0\", \"playerNumber\": 1, \"displayName\": \"Host\", \"role\": \"host\", \"isHost\": true, \"isSingerForCurrentSong\": false, \"micState\": { \"permissionState\": \"prompt\", \"enabled\": false, \"muted\": true, \"publishing\": false, \"receivingPeerIds\": [], \"remoteGain\": 1, \"localMonitorGain\": 0, \"backingGain\": 0, \"masterGain\": 1 }, \"monitorState\": { \"headphonesConfirmed\": false, \"phoneSpeakerOutputAck\": false, \"keepAwake\": \"unknown\" }, \"connectionState\": \"new\", \"lastSeenAt\": 1778148220285 } }"
+      - heading "Connection diagnostics" [level=2] [ref=e11]
+      - generic [ref=e12]: "{ \"peerId\": \"6bcf8ef6-2552-453c-b471-8556139cb27f\", \"hostPeerId\": \"6bcf8ef6-2552-453c-b471-8556139cb27f\", \"dataChannelPeerIds\": [], \"clockOffsetMs\": null, \"castState\": { \"available\": false, \"connected\": false, \"receiverReady\": false, \"currentMediaLoaded\": false, \"lastCommandAt\": null, \"lastReceiverAckAt\": null, \"error\": null }, \"micPermission\": \"prompt\" }"
+      - paragraph [ref=e13]: ICE failures mean network may require TURN/different Wi-Fi. Strict MVP uses STUN only.
+      - paragraph [ref=e14]: Keep phone unlocked and tab open; mobile browsers may suspend audio/WebRTC.
+    - generic [ref=e15]:
+      - heading "Manual offer/answer" [level=2] [ref=e16]
+      - paragraph [ref=e17]: Use these for manual pairing when WebRTC signaling fails.
+      - button "Create offer" [ref=e18] [cursor=pointer]
+      - textbox "Paste answer/link/chunks" [ref=e19]
+      - button "Import answer" [ref=e20] [cursor=pointer]
+  - heading "Log" [level=2] [ref=e22]

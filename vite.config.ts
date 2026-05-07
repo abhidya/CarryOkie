@@ -1,6 +1,10 @@
 import { defineConfig } from 'vite';
 
+const allowedHosts = ['abdulrehmans-macbook-pro.local'];
+
 export default defineConfig({
+  base: './',
+  preview: { host: '0.0.0.0', port: 4174, strictPort: true, allowedHosts },
   root: '.',
   build: {
     outDir: 'dist',
@@ -21,7 +25,9 @@ export default defineConfig({
     },
   },
   server: {
-    port: 4173,
-    host: '127.0.0.1',
+    port: 4174,
+    strictPort: true,
+    host: '0.0.0.0',
+    allowedHosts,
   },
 });

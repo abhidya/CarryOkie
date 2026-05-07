@@ -1,0 +1,4 @@
+[     170ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:4173/favicon.ico:0
+[     214ms] ReferenceError: MAX_SINGERS is not defined
+    at Y (http://localhost:4173/assets/main2.js:2:23345)
+    at Je (http://localhost:4173/assets/main2.js:2:23132)

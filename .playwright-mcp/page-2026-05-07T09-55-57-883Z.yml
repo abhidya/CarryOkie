@@ -1,0 +1,45 @@
+- main [ref=e3]:
+  - heading "Host Controller" [level=1] [ref=e5]
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - heading "Room WAVEMOON" [level=2] [ref=e9]
+      - paragraph [ref=e10]: Players 1/5. Active singers max 5.
+      - paragraph [ref=e11]:
+        - link "Player join link" [ref=e12] [cursor=pointer]:
+          - /url: ../player/?room=WAVEMOON
+      - button "New room" [ref=e13] [cursor=pointer]
+    - generic [ref=e14]:
+      - heading "Cast" [level=2] [ref=e15]
+      - paragraph [ref=e16]: "{\"available\":false,\"connected\":false,\"receiverReady\":false,\"currentMediaLoaded\":false,\"defaultMediaReceiver\":true,\"error\":null}"
+      - generic [ref=e17]:
+        - text: Receiver app ID
+        - textbox "Receiver app ID" [ref=e18]: CC1AD845
+      - button "Init Cast" [ref=e19] [cursor=pointer]
+      - button "Start Cast" [ref=e20] [cursor=pointer]
+      - button "Load TV media" [ref=e21] [cursor=pointer]
+      - button "Play/Pause" [ref=e22] [cursor=pointer]
+      - button "Pause" [ref=e23] [cursor=pointer]
+      - spinbutton [ref=e24]: "0"
+      - button "Seek seconds" [ref=e25] [cursor=pointer]
+      - button "Preview locally" [ref=e26] [cursor=pointer]
+    - generic [ref=e28]:
+      - heading "Manual pairing" [level=2] [ref=e29]
+      - textbox "Paste player offer/link/chunks" [ref=e30]
+      - button "Create answer after complete ICE" [ref=e31] [cursor=pointer]
+    - generic [ref=e32]:
+      - heading "Queue" [level=2] [ref=e33]
+      - list
+      - button "Accept all" [ref=e34] [cursor=pointer]
+      - button "Start next queued" [ref=e35] [cursor=pointer]
+    - generic [ref=e36]:
+      - heading "Singers" [level=2] [ref=e37]
+      - generic [ref=e38]:
+        - checkbox "#1 Host" [ref=e39]
+        - text: "#1 Host"
+      - 'button "Mute #1" [ref=e40] [cursor=pointer]'
+      - button "Set singers" [ref=e41] [cursor=pointer]
+    - generic [ref=e42]:
+      - heading "Playback sync" [level=2] [ref=e43]
+      - button "Broadcast TV media sample" [ref=e44] [cursor=pointer]
+      - generic [ref=e45]: "{ \"songId\": \"song_002\", \"status\": \"idle\", \"startedAtHostMs\": null, \"pausedAtSongMs\": 0, \"seekOffsetMs\": 0, \"playbackRate\": 1, \"lastUpdatedAtHostMs\": 1778147669786, \"tvMediaTimeMs\": 0, \"tvMediaTimeSampledAtHostMs\": null, \"syncDegraded\": true }"
+  - heading "Log" [level=2] [ref=e47]

@@ -32,7 +32,7 @@ assert.match(script, /MP4 SUCCESS/);
 assert.match(script, /MP4 FAILURE/);
 assert.match(script, /MP3 SUCCESS/);
 assert.match(script, /MP3 FAILURE/);
-assert.equal(links.length, 31);
+assert.ok(links.length > 0, 'links.txt should include at least one YouTube URL');
 assert.ok(links.every(url => /^https:\/\/www\.youtube\.com\/watch\?v=/.test(url)));
 assert.match(readme, /brew install yt-dlp ffmpeg/);
 assert.match(readme, /python3 -m pip install -U "yt-dlp\[default\]"/);

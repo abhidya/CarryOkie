@@ -32,6 +32,8 @@ await first.loadSong(song, room);
 assert.equal(requested, 1, 'loadSong should auto-request Cast session');
 assert.equal(fakeSession.loaded.length, 1, 'media should load');
 assert.equal(fakeSession.loaded[0].media.contentType, 'video/mp4');
+assert.equal(fakeSession.loaded[0].autoplay, true, 'Cast load should autoplay backing/lyric video on TV');
+assert.equal(first.remotePlayer.isPaused, false, 'loadSong should explicitly start TV playback after loading');
 assert.equal(events.length, 0, 'Default Media Receiver should not receive unsupported CarryOkie namespace messages');
 
 const second = new CastController('CC1AD845');

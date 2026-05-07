@@ -22,8 +22,8 @@ test('QR SVG renders locally with finder-like dark modules and no remote QR serv
 
 test('manual payload card includes QR rendering code path', () => {
   const signaling = fs.readFileSync('src/signaling.ts','utf8');
-  assert.match(signaling, /qrSvg\(chunk\)/);
-  assert.match(signaling, /Scan QR chunks in order/);
+  assert.match(signaling, /qrSvg\(encoded\.chunks\[index\]\)/);
+  assert.match(signaling, /One QR code is shown at a time/);
 });
 
 test('peer-assisted signaling relay forwards non-local relay messages', () => {

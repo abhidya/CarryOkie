@@ -17,6 +17,10 @@ interface PeerEdge {
   initiator: boolean;
 }
 
+export function assertWebRtcSupported(): void {
+  if (typeof RTCPeerConnection === 'undefined') throw new Error('WebRTC is unavailable in this browser/context. On phones, open the GitHub Pages HTTPS URL or serve local testing over HTTPS; local HTTP hostnames may block offer creation.');
+}
+
 export class PeerNode extends EventTarget {
   localPeerId: string;
   peers: Map<string, PeerEdge>;
@@ -24,6 +28,7 @@ export class PeerNode extends EventTarget {
 
   constructor(localPeerId: string) { super(); this.localPeerId = localPeerId; this.peers = new Map(); this.clockOffsetMs = 0; }
   makeConnection(remotePeerId: string, {manual = true, initiator = false}: {manual?: boolean; initiator?: boolean} = {}): PeerEdge {
+    assertWebRtcSupported();
     const pc = new RTCPeerConnection(rtcConfig);
     const edge: PeerEdge = { remotePeerId, pc, dc:null, streams:[], manual, initiator };
     pc.oniceconnectionstatechange = () => this.emit('ice', {remotePeerId, state:pc.iceConnectionState});

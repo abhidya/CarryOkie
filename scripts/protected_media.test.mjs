@@ -8,8 +8,10 @@ const key = Buffer.from(keyText.match(/MEDIA_KEY_B64\s*:\s*string\s*=\s*['"]([^'
 assert.equal(key.length, 32);
 
 const catalog = JSON.parse(fs.readFileSync('public/protected/catalog.json', 'utf8'));
-assert.ok(catalog.songs.length > 0, 'protected catalog imports downloads/mp4 files');
-assert.equal(catalog.songs.length, fs.readdirSync('downloads/mp4').filter(f => f.endsWith('.mp4')).length);
+assert.ok(catalog.songs.length > 0, 'protected catalog imports encrypted media');
+if (fs.existsSync('downloads/mp4')) {
+  assert.equal(catalog.songs.length, fs.readdirSync('downloads/mp4').filter(f => f.endsWith('.mp4')).length);
+}
 
 for (const song of catalog.songs) {
   assert.match(song.songId, /^(yt_[A-Za-z0-9_-]+|song_00[12])$/);
@@ -42,6 +44,8 @@ assert.equal(plain.subarray(4, 8).toString('utf8'), 'ftyp', 'decrypted media sho
 
 const protectedMedia = fs.readFileSync('src/protectedMedia.ts', 'utf8');
 assert.match(protectedMedia, /crypto\.subtle\.decrypt/);
+assert.match(protectedMedia, /hasWebCryptoAes/);
+assert.match(protectedMedia, /defaultCastMediaUrl/);
 assert.match(protectedMedia, /MEDIA_KEY_B64/);
 const app = fs.readFileSync('src/app.ts', 'utf8');
 assert.match(app, /loadProtectedCatalog/);

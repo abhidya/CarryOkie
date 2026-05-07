@@ -91,7 +91,7 @@ export interface Room {
 }
 
 export function uuid(): string {
-  return crypto.randomUUID ? crypto.randomUUID() : URL.createObjectURL(new Blob()).split('/').pop()!;
+  return globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : URL.createObjectURL(new Blob()).split('/').pop()!;
 }
 export function nowMs(): number { return Date.now(); }
 export function makeRoomCode(): string {

@@ -70,6 +70,18 @@ export const CAST_NAMESPACE = 'urn:x-cast:com.carryokie.room';
 export const DEFAULT_MEDIA_RECEIVER_APP_ID = 'CC1AD845';
 export const CAST_TYPES = ['CAST_LOAD_SONG','CAST_PLAY','CAST_PAUSE','CAST_SEEK','CAST_STOP','CAST_SET_SINGERS','CAST_UPDATE_QUEUE_PREVIEW','CAST_SHOW_JOIN_QR','CAST_SYNC_PLAYBACK_STATE','CAST_SHOW_ERROR'];
 
+function castOriginOverride(): string | null {
+  try {
+    const params = new URLSearchParams(location.search);
+    return params.get('castOrigin') || localStorage.getItem('carryokie.castOrigin');
+  } catch { return null; }
+}
+function rewriteCastUrlForReceiver(url: string): string {
+  const origin = castOriginOverride();
+  if (!origin) return url;
+  try { const u = new URL(url, location.href); return new URL(u.pathname + u.search + u.hash, origin).toString(); } catch { return url; }
+}
+
 export class CastController extends EventTarget {
   appId: string;
   available = false;
@@ -82,8 +94,15 @@ export class CastController extends EventTarget {
   constructor(appId = DEFAULT_MEDIA_RECEIVER_APP_ID) { super(); this.appId = appId; }
   get usesDefaultMediaReceiver(): boolean { return this.appId === DEFAULT_MEDIA_RECEIVER_APP_ID; }
   async init(): Promise<void> {
-    (window as unknown as Record<string, unknown>).__onGCastApiAvailable = (ok: boolean) => { if (ok) this.configure(); else this.emit('error', { message: 'Cast Sender unavailable in this browser.' }); };
-    if (!document.querySelector('script[src*=cast_sender]')) { const s = document.createElement('script'); s.src = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1'; document.head.appendChild(s); }
+    if (globalThis.cast?.framework) { if (!this.available) this.configure(); return; }
+    return new Promise((resolve, reject) => {
+      const w = window as unknown as Record<string, unknown>;
+      w.__onGCastApiAvailable = (ok: boolean) => {
+        if (ok) { this.configure(); resolve(); }
+        else { const error = new Error('Cast Sender unavailable in this browser.'); this.emit('error', { message: error.message }); reject(error); }
+      };
+      if (!document.querySelector('script[src*=cast_sender]')) { const s = document.createElement('script'); s.src = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1'; document.head.appendChild(s); }
+    });
   }
   configure(): void {
     const context = cast.framework.CastContext.getInstance();
@@ -122,21 +141,23 @@ export class CastController extends EventTarget {
   }
   async loadSong(song: Song, room: Room): Promise<void> {
     await this.ensureSession();
-    const mediaUrl = this.usesDefaultMediaReceiver ? resolveDefaultCastMediaUrl(song) : await resolvePlayableMediaUrl(song);
-    if (!mediaUrl) throw new Error(this.usesDefaultMediaReceiver ? 'Default Chromecast needs a clear cast export. Run npm run exportCastMedia.' : 'No playable media URL for song.');
+    const rawMediaUrl = this.usesDefaultMediaReceiver ? resolveDefaultCastMediaUrl(song) : await resolvePlayableMediaUrl(song);
+    if (!rawMediaUrl) throw new Error(this.usesDefaultMediaReceiver ? 'Default Chromecast needs a clear cast export. Run npm run exportCastMedia.' : 'No playable media URL for song.');
+    const mediaUrl = this.usesDefaultMediaReceiver ? rewriteCastUrlForReceiver(rawMediaUrl) : rawMediaUrl;
     const mediaInfo = new chrome.cast.media.MediaInfo(mediaUrl, resolveDefaultCastMediaType(song));
     mediaInfo.metadata = new chrome.cast.media.GenericMediaMetadata();
     mediaInfo.metadata.title = `${song.title} — ${song.artist}`;
     mediaInfo.customData = { roomCode: room.roomCode, note: 'TV plays backing/lyrics only; no live mic.' };
     const request = new chrome.cast.media.LoadRequest(mediaInfo);
-    request.autoplay = false;
+    request.autoplay = true;
     await this.session.loadMedia(request);
     this.currentMediaLoaded = true; this.emit('state', this.state());
     this.sendSafe('CAST_LOAD_SONG', { song, roomCode: room.roomCode });
+    await this.play();
     this.sampleMediaStatus();
   }
-  async play(): Promise<void> { await this.ensureSession(); this.controller?.playOrPause(); this.sendSafe('CAST_PLAY'); }
-  pause(): void { this.controller?.playOrPause(); this.sendSafe('CAST_PAUSE'); }
+  async play(): Promise<void> { await this.ensureSession(); if (!this.remotePlayer || this.remotePlayer.isPaused) this.controller?.playOrPause(); this.sendSafe('CAST_PLAY'); }
+  pause(): void { if (!this.remotePlayer || !this.remotePlayer.isPaused) this.controller?.playOrPause(); this.sendSafe('CAST_PAUSE'); }
   seek(seconds: number): void { if (this.remotePlayer) { this.remotePlayer.currentTime = seconds; this.controller?.seek(); } this.send('CAST_SEEK', { seconds }); }
   sampleMediaStatus(): void {
     if (!this.remotePlayer) return;
@@ -149,7 +170,7 @@ export class CastController extends EventTarget {
 
 export function receiverApp(root: HTMLElement): void {
   const state: { roomCode: string; song: Song | null; singers: Array<{ playerNumber: number | null; displayName: string }>; queue: Array<{ songId: string; singerNumbers: number[] }>; mediaTimeMs: number; lines: Array<{ startMs: number; endMs: number; text: string }> } = { roomCode: '------', song: null, singers: [], queue: [], mediaTimeMs: 0, lines: [] };
-  root.innerHTML = `<main class="tv"><section><h1>CarryOkie</h1><div class="room" id="room">------</div><div id="joinQr"></div><p>Scan/open /player. TV plays backing track/video only — no live mic routed here.</p><section id="singers"></section></section><section><video id="media" class="castMediaElement" controls playsinline poster="../public/songs/song_001/thumbnail.svg"></video><section id="lyrics" class="lyrics big"></section><section id="queue"></section></section></main>`;
+  root.innerHTML = `<main class="tv"><section><h1>CarryOkie</h1><div class="room" id="room">------</div><div id="joinQr"></div><p>Scan/open /player. TV plays backing track/video only — no live mic routed here.</p><section id="singers"></section></section><section><video id="media" class="castMediaElement" controls playsinline></video><section id="lyrics" class="lyrics big"></section><section id="queue"></section></section></main>`;
   const media = root.querySelector<HTMLVideoElement>('#media')!;
   function activeLine(): typeof state.lines[0] | undefined { const t = state.mediaTimeMs; return state.lines.findLast?.(l => t >= l.startMs) || state.lines.filter(l => t >= l.startMs).pop() || state.lines[0]; }
   function render(): void {
@@ -171,7 +192,7 @@ export function receiverApp(root: HTMLElement): void {
   function handle(raw: unknown): void {
     const msg = unpack(raw); if (!msg?.type) return;
     const payload = (msg as Record<string, unknown>).payload as Record<string, unknown> | undefined;
-    if (msg.type === 'CAST_LOAD_SONG' && payload) { state.song = payload.song as Song; state.roomCode = (payload.roomCode as string) ?? state.roomCode; resolvePlayableMediaUrl(state.song!).then(url => { if (url) media.src = url; }); loadLyrics(state.song); }
+    if (msg.type === 'CAST_LOAD_SONG' && payload) { state.song = payload.song as Song; state.roomCode = (payload.roomCode as string) ?? state.roomCode; resolvePlayableMediaUrl(state.song!).then(url => { if (url) { media.src = url; media.play().catch(() => {}); } }); loadLyrics(state.song); }
     if (msg.type === 'CAST_PLAY') media.play();
     if (msg.type === 'CAST_PAUSE') media.pause();
     if (msg.type === 'CAST_SEEK' && payload) media.currentTime = payload.seconds as number;

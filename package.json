@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0",
     "preview": "vite preview",
     "test": "c8 --reporter=text --include='src/**' npx tsx scripts/static.test.mjs && c8 --no-clean --reporter=text npx tsx scripts/use_cases.test.mjs && c8 --no-clean --reporter=text npx tsx scripts/cast_ui.test.mjs && c8 --no-clean --reporter=text npx tsx scripts/coverage_extended.test.mjs && c8 --no-clean --reporter=text npx tsx scripts/sync_and_webrtc.test.mjs && c8 --no-clean --reporter=text npx tsx scripts/downloader_static.test.mjs && c8 --no-clean --reporter=text npx tsx scripts/design_coverage.test.mjs && c8 --no-clean --reporter=text npx tsx scripts/protected_media.test.mjs && c8 --no-clean --reporter=text npx tsx scripts/e2e_mics_speakers_cast.test.mjs && c8 --no-clean --reporter=text npx tsx scripts/import_media_e2e.test.mjs",
-    "serve": "vite preview --port 4173 --host 127.0.0.1",
+    "serve": "vite preview --port 4174 --host 0.0.0.0",
     "importMedia": "node scripts/import_obfuscated_media.mjs && node scripts/export_cast_media.mjs",
-    "exportCastMedia": "node scripts/export_cast_media.mjs"
+    "exportCastMedia": "node scripts/export_cast_media.mjs",
+    "serve:local": "vite preview --port 4174 --host 127.0.0.1"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",

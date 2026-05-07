@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-07T09:23:28.821Z",
+  "generatedAt": "2026-05-07T09:38:42.246Z",
   "sources": [
     "public/songs",
     "downloads/mp4"
@@ -637,7 +637,7 @@
     }
   ],
   "defaultCastExport": {
-    "generatedAt": "2026-05-07T09:23:28.821Z",
+    "generatedAt": "2026-05-07T09:38:42.246Z",
     "note": "Clear MP4 compatibility cache for Chromecast Default Media Receiver. Encrypted browser path remains in public/protected/media."
   }
 }

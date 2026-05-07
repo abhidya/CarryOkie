@@ -172,8 +172,53 @@ export function joinChunks(text: string): string {
   return parts.sort((a,b) => a!.i - b!.i).map(p => p!.data).join('');
 }
 export function renderPayloadCard(target: HTMLElement, encoded: EncodedPayload, label = 'Signal payload'): void {
-  const qrItems = encoded.chunks.map((chunk, i) => `<figure><figcaption>QR chunk ${i+1}/${encoded.chunks.length}</figcaption>${qrSvg(chunk)}</figure>`).join('');
-  target.innerHTML = `<div class="payload"><h3>${label}</h3><p>Scan QR chunks in order, or use link/share/copy. Chunk fallback keeps payload local; no QR server used.</p>${qrItems}<textarea readonly>${encoded.url}</textarea><div class="actions"><button data-copy>Copy</button><button data-share>Share</button></div><details><summary>Chunk text (${encoded.chunks.length})</summary><textarea readonly>${encoded.chunks.join('\n')}</textarea></details></div>`;
+  let index = 0;
+  const renderQr = () => {
+    const qr = target.querySelector('[data-single-qr]') as HTMLElement | null;
+    const count = target.querySelector('[data-qr-count]') as HTMLElement | null;
+    if (qr) qr.innerHTML = qrSvg(encoded.chunks[index]);
+    if (count) count.textContent = `QR ${index + 1}/${encoded.chunks.length}`;
+  };
+  target.innerHTML = `<div class="payload"><h3>${label}</h3><p>One QR code is shown at a time. Scan it, then use Next only if this payload needs another local chunk. Link/share/copy remains available.</p><figure><figcaption data-qr-count></figcaption><div data-single-qr></div></figure><div class="actions"><button data-prev>Prev QR</button><button data-next>Next QR</button><button data-copy>Copy link</button><button data-share>Share</button></div><textarea readonly>${encoded.url}</textarea><details><summary>Text fallback (${encoded.chunks.length} local chunk${encoded.chunks.length === 1 ? '' : 's'})</summary><textarea readonly>${encoded.chunks.join('\n')}</textarea></details></div>`;
+  renderQr();
+  const syncButtons = () => { (target.querySelector('[data-prev]') as HTMLButtonElement)!.disabled = index === 0; (target.querySelector('[data-next]') as HTMLButtonElement)!.disabled = index === encoded.chunks.length - 1; };
+  syncButtons();
+  target.querySelector('[data-prev]')!.onclick = () => { index = Math.max(0, index - 1); renderQr(); syncButtons(); };
+  target.querySelector('[data-next]')!.onclick = () => { index = Math.min(encoded.chunks.length - 1, index + 1); renderQr(); syncButtons(); };
   target.querySelector('[data-copy]')!.onclick = () => navigator.clipboard.writeText(encoded.url);
   target.querySelector('[data-share]')!.onclick = async () => navigator.share ? await navigator.share({title:'CarryOkie signal', text:encoded.url}) : navigator.clipboard.writeText(encoded.url);
+}
+
+export async function scanQrInto(target: HTMLTextAreaElement, log: (message: string) => void = () => {}): Promise<string> {
+  const Detector = (globalThis as unknown as { BarcodeDetector?: new (opts: {formats: string[]}) => { detect(video: HTMLVideoElement): Promise<Array<{rawValue: string}>> } }).BarcodeDetector;
+  if (!Detector) throw new Error('Camera QR import needs Chrome/Android BarcodeDetector support. Use copy/paste fallback on this browser.');
+  if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera QR import needs camera permission and HTTPS.');
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+  const video = document.createElement('video');
+  video.playsInline = true; video.muted = true; video.autoplay = true; video.srcObject = stream;
+  video.style.cssText = 'width:100%;max-height:280px;background:#000;border-radius:12px;margin:.5rem 0';
+  target.insertAdjacentElement('beforebegin', video);
+  await video.play();
+  const detector = new Detector({ formats: ['qr_code'] });
+  log('Scanning QR with camera…');
+  return new Promise((resolve, reject) => {
+    const stop = () => { stream.getTracks().forEach(t => t.stop()); video.remove(); };
+    const timeout = window.setTimeout(() => { stop(); reject(new Error('No QR found. Try brighter light or paste the link/chunks.')); }, 30000);
+    const tick = async () => {
+      try {
+        const codes = await detector.detect(video);
+        const raw = codes[0]?.rawValue?.trim();
+        if (raw) {
+          window.clearTimeout(timeout); stop();
+          target.value = raw.startsWith('chunk:') && target.value.trim() ? `${target.value.trim()}\n${raw}` : raw;
+          target.dispatchEvent(new Event('input', { bubbles: true }));
+          log('QR imported.');
+          resolve(raw);
+          return;
+        }
+        requestAnimationFrame(tick);
+      } catch (e) { window.clearTimeout(timeout); stop(); reject(e); }
+    };
+    tick();
+  });
 }
