@@ -7,5 +7,4 @@ coverage/
 .idea/
 .sisyphus/
 .DS_Store
-links.txt
 coverage/*
