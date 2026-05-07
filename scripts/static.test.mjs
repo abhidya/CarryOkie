@@ -2,12 +2,13 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 const checks = [];
 const REPO_BASE = '/CarryOkie';
+const GH_PAGES_HOSTNAME = 'abhidya.github.io';
 function loadBootstrap(page){
   const html = fs.readFileSync(`${page}/index.html`, 'utf8');
   const match = html.match(/<script data-gh-pages-bootstrap>([\s\S]*?)<\/script>/);
   return match?.[1] || '';
 }
-function runBootstrap(page, { hostname='abhidya.github.io', pathname=`${REPO_BASE}/${page}/`, search='', hash='' } = {}){
+function runBootstrap(page, { hostname=GH_PAGES_HOSTNAME, pathname=`${REPO_BASE}/${page}/`, search='', hash='' } = {}){
   const script = loadBootstrap(page);
   let redirectedTo = null;
   const location = {
@@ -75,7 +76,7 @@ const protectedCatalog = JSON.parse(fs.readFileSync('public/protected/catalog.js
 checks.push(['protected catalog has songs', protectedCatalog.songs?.length > 0]);
 checks.push(['public songs folder removed', !fs.existsSync('public/songs')]);
 for (const page of ['host', 'player', 'receiver', 'debug']) {
-  checks.push([`${page} source redirects GitHub Pages traffic to dist`, runBootstrap(page, { pathname:`${REPO_BASE}/${page}/`, search:'?room=BLUECAT', hash:'#join' }) === `https://abhidya.github.io${REPO_BASE}/dist/${page}/?room=BLUECAT#join`]);
+  checks.push([`${page} source redirects GitHub Pages traffic to dist`, runBootstrap(page, { pathname:`${REPO_BASE}/${page}/`, search:'?room=BLUECAT', hash:'#join' }) === `https://${GH_PAGES_HOSTNAME}${REPO_BASE}/dist/${page}/?room=BLUECAT#join`]);
   checks.push([`${page} source does not redirect local dev`, runBootstrap(page, { hostname:'localhost', pathname:`/${page}/` }) === null]);
   checks.push([`${page} dist path does not loop`, runBootstrap(page, { pathname:`${REPO_BASE}/dist/${page}/` }) === null]);
 }
