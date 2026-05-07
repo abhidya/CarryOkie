@@ -161,7 +161,8 @@ export class CastController extends EventTarget {
   seek(seconds: number): void { if (this.remotePlayer) { this.remotePlayer.currentTime = seconds; this.controller?.seek(); } this.send('CAST_SEEK', { seconds }); }
   sampleMediaStatus(): void {
     if (!this.remotePlayer) return;
-    const sample = { tvMediaTimeMs: Math.round((this.remotePlayer.currentTime || 0) * 1000), tvMediaTimeSampledAtHostMs: Date.now(), paused: !!this.remotePlayer.isPaused, source: 'RemotePlayerController.currentTime' };
+    const paused = !!this.remotePlayer.isPaused;
+    const sample = { tvMediaTimeMs: Math.round((this.remotePlayer.currentTime || 0) * 1000), tvMediaTimeSampledAtHostMs: Date.now(), paused, status: paused ? 'paused' : 'playing', playbackRate: 1, source: 'RemotePlayerController.currentTime' };
     this.emit('playbackSample', sample); this.sendSafe('CAST_SYNC_PLAYBACK_STATE', sample);
   }
   state(): CastState { return { available: this.available, connected: this.connected, receiverReady: this.connected, currentMediaLoaded: this.currentMediaLoaded, defaultMediaReceiver: this.usesDefaultMediaReceiver, error: null }; }
@@ -169,7 +170,7 @@ export class CastController extends EventTarget {
 }
 
 export function receiverApp(root: HTMLElement): void {
-  const state: { roomCode: string; song: Song | null; singers: Array<{ playerNumber: number | null; displayName: string }>; queue: Array<{ songId: string; singerNumbers: number[] }>; mediaTimeMs: number; lines: Array<{ startMs: number; endMs: number; text: string }> } = { roomCode: '------', song: null, singers: [], queue: [], mediaTimeMs: 0, lines: [] };
+  const state: { roomCode: string; song: Song | null; singers: Array<{ playerNumber: number | null; displayName: string }>; queue: Array<{ songId: string; title?: string; singerNumbers: number[] }>; mediaTimeMs: number; lines: Array<{ startMs: number; endMs: number; text: string }> } = { roomCode: '------', song: null, singers: [], queue: [], mediaTimeMs: 0, lines: [] };
   root.innerHTML = `<main class="tv"><section><h1>CarryOkie</h1><div class="room" id="room">------</div><div id="joinQr"></div><p>Scan/open /player. TV plays backing track/video only — no live mic routed here.</p><section id="singers"></section></section><section><video id="media" class="castMediaElement" controls playsinline></video><section id="lyrics" class="lyrics big"></section><section id="queue"></section></section></main>`;
   const media = root.querySelector<HTMLVideoElement>('#media')!;
   function activeLine(): typeof state.lines[0] | undefined { const t = state.mediaTimeMs; return state.lines.findLast?.(l => t >= l.startMs) || state.lines.filter(l => t >= l.startMs).pop() || state.lines[0]; }
@@ -177,7 +178,7 @@ export function receiverApp(root: HTMLElement): void {
     root.querySelector('#room')!.textContent = state.roomCode;
     const playerUrl = new URL(`../player/?room=${encodeURIComponent(state.roomCode)}`, location.href).toString();
     root.querySelector('#joinQr')!.innerHTML = state.roomCode === '------' ? '' : qrSvg(playerUrl, { scale: 3, title: 'Join CarryOkie room' });
-    root.querySelector('#queue')!.innerHTML = '<h2>Queue</h2><ol>' + state.queue.map(q => `<li>${q.songId} singers ${(q.singerNumbers || []).join(', ')}</li>`).join('') + '</ol>';
+    root.querySelector('#queue')!.innerHTML = '<h2>Queue</h2><ol>' + state.queue.map(q => `<li>${q.title || q.songId} singers ${(q.singerNumbers || []).join(', ')}</li>`).join('') + '</ol>';
     root.querySelector('#singers')!.innerHTML = '<h2>Singers</h2>' + ((state.singers || []).map(p => `<p>#${p.playerNumber} ${p.displayName}</p>`).join('') || '<p>No active singers</p>');
     const active = activeLine();
     root.querySelector('#lyrics')!.innerHTML = state.lines.length ? state.lines.map(l => `<p class="${l === active ? 'active' : ''}">${l.text}</p>`).join('') : '<p>Waiting for lyrics…</p>';

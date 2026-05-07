@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { qrMatrix, qrSvg } from '../src/qr.ts';
+import { QR_MAX_TEXT_BYTES, qrMatrix, qrSvg } from '../src/qr.ts';
 import { encodeSignalPayload } from '../src/signaling.ts';
 import { PeerNode, RPC } from '../src/webrtc.ts';
 import { PhoneAudio } from '../src/audio.ts';
@@ -18,6 +18,13 @@ test('QR SVG renders locally with finder-like dark modules and no remote QR serv
   assert.equal(m.length, 57);
   assert.equal(m[0][0], true);
   assert.equal(m[6][6], true);
+});
+
+test('QR encoder accepts larger near-capacity local chunks', () => {
+  const text = 'x'.repeat(QR_MAX_TEXT_BYTES);
+  const svg = qrSvg(text);
+  assert.match(svg, /data-qr="true"/);
+  assert.throws(() => qrSvg(text + 'x'), /QR chunk too large/);
 });
 
 test('manual payload card includes QR rendering code path', () => {
@@ -66,6 +73,60 @@ test('phone mic input requests echo-cancelled audio and mute toggles tracks', as
     assert.equal(track.enabled, true);
   } finally {
     globalThis.AudioContext = oldAudioContext;
+    Object.defineProperty(globalThis, 'navigator', { configurable:true, value:oldNavigator });
+  }
+});
+
+test('phone mic publishes filtered WebAudio stream and PeerNode routes filtered track', async () => {
+  const oldAudioContext = globalThis.AudioContext;
+  const oldNavigator = globalThis.navigator;
+  const oldRtc = globalThis.RTCPeerConnection;
+  const rawTrack = { id:'raw-mic', enabled:true };
+  const filteredTrack = { id:'filtered-mic', enabled:true };
+  const rawStream = { id:'raw-stream', getAudioTracks(){ return [rawTrack]; }, getTracks(){ return [rawTrack]; } };
+  const filteredStream = { id:'filtered-stream', getAudioTracks(){ return [filteredTrack]; }, getTracks(){ return [filteredTrack]; } };
+  const links = [];
+  function node(name){ return { name, connect(target){ links.push([name, target.name || 'destination']); }, disconnect(){} }; }
+  const created = { filters:[], compressors:[], gains:[] };
+  globalThis.AudioContext = class {
+    constructor(){ this.destination = { name:'speakers' }; }
+    createGain(){ const n = node('gain'); n.gain = { value:0 }; created.gains.push(n); return n; }
+    createMediaStreamSource(){ return node('rawSource'); }
+    createMediaStreamDestination(){ return { name:'filteredDestination', stream:filteredStream }; }
+    createBiquadFilter(){ const n = node('filter'); n.frequency = { value:0 }; n.gain = { value:0 }; n.Q = { value:0 }; created.filters.push(n); return n; }
+    createDynamicsCompressor(){ const n = node('compressor'); n.threshold = { value:0 }; n.knee = { value:0 }; n.ratio = { value:0 }; n.attack = { value:0 }; n.release = { value:0 }; created.compressors.push(n); return n; }
+    createScriptProcessor(){ return { name:'gate', connect(){}, onaudioprocess:null }; }
+  };
+  class FakePc extends EventTarget {
+    constructor(){ super(); this.addedTracks = []; }
+    createDataChannel(){ return { readyState:'open', send(){} }; }
+    addTrack(track, stream){ this.addedTracks.push({ track, stream }); }
+  }
+  globalThis.RTCPeerConnection = FakePc;
+  Object.defineProperty(globalThis, 'navigator', { configurable:true, value:{ mediaDevices:{ async getUserMedia(){ return rawStream; } } } });
+  try {
+    const audio = new PhoneAudio(() => {});
+    const published = await audio.requestMic({ headphonesConfirmed:true });
+    assert.equal(published, filteredStream, 'requestMic should return filtered publish stream when WebAudio routing is available');
+    assert.deepEqual(links.map(([from, to]) => `${from}->${to}`), [
+      'gain->gain', 'gain->gain', 'gain->speakers',
+      'rawSource->filter', 'filter->filter', 'filter->filter', 'filter->compressor', 'compressor->gain', 'gain->filteredDestination'
+    ]);
+    audio.setVoicePreset('autotune');
+    assert.equal(created.compressors[0].ratio.value, 8);
+    assert.equal(created.filters[2].gain.value, 3);
+    audio.setMicMuted(true);
+    assert.equal(rawTrack.enabled, false);
+    assert.equal(filteredTrack.enabled, false);
+
+    const peer = new PeerNode('singer');
+    const edge = peer.makeConnection('host', { initiator:true });
+    peer.addLocalStream(published);
+    assert.equal(edge.pc.addedTracks[0].track, filteredTrack);
+    assert.equal(edge.pc.addedTracks[0].stream, filteredStream);
+  } finally {
+    globalThis.AudioContext = oldAudioContext;
+    globalThis.RTCPeerConnection = oldRtc;
     Object.defineProperty(globalThis, 'navigator', { configurable:true, value:oldNavigator });
   }
 });

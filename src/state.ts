@@ -131,19 +131,53 @@ export function assignSingers(room: Room, playerIds: string[]): Room {
 }
 export function queueRequest(songId: string, singerNumbers: number[], requestedByPlayerId: string, currentQueueLength=0): QueueItem {
   if (singerNumbers.length > MAX_SINGERS) throw new Error(`Queue item max ${MAX_SINGERS} singers.`);
+  const singers = [...new Set(singerNumbers.filter(n => Number.isInteger(n) && n >= 1 && n <= MAX_PLAYERS))];
+  if (!songId) throw new Error('Queue item needs a song.');
+  if (!requestedByPlayerId) throw new Error('Queue item needs a requesting player.');
+  if (singers.length === 0) throw new Error('Queue item needs at least one singer number.');
   if (currentQueueLength >= MAX_QUEUE_ITEMS) throw new Error(`Queue full: MVP cap is ${MAX_QUEUE_ITEMS} items.`);
-  return { queueItemId: uuid(), songId, singerNumbers, requestedByPlayerId, status:'requested', createdAt:nowMs(), acceptedAt:null };
+  return { queueItemId: uuid(), songId, singerNumbers: singers, requestedByPlayerId, status:'requested', createdAt:nowMs(), acceptedAt:null };
 }
 export function acceptQueue(room: Room, queueItemId: string): Room {
-  const item = room.queue.find(q => q.queueItemId === queueItemId); if (!item) return room;
+  const item = room.queue.find(q => q.queueItemId === queueItemId); if (!item || item.status === 'active' || item.status === 'ended') return room;
   item.status = 'queued'; item.acceptedAt = nowMs(); return room;
 }
 export function rejectQueue(room: Room, queueItemId: string): Room {
-  const item = room.queue.find(q => q.queueItemId === queueItemId); if (!item) return room;
+  const item = room.queue.find(q => q.queueItemId === queueItemId); if (!item || item.status === 'active' || item.status === 'ended') return room;
   item.status = 'rejected'; return room;
 }
 export function removeQueueItem(room: Room, queueItemId: string): Room {
-  room.queue = room.queue.filter(q => q.queueItemId !== queueItemId); return room;
+  room.queue = room.queue.filter(q => q.queueItemId !== queueItemId);
+  if (room.currentQueueItemId === queueItemId) room.currentQueueItemId = null;
+  return room;
+}
+export function enqueueRequest(room: Room, item: QueueItem): Room {
+  if (room.queue.some(q => q.queueItemId === item.queueItemId)) return room;
+  const openLength = room.queue.filter(q => !['ended','rejected'].includes(q.status)).length;
+  const normalized = queueRequest(item.songId, item.singerNumbers, item.requestedByPlayerId, openLength);
+  normalized.queueItemId = item.queueItemId || normalized.queueItemId;
+  normalized.createdAt = item.createdAt || normalized.createdAt;
+  room.queue.push(normalized);
+  return room;
+}
+export function nextQueuedItem(room: Room): QueueItem | undefined {
+  return room.queue.find(q => q.status === 'queued');
+}
+
+export function addSingerToQueueItem(room: Room, queueItemId: string, singerNumber: number): Room {
+  const item = room.queue.find(q => q.queueItemId === queueItemId); if (!item || item.status === 'active' || item.status === 'ended') return room;
+  if (!Number.isInteger(singerNumber) || singerNumber < 1 || singerNumber > MAX_PLAYERS) return room;
+  if (!item.singerNumbers.includes(singerNumber)) {
+    if (item.singerNumbers.length >= MAX_SINGERS) throw new Error(`Queue item max ${MAX_SINGERS} singers.`);
+    item.singerNumbers.push(singerNumber);
+  }
+  if (item.status === 'rejected') item.status = 'requested';
+  return room;
+}
+export function removeSingerFromQueueItem(room: Room, queueItemId: string, singerNumber: number): Room {
+  const item = room.queue.find(q => q.queueItemId === queueItemId); if (!item || item.status === 'active' || item.status === 'ended') return room;
+  item.singerNumbers = item.singerNumbers.filter(n => n !== singerNumber);
+  return room;
 }
 export function lockHostLost(room: Room): Room {
   room.playbackState.status = 'host_lost';

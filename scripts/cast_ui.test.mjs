@@ -34,6 +34,8 @@ assert.equal(fakeSession.loaded.length, 1, 'media should load');
 assert.equal(fakeSession.loaded[0].media.contentType, 'video/mp4');
 assert.equal(fakeSession.loaded[0].autoplay, true, 'Cast load should autoplay backing/lyric video on TV');
 assert.equal(first.remotePlayer.isPaused, false, 'loadSong should explicitly start TV playback after loading');
+let sample; first.addEventListener('playbackSample', e => { sample = e.detail; }); first.sampleMediaStatus();
+assert.equal(sample.status, 'playing', 'Cast samples should carry playing status so phones can advance between samples');
 assert.equal(events.length, 0, 'Default Media Receiver should not receive unsupported CarryOkie namespace messages');
 
 const second = new CastController('CC1AD845');

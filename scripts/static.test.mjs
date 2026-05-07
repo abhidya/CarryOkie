@@ -47,12 +47,14 @@ checks.push(['player exposes manual answer import', app.includes('id="answer"') 
 checks.push(['player exposes singer slot request', app.includes('id="requestSinger"') && app.includes('type:RPC.SINGER_JOIN_REQUEST')]);
 checks.push(['mic publishing requires singer assignment in UI', app.includes('Mic blocked: ask the host to assign you as a singer') && app.includes('isSingerForCurrentSong')]);
 checks.push(['host can start next queued song', app.includes('startQueueItem') && app.includes('id="startNext"') && app.includes("item.status = 'active'") && app.includes('currentQueueItemId')]);
-checks.push(['queue can recover and start rejected items', app.includes('class="acceptItem"') && app.includes('class="startItem"') && app.includes("['requested','rejected']") && app.includes("q.status==='rejected'")]);
+checks.push(['queue can recover rejected items only by re-accepting before start', app.includes('class="acceptItem"') && app.includes('class="startItem"') && app.includes("['requested','rejected']") && app.includes("q.status==='queued'") && app.includes('nextQueuedItem(room)')]);
 checks.push(['queue start loads current song on connected Cast', app.includes('loadCurrentSongOnTv') && app.includes('castController?.state?.().connected') && app.includes('Loaded ${song.title || song.songId} on TV')]);
 checks.push(['host handles PLAYER_LEFT on disconnect', app.includes('handlePlayerLeft') && app.includes('RPC.PLAYER_LEFT')]);
 checks.push(['participant locks room on host disconnect', app.includes('handlePeerClosed') && app.includes('lockHostLost(room)') && app.includes('isHostEdge')]);
 checks.push(['host tracks MIC_ENABLED from players', app.includes('msg.type===RPC.MIC_ENABLED') && app.includes('micState')]);
 checks.push(['host has reject/remove queue controls', app.includes('rejectQueue') && app.includes('removeQueueItem') && app.includes('class="rejectItem"')]);
+checks.push(['phones can see and self-update titled queue', app.includes("<h2>Queue</h2>${queueHtml(room,'phone')}") && app.includes('QUEUE_UPDATE_REQUEST') && app.includes('Add me as singer') && app.includes('songTitle(q.songId)')]);
+checks.push(['phone mic exposes voice filter presets', app.includes('id="voicePreset"') && app.includes('Autotune-style polish') && fs.readFileSync('src/audio.ts','utf8').includes('setVoicePreset') && fs.readFileSync('src/audio.ts','utf8').includes('DynamicsCompressor')]);
 checks.push(['player has reconnect UI', app.includes('reconnectPair') && app.includes('forgetRoom')]);
 checks.push(['debug page exposes connection diagnostics', app.includes('Connection diagnostics') && app.includes('dataChannelPeerIds') && app.includes('clockOffsetMs') && app.includes('micPermission')]);
 const cast = fs.readFileSync('src/cast.ts','utf8');

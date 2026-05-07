@@ -25,8 +25,8 @@ export function deriveTvMediaPositionMs(playbackState: { status?: string; tvMedi
   }
   const hostNowMs = nowMs + hostOffsetMs;
   const elapsedMs = Math.max(0, hostNowMs - playbackState.tvMediaTimeSampledAtHostMs);
-  const status = playbackState.status || (playbackState.paused ? 'paused' : 'playing');
-  const shouldAdvance = status === 'playing' || status === 'countdown';
+  const status = playbackState.paused ? 'paused' : (playbackState.status || 'playing');
+  const shouldAdvance = !playbackState.paused && !['paused','idle','ended','host_lost','error'].includes(status);
   const rate = playbackState.playbackRate ?? 1;
   const baseMs = playbackState.tvMediaTimeMs || 0;
   const offsetMs = playbackState.seekOffsetMs || 0;

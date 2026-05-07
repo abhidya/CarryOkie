@@ -1,8 +1,11 @@
 // Minimal no-dependency QR generator for CarryOkie manual signaling.
 // Fixed model: QR Version 10, ECC L, byte mode, mask 0. Capacity: 274 data codewords.
+// Byte mode overhead is 20 bits plus terminator/padding, so keep chunks below 260 bytes
+// to leave room for the `chunk:i/n:` prefix and avoid edge-of-capacity scanner failures.
 const VERSION = 10;
 const SIZE = 17 + VERSION * 4;
 const DATA_CODEWORDS = 274;
+export const QR_MAX_TEXT_BYTES = 260;
 const EC_CODEWORDS_PER_BLOCK = 18;
 const BLOCK_SIZES = [68, 68, 69, 69];
 const ALIGN = [6, 28, 50];
@@ -49,7 +52,7 @@ function rsRemainder(data: number[], degree: number): number[] {
 }
 function encodeData(text: string): number[] {
   const bytes = [...new TextEncoder().encode(text)];
-  if (bytes.length > 180) throw new Error(`QR chunk too large (${bytes.length} bytes). Use smaller chunks.`);
+  if (bytes.length > QR_MAX_TEXT_BYTES) throw new Error(`QR chunk too large (${bytes.length} bytes). Use smaller chunks.`);
   const bits = [];
   pushBits(bits, 0b0100, 4);       // byte mode
   pushBits(bits, bytes.length, 16); // version 10 byte count indicator

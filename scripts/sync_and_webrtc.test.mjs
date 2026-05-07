@@ -25,6 +25,8 @@ test('lyric position advances only from sampled Cast media time', () => {
   const state = { status:'playing', tvMediaTimeMs:5000, tvMediaTimeSampledAtHostMs:10000, playbackRate:1, seekOffsetMs:250, syncDegraded:false };
   assert.equal(deriveTvMediaPositionMs(state, 11250, 0).positionMs, 6500);
   assert.equal(deriveTvMediaPositionMs({...state, status:'paused'}, 11250, 0).positionMs, 5250);
+  assert.equal(deriveTvMediaPositionMs({...state, status:'idle', paused:false}, 11250, 0).positionMs, 5250);
+  assert.equal(deriveTvMediaPositionMs({...state, status:'playing', paused:false, source:'RemotePlayerController.currentTime'}, 11250, 0).positionMs, 6500);
   assert.equal(deriveTvMediaPositionMs({...state, syncDegraded:true}, 11250, 0).syncDegraded, true);
 });
 

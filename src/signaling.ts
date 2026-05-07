@@ -1,4 +1,4 @@
-import { qrSvg } from './qr.ts';
+import { QR_MAX_TEXT_BYTES, qrSvg } from './qr.ts';
 const enc = new TextEncoder(); const dec = new TextDecoder();
 
 interface SignalPayload {
@@ -134,7 +134,47 @@ async function decompress(alg: string, bytes: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 export function stripSdpForManual(sdp: string): string {
-  return sdp;
+  const normalized = sdp.replace(/\r?\n/g, '\r\n').trim();
+  const rawLines = normalized.split('\r\n').filter(Boolean);
+  const sessionLines: string[] = [];
+  const sections: string[][] = [];
+  let current: string[] | null = null;
+  for (const line of rawLines) {
+    if (line.startsWith('m=')) { current = [line]; sections.push(current); }
+    else if (current) current.push(line);
+    else sessionLines.push(line);
+  }
+  const keptSections = sections.map(minifyMediaSection).filter((section): section is string[] => section.length > 0);
+  const keptMids = keptSections.map(section => section.find(line => line.startsWith('a=mid:'))?.slice(6)).filter(Boolean);
+  const compactSession = sessionLines
+    .map(line => line.startsWith('a=group:BUNDLE') && keptMids.length ? `a=group:BUNDLE ${keptMids.join(' ')}` : line)
+    .filter(line => isSessionLineKept(line));
+  return [...compactSession, ...keptSections.flat()].join('\r\n') + '\r\n';
+}
+function isSessionLineKept(line: string): boolean {
+  return /^(v=|o=|s=|t=|a=group:BUNDLE|a=msid-semantic:)/.test(line);
+}
+function minifyCandidate(line: string): string {
+  const parts = line.split(/\s+/);
+  const typ = parts.indexOf('typ');
+  return typ > 0 ? parts.slice(0, typ + 2).join(' ') : line;
+}
+function minifyMediaSection(section: string[]): string[] {
+  const m = section[0];
+  const kind = m.split(/\s+/)[0].slice(2);
+  if (!['audio','application'].includes(kind)) return [];
+  const mid = section.find(line => line.startsWith('a=mid:'));
+  if (kind === 'application') {
+    return section.filter(line =>
+      line.startsWith('m=') || line === mid || /^(c=|a=ice-ufrag:|a=ice-pwd:|a=fingerprint:|a=setup:|a=sctp-port:|a=max-message-size:|a=candidate:|a=end-of-candidates)/.test(line)
+    ).map(line => line.startsWith('a=candidate:') ? minifyCandidate(line) : line);
+  }
+  const opusPayload = section.map(line => line.match(/^a=rtpmap:(\d+) opus\/48000\/2/i)?.[1]).find(Boolean);
+  const header = opusPayload ? m.split(/\s+/).slice(0, 3).concat(opusPayload).join(' ') : m;
+  return section.map(line => line === m ? header : line).filter(line => {
+    if (line.startsWith('a=rtpmap:') || line.startsWith('a=fmtp:') || line.startsWith('a=rtcp-fb:')) return !opusPayload || line.startsWith(`a=rtpmap:${opusPayload} `) || line.startsWith(`a=fmtp:${opusPayload} `);
+    return line.startsWith('m=') || line === mid || /^(c=|a=ice-ufrag:|a=ice-pwd:|a=fingerprint:|a=setup:|a=rtcp-mux|a=sendrecv|a=recvonly|a=sendonly|a=inactive|a=msid:|a=ssrc:|a=candidate:|a=end-of-candidates)/.test(line);
+  }).map(line => line.startsWith('a=candidate:') ? minifyCandidate(line) : line);
 }
 export async function encodeSignalPayload(payload: Record<string, unknown>): Promise<EncodedPayload> {
   const body = { v:1, app:'carryokie', createdAt:Date.now(), ...payload };
@@ -160,8 +200,11 @@ export function extractToken(input: string): string {
   const m = input.match(/ck1\.[a-z]+\.[A-Za-z0-9_-]+/); if (!m) throw new Error('Signal import failed: no payload found.');
   return m[0];
 }
-export function chunkToken(token: string, size = 150): string[] {
-  const n = Math.ceil(token.length / size);
+export function chunkToken(token: string, size = 240): string[] {
+  let n = Math.ceil(token.length / size);
+  const maxPrefix = `chunk:${n}/${n}:`.length;
+  if (size + maxPrefix > QR_MAX_TEXT_BYTES) size = Math.max(1, QR_MAX_TEXT_BYTES - maxPrefix);
+  n = Math.ceil(token.length / size);
   return Array.from({length:n}, (_,i) => `chunk:${i+1}/${n}:${token.slice(i*size,(i+1)*size)}`);
 }
 export function joinChunks(text: string): string {

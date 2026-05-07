@@ -5,6 +5,11 @@ export class PhoneAudio {
   remoteGain: GainNode | null;
   backingGain: GainNode | null;
   localStream: MediaStream | null;
+  publishedStream: MediaStream | null;
+  micSource: MediaStreamAudioSourceNode | null;
+  micDestination: MediaStreamAudioDestinationNode | null;
+  micFilters: { highpass?: BiquadFilterNode; tone?: BiquadFilterNode; presence?: BiquadFilterNode; compressor?: DynamicsCompressorNode; output?: GainNode };
+  voicePreset: string;
   localMonitorGain: number;
   backingAudio: HTMLAudioElement | null;
   backingSource: MediaElementAudioSourceNode | null;
@@ -16,7 +21,8 @@ export class PhoneAudio {
 
   constructor(log: (msg: string) => void = () => {}) {
     this.log = log; this.ctx = null; this.master = null; this.remoteGain = null; this.backingGain = null;
-    this.localStream = null; this.localMonitorGain = 0; this.backingAudio = null; this.backingSource = null;
+    this.localStream = null; this.publishedStream = null; this.micSource = null; this.micDestination = null; this.micFilters = {}; this.voicePreset = 'clean';
+    this.localMonitorGain = 0; this.backingAudio = null; this.backingSource = null;
     this.pushToSing = false; this.gateThreshold = 0.03; this.gateEnabled = false; this.gateProcessor = null;
   }
   async init(): Promise<void> {
@@ -30,9 +36,57 @@ export class PhoneAudio {
     await this.init(); this.pushToSing = pushToSing;
     this.localStream = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true }, video:false });
     if (pushToSing) this.setMicMuted(true);
-    this.applyGate(); return this.localStream;
+    this.applyGate();
+    this.publishedStream = this.buildMicFilterStream(this.localStream);
+    return this.publishedStream;
   }
-  setMicMuted(muted: boolean): void { this.localStream?.getAudioTracks().forEach(t => { t.enabled = !muted; }); }
+  setMicMuted(muted: boolean): void {
+    this.localStream?.getAudioTracks().forEach(t => { t.enabled = !muted; });
+    this.publishedStream?.getAudioTracks().forEach(t => { t.enabled = !muted; });
+  }
+  buildMicFilterStream(stream: MediaStream): MediaStream {
+    if (!this.ctx?.createMediaStreamDestination || !this.ctx.createBiquadFilter || !this.ctx.createDynamicsCompressor) return stream;
+    try {
+      this.micSource?.disconnect();
+      this.micSource = this.ctx.createMediaStreamSource(stream);
+      this.micDestination = this.ctx.createMediaStreamDestination();
+      const highpass = this.ctx.createBiquadFilter();
+      const tone = this.ctx.createBiquadFilter();
+      const presence = this.ctx.createBiquadFilter();
+      const compressor = this.ctx.createDynamicsCompressor();
+      const output = this.ctx.createGain();
+      highpass.type = 'highpass'; tone.type = 'lowshelf'; presence.type = 'peaking';
+      this.micSource.connect(highpass); highpass.connect(tone); tone.connect(presence); presence.connect(compressor); compressor.connect(output); output.connect(this.micDestination);
+      this.micFilters = { highpass, tone, presence, compressor, output };
+      this.applyVoicePreset();
+      return this.micDestination.stream;
+    } catch (err: unknown) {
+      this.log(`Mic filters unavailable: ${(err as Error).message}. Using clean mic.`);
+      return stream;
+    }
+  }
+  setVoicePreset(preset: string): void {
+    this.voicePreset = ['clean','alto','bravo','bass','radio','autotune'].includes(preset) ? preset : 'clean';
+    this.applyVoicePreset();
+  }
+  applyVoicePreset(): void {
+    const { highpass, tone, presence, compressor, output } = this.micFilters;
+    if (!highpass || !tone || !presence || !compressor || !output) return;
+    const presets: Record<string, { hp: number; lowGain: number; presenceFreq: number; presenceGain: number; ratio: number; threshold: number; out: number }> = {
+      clean: { hp: 70, lowGain: 0, presenceFreq: 3200, presenceGain: 0, ratio: 2, threshold: -24, out: 1 },
+      alto: { hp: 95, lowGain: 2, presenceFreq: 2400, presenceGain: 1.5, ratio: 3, threshold: -26, out: 1.05 },
+      bravo: { hp: 120, lowGain: -1, presenceFreq: 4200, presenceGain: 4, ratio: 3.5, threshold: -28, out: 1.08 },
+      bass: { hp: 55, lowGain: 4, presenceFreq: 1800, presenceGain: -1, ratio: 3, threshold: -25, out: 1 },
+      radio: { hp: 180, lowGain: -6, presenceFreq: 2800, presenceGain: 5, ratio: 6, threshold: -32, out: 1.1 },
+      autotune: { hp: 100, lowGain: -1, presenceFreq: 3600, presenceGain: 3, ratio: 8, threshold: -34, out: 1.12 }
+    };
+    const p = presets[this.voicePreset] || presets.clean;
+    highpass.frequency.value = p.hp;
+    tone.gain.value = p.lowGain;
+    presence.frequency.value = p.presenceFreq; presence.Q.value = 1; presence.gain.value = p.presenceGain;
+    compressor.threshold.value = p.threshold; compressor.knee.value = 12; compressor.ratio.value = p.ratio; compressor.attack.value = 0.003; compressor.release.value = 0.18;
+    output.gain.value = p.out;
+  }
   addRemoteStream(stream: MediaStream, label = 'remote singer'): void {
     this.init().then(() => { if (!this.ctx || !this.remoteGain) return; const src = this.ctx.createMediaStreamSource(stream); src.connect(this.remoteGain); this.log(`Receiving ${label}`); });
   }
