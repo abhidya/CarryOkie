@@ -53,6 +53,10 @@ checks.push(['PeerRelaySignalingAdapter exists', signaling.includes('class PeerR
 const protectedCatalog = JSON.parse(fs.readFileSync('public/protected/catalog.json','utf8'));
 checks.push(['protected catalog has songs', protectedCatalog.songs?.length > 0]);
 checks.push(['public songs folder removed', !fs.existsSync('public/songs')]);
+for (const page of ['host', 'player', 'receiver', 'debug']) {
+  const sourceHtml = fs.readFileSync(`${page}/index.html`, 'utf8');
+  checks.push([`${page} source redirects GitHub Pages traffic to dist`, sourceHtml.includes("host.endsWith('github.io')") && sourceHtml.includes("parts.includes('dist')") && sourceHtml.includes("'dist',page,''])")]);
+}
 const distHtml = ['dist/host/index.html','dist/player/index.html','dist/receiver/index.html','dist/debug/index.html'].map(f=>fs.existsSync(f)?fs.readFileSync(f,'utf8'):'').join('\n');
 checks.push(['dist never serves TypeScript module scripts', !distHtml.includes('src/main.ts') && !distHtml.includes('.ts"')]);
 let failed = 0;
