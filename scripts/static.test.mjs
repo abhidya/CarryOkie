@@ -79,7 +79,7 @@ checks.push(['public songs folder removed', !fs.existsSync('public/songs')]);
 for (const page of ['host', 'player', 'receiver', 'debug']) {
   checks.push([`${page} source redirects GitHub Pages traffic to dist`, runBootstrap(page, { pathname:`${REPO_BASE}/${page}/`, search:'?room=BLUECAT', hash:'#join' }) === `https://${GH_PAGES_HOSTNAME}${REPO_BASE}/dist/${page}/?room=BLUECAT#join`]);
   checks.push([`${page} source redirects without trailing slash`, runBootstrap(page, { pathname:`${REPO_BASE}/${page}`, search:'?room=BLUECAT' }) === `https://${GH_PAGES_HOSTNAME}${REPO_BASE}/dist/${page}/?room=BLUECAT`]);
-  checks.push([`${page} source redirects with repeated slashes`, runBootstrap(page, { pathname:`//CarryOkie///${page}//` }) === `https://${GH_PAGES_HOSTNAME}${REPO_BASE}/dist/${page}/`]);
+  checks.push([`${page} source redirects with repeated slashes`, runBootstrap(page, { pathname:`//${REPO_BASE.replace(/^\//, '')}///${page}//` }) === `https://${GH_PAGES_HOSTNAME}${REPO_BASE}/dist/${page}/`]);
   checks.push([`${page} source does not redirect local dev`, runBootstrap(page, { hostname:'localhost', pathname:`/${page}/` }) === null]);
   checks.push([`${page} dist path does not loop`, runBootstrap(page, { pathname:`${REPO_BASE}/dist/${page}/` }) === null]);
 }
