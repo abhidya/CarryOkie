@@ -54,6 +54,7 @@ checks.push(['participant locks room on host disconnect', app.includes('handlePe
 checks.push(['host tracks MIC_ENABLED from players', app.includes('msg.type===RPC.MIC_ENABLED') && app.includes('micState')]);
 checks.push(['host has reject/remove queue controls', app.includes('rejectQueue') && app.includes('removeQueueItem') && app.includes('class="rejectItem"')]);
 checks.push(['phones can see and self-update titled queue', app.includes("queueHtml(room,'phone')") && app.includes('QUEUE_UPDATE_REQUEST') && app.includes('Add me as singer') && app.includes('songTitle(q.songId)')]);
+checks.push(['queue RPCs require paired peer identity and catalog songs', app.includes('pairedActor(remotePeerId') && app.includes('handleQueueAddRequest') && app.includes('Queue request song is not in this room catalog') && app.includes('data-queue-id="${queueId}"')]);
 checks.push(['phone mic exposes voice filter presets', app.includes('id="voicePreset"') && app.includes('Autotune-style polish') && fs.readFileSync('src/audio.ts','utf8').includes('setVoicePreset') && fs.readFileSync('src/audio.ts','utf8').includes('DynamicsCompressor')]);
 const styles = fs.readFileSync('src/styles.css','utf8');
 checks.push(['phone UI is mobile-first, touch sized, and non-overlapping', app.includes('phone-screen') && app.includes('phone-hero') && styles.includes('iPhone') === false && /min-height:\s*var\(--tap\)/.test(styles) && styles.includes('@media (max-width: 520px)') && !/\.phone-hero\s*\{[^}]*position:\s*sticky/s.test(styles)]);

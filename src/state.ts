@@ -151,11 +151,14 @@ export function removeQueueItem(room: Room, queueItemId: string): Room {
   if (room.currentQueueItemId === queueItemId) room.currentQueueItemId = null;
   return room;
 }
+function safeClientQueueId(id: unknown): id is string {
+  return typeof id === 'string' && /^[a-zA-Z0-9_-]{8,80}$/.test(id);
+}
 export function enqueueRequest(room: Room, item: QueueItem): Room {
   if (room.queue.some(q => q.queueItemId === item.queueItemId)) return room;
   const openLength = room.queue.filter(q => !['ended','rejected'].includes(q.status)).length;
   const normalized = queueRequest(item.songId, item.singerNumbers, item.requestedByPlayerId, openLength);
-  normalized.queueItemId = item.queueItemId || normalized.queueItemId;
+  normalized.queueItemId = safeClientQueueId(item.queueItemId) ? item.queueItemId : normalized.queueItemId;
   normalized.createdAt = item.createdAt || normalized.createdAt;
   room.queue.push(normalized);
   return room;
@@ -176,7 +179,9 @@ export function addSingerToQueueItem(room: Room, queueItemId: string, singerNumb
 }
 export function removeSingerFromQueueItem(room: Room, queueItemId: string, singerNumber: number): Room {
   const item = room.queue.find(q => q.queueItemId === queueItemId); if (!item || item.status === 'active' || item.status === 'ended') return room;
-  item.singerNumbers = item.singerNumbers.filter(n => n !== singerNumber);
+  const next = item.singerNumbers.filter(n => n !== singerNumber);
+  if (next.length === 0) throw new Error('Queue item needs at least one singer number.');
+  item.singerNumbers = next;
   return room;
 }
 export function lockHostLost(room: Room): Room {

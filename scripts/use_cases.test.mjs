@@ -75,6 +75,16 @@ test('host queue intake normalizes stale phone requests and ignores duplicate su
   assert.deepEqual(room.queue[0].singerNumbers, [p1.playerNumber]);
 });
 
+test('host queue intake replaces unsafe client queue ids', () => {
+  const host = makePlayer('host', 'Host'); const room = makeRoom(host);
+  const p1 = makePlayer('participant', 'P1'); addPlayer(room, p1);
+  const item = queueRequest('song_001', [p1.playerNumber], p1.playerId, 0);
+  item.queueItemId = 'x" autofocus onclick="alert(1)';
+  enqueueRequest(room, item);
+  assert.notEqual(room.queue[0].queueItemId, item.queueItemId);
+  assert.match(room.queue[0].queueItemId, /^[a-zA-Z0-9_-]{8,80}$/);
+});
+
 test('host start-next only selects accepted queued items', () => {
   const host = makePlayer('host', 'Host'); const room = makeRoom(host);
   const requested = queueRequest('song_requested', [1], host.playerId, 0);
@@ -96,6 +106,15 @@ test('phones can update queue singer slots before a song starts', () => {
   assert.deepEqual(room.queue[0].singerNumbers, [p1.playerNumber, p2.playerNumber]);
   removeSingerFromQueueItem(room, item.queueItemId, p1.playerNumber);
   assert.deepEqual(room.queue[0].singerNumbers, [p2.playerNumber]);
+});
+
+test('phones cannot leave a queue item with zero singers', () => {
+  const host = makePlayer('host', 'Host'); const room = makeRoom(host);
+  const p1 = makePlayer('participant', 'P1'); addPlayer(room, p1);
+  const item = queueRequest('song_001', [p1.playerNumber], p1.playerId, 0);
+  room.queue.push(item);
+  assert.throws(() => removeSingerFromQueueItem(room, item.queueItemId, p1.playerNumber), /at least one singer/);
+  assert.deepEqual(room.queue[0].singerNumbers, [p1.playerNumber]);
 });
 
 test('rejectQueue sets item status to rejected', () => {

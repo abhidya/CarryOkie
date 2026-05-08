@@ -98,8 +98,23 @@ function startQueueItem(item){
  persist();
  if(castController?.state?.().connected) loadCurrentSongOnTv();
 }
+function pairedActor(remotePeerId,msgPlayerId){
+ return room?.players?.find(p=>p.playerId===msgPlayerId && p.peerId===remotePeerId);
+}
+function validSingerNumbers(numbers){
+ const inRoom = new Set(room?.players?.map(p=>p.playerNumber).filter(Boolean) || []);
+ return [...new Set((numbers || []).filter(n=>Number.isInteger(n) && inRoom.has(n)))];
+}
+function handleQueueAddRequest(remotePeerId,msg){
+ const item = msg.item || {};
+ const actor = pairedActor(remotePeerId,item.requestedByPlayerId);
+ if(!actor?.playerNumber) throw new Error('Queue request needs a paired requester.');
+ if(!catalog.some(s=>s.songId===item.songId)) throw new Error('Queue request song is not in this room catalog.');
+ const singerNumbers = validSingerNumbers(item.singerNumbers);
+ enqueueRequest(room,{...item, requestedByPlayerId:actor.playerId, singerNumbers: singerNumbers.length ? singerNumbers : [actor.playerNumber]});
+}
 function applyPhoneQueueUpdate(remotePeerId,msg){
- const actor = room.players.find(p=>p.playerId===msg.playerId && (p.peerId===remotePeerId || msg.playerId===p.playerId));
+ const actor = pairedActor(remotePeerId,msg.playerId);
  if(!actor?.playerNumber) throw new Error('Queue update needs a paired player number.');
  const item = room.queue.find(q=>q.queueItemId===msg.queueItemId);
  if(!item) throw new Error('Queue item not found.');
@@ -116,11 +131,11 @@ function handleRpc(remotePeerId,msg){
   if(changed){ broadcastRoom(RPC.PLAYER_JOINED); persist(); renderHost($('#main')); }
  }
  if(msg.type===RPC.ROOM_STATE_SNAPSHOT && !player?.isHost){ room=msg.room; const self=room.players.find(p=>p.peerId===player.peerId || p.playerId===player.playerId); if(self) player={...player, ...self}; persist(); renderPlayer($('#main')); }
- if(msg.type===RPC.QUEUE_ADD_REQUEST && player?.isHost){ try{ enqueueRequest(room,msg.item); publishQueueUpdate(); renderHost($('#main')); }catch(e){ peerNode.send(remotePeerId,{type:RPC.ERROR_NOTICE,message:e.message}); log(e.message); } }
+ if(msg.type===RPC.QUEUE_ADD_REQUEST && player?.isHost){ try{ handleQueueAddRequest(remotePeerId,msg); publishQueueUpdate(); renderHost($('#main')); }catch(e){ peerNode.send(remotePeerId,{type:RPC.ERROR_NOTICE,message:e.message}); log(e.message); } }
  if(msg.type===RPC.QUEUE_UPDATE_REQUEST && player?.isHost){ try{ applyPhoneQueueUpdate(remotePeerId,msg); publishQueueUpdate(); renderHost($('#main')); }catch(e){ peerNode.send(remotePeerId,{type:RPC.ERROR_NOTICE,message:e.message}); log(e.message); } }
  if(msg.type===RPC.QUEUE_UPDATED && !player?.isHost){ room=msg.room; persist(); renderPlayer($('#main')); }
  if(msg.type===RPC.PLAYBACK_SYNC){ room.playbackState={...room.playbackState,...msg.sample,syncDegraded:false}; persist(); renderLyricsPanel(); syncPhoneVideo(); }
- if(msg.type===RPC.SINGER_JOIN_REQUEST && player?.isHost){ assignSingers(room,[msg.playerId]); broadcastRoom(RPC.SINGER_ASSIGNED); sendCastRoomUpdate('CAST_SET_SINGERS',{players:room.players.filter(p=>p.isSingerForCurrentSong)}); persist(); renderHost($('#main')); }
+ if(msg.type===RPC.SINGER_JOIN_REQUEST && player?.isHost){ const actor=pairedActor(remotePeerId,msg.playerId); if(actor){ const singers=[...new Set([...room.players.filter(p=>p.isSingerForCurrentSong).map(p=>p.playerId), actor.playerId])].slice(0,MAX_SINGERS); assignSingers(room,singers); broadcastRoom(RPC.SINGER_ASSIGNED); sendCastRoomUpdate('CAST_SET_SINGERS',{players:room.players.filter(p=>p.isSingerForCurrentSong)}); persist(); renderHost($('#main')); } else peerNode.send(remotePeerId,{type:RPC.ERROR_NOTICE,message:'Singer request needs a paired player.'}); }
  if(msg.type===RPC.SINGER_ASSIGNED && !player?.isHost){ room=msg.room; const self=room.players.find(p=>p.peerId===player.peerId || p.playerId===player.playerId); if(self) player={...player, ...self}; persist(); renderPlayer($('#main')); }
   if(msg.type===RPC.PLAYER_LEFT && !player?.isHost){ room=msg.room; if(room?.playbackState?.status==='host_lost'){ log('Host disconnected. TV and queue controls are locked. Create a new room to continue.'); } else { log(`Player ${msg.peerId} left the room.`); } persist(); renderPlayer($('#main')); }
   if(msg.type===RPC.MIC_MUTED && msg.playerId===player?.playerId){ setOwnMicMuted(true); log('Host muted your mic.'); }
@@ -198,8 +213,9 @@ async function renderLyricsPanel(){ const panel=$('#lyricsPanel'); if(!panel || 
 function queueHtml(r, mode='host'){
  if(!r?.queue?.length) return '<p>Queue is empty.</p>';
  return `<ul>${r.queue.map(q=>{
-  const hostControls = `${['requested','rejected'].includes(q.status)?`<button class="acceptItem" data-queue-id="${q.queueItemId}" title="Accept/requeue">Accept</button>`:''} ${q.status==='queued'?`<button class="startItem" data-queue-id="${q.queueItemId}" title="Start on TV">Start</button>`:''} ${q.status==='requested'?`<button class="rejectItem" data-queue-id="${q.queueItemId}" title="Reject">Reject</button>`:''} <button class="removeItem" data-queue-id="${q.queueItemId}" title="Remove">Remove</button>`;
-  const phoneControls = !['active','ended'].includes(q.status) ? `<button class="queueSelf" data-action="join" data-queue-id="${q.queueItemId}">Add me as singer</button> <button class="queueSelf" data-action="leave" data-queue-id="${q.queueItemId}">Remove me</button> ${q.requestedByPlayerId===player?.playerId?`<button class="queueSelf" data-action="remove" data-queue-id="${q.queueItemId}">Remove request</button>`:''}` : '';
+  const queueId = escapeHtml(q.queueItemId);
+  const hostControls = `${['requested','rejected'].includes(q.status)?`<button class="acceptItem" data-queue-id="${queueId}" title="Accept/requeue">Accept</button>`:''} ${q.status==='queued'?`<button class="startItem" data-queue-id="${queueId}" title="Start on TV">Start</button>`:''} ${q.status==='requested'?`<button class="rejectItem" data-queue-id="${queueId}" title="Reject">Reject</button>`:''} <button class="removeItem" data-queue-id="${queueId}" title="Remove">Remove</button>`;
+  const phoneControls = !['active','ended'].includes(q.status) ? `<button class="queueSelf" data-action="join" data-queue-id="${queueId}">Add me as singer</button> <button class="queueSelf" data-action="leave" data-queue-id="${queueId}">Remove me</button> ${q.requestedByPlayerId===player?.playerId?`<button class="queueSelf" data-action="remove" data-queue-id="${queueId}">Remove request</button>`:''}` : '';
   return `<li>${escapeHtml(q.status)}: ${escapeHtml(songTitle(q.songId))} singers ${escapeHtml(q.singerNumbers.join(','))} ${mode==='host'?hostControls:phoneControls}</li>`;
  }).join('')}</ul>`;
 }
