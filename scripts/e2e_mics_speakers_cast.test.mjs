@@ -351,13 +351,16 @@ test('E2E: Full room with 3 singers, 2 listeners, and Chromecast', async () => {
   const listeners = participants.slice(2); // Last 2 participants are listeners
   assert.equal(listeners.length, 2, 'Should have 2 listeners');
 
-  // Verify listeners have the host edge needed for room RPC/audio bootstrapping.
-  // Full listener↔singer mesh expansion is covered as a remaining product gap, not falsely asserted here.
+  // Listeners hear singers through host-forwarded WebRTC renegotiation, not direct TV audio.
   for (const listener of listeners) {
     const listenerNode = peerNodes.get(listener.peerId);
-    assert.ok(listenerNode.peers.has(host.peerId), `Listener should be connected to host for room coordination ${listener.playerId}`);
+    assert.ok(listenerNode.peers.has(host.peerId), `Listener should be connected to host for room coordination/audio ${listener.playerId}`);
   }
-  assert.ok(fs.readFileSync('src/webrtc.ts', 'utf8').includes('SIGNAL_RELAY_OFFER'), 'Peer-assisted mesh relay primitives should exist for the remaining expansion path');
+  const webrtcCode = fs.readFileSync('src/webrtc.ts', 'utf8');
+  const appCodeForAudio = fs.readFileSync('src/app.ts', 'utf8');
+  assert.match(webrtcCode, /relayRemoteStream/, 'Host should forward received singer streams to listener peer connections');
+  assert.match(webrtcCode, /onnegotiationneeded/, 'Adding mic tracks after pairing should renegotiate over the existing DataChannel');
+  assert.match(appCodeForAudio, /relayRemoteStream/, 'Host track handler should invoke audio relay');
 
   // Design Req #5: TV shows room code and QR
   assert.match(receiverCode, /roomCode|room-code/, 'Receiver should show room code');

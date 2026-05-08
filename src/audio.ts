@@ -18,18 +18,23 @@ export class PhoneAudio {
   gateEnabled: boolean;
   gateProcessor: ScriptProcessorNode | null;
   wakeLock: WakeLockSentinel | null = null;
+  remoteSources: MediaStreamAudioSourceNode[];
+  remoteStreams: Set<MediaStream>;
 
   constructor(log: (msg: string) => void = () => {}) {
     this.log = log; this.ctx = null; this.master = null; this.remoteGain = null; this.backingGain = null;
     this.localStream = null; this.publishedStream = null; this.micSource = null; this.micDestination = null; this.micFilters = {}; this.voicePreset = 'clean';
     this.localMonitorGain = 0; this.backingAudio = null; this.backingSource = null;
-    this.pushToSing = false; this.gateThreshold = 0.03; this.gateEnabled = false; this.gateProcessor = null;
+    this.pushToSing = false; this.gateThreshold = 0.03; this.gateEnabled = false; this.gateProcessor = null; this.remoteSources = []; this.remoteStreams = new Set();
   }
   async init(): Promise<void> {
     this.ctx = this.ctx || new AudioContext();
-    this.master = this.ctx.createGain(); this.remoteGain = this.ctx.createGain(); this.backingGain = this.ctx.createGain();
-    this.master.gain.value = 1; this.remoteGain.gain.value = 1; this.backingGain.gain.value = 0; this.localMonitorGain = 0;
-    this.remoteGain.connect(this.master); this.backingGain.connect(this.master); this.master.connect(this.ctx.destination);
+    if (!this.master || !this.remoteGain || !this.backingGain) {
+      this.master = this.ctx.createGain(); this.remoteGain = this.ctx.createGain(); this.backingGain = this.ctx.createGain();
+      this.master.gain.value = 1; this.remoteGain.gain.value = 1; this.backingGain.gain.value = 0; this.localMonitorGain = 0;
+      this.remoteGain.connect(this.master); this.backingGain.connect(this.master); this.master.connect(this.ctx.destination);
+    }
+    if (this.ctx.state === 'suspended') await this.ctx.resume?.().catch(() => {});
   }
   async requestMic({headphonesConfirmed = false, pushToSing = false}: {headphonesConfirmed?: boolean; pushToSing?: boolean} = {}): Promise<MediaStream> {
     if (!headphonesConfirmed && !pushToSing) throw new Error('TV backing track bleed risk. Use headphones or enable push-to-sing before mic publishing.');
@@ -88,7 +93,9 @@ export class PhoneAudio {
     output.gain.value = p.out;
   }
   addRemoteStream(stream: MediaStream, label = 'remote singer'): void {
-    this.init().then(() => { if (!this.ctx || !this.remoteGain) return; const src = this.ctx.createMediaStreamSource(stream); src.connect(this.remoteGain); this.log(`Receiving ${label}`); });
+    if (this.remoteStreams.has(stream)) return;
+    this.remoteStreams.add(stream);
+    this.init().then(() => { if (!this.ctx || !this.remoteGain) return; const src = this.ctx.createMediaStreamSource(stream); this.remoteSources.push(src); src.connect(this.remoteGain); this.log(`Receiving ${label}`); });
   }
   async startBackingMonitor(url: string, {headphonesConfirmed = false, speakerAck = false}: {headphonesConfirmed?: boolean; speakerAck?: boolean} = {}): Promise<HTMLAudioElement> {
     if (!headphonesConfirmed && !speakerAck) throw new Error('Use headphones before phone backing monitor. Speaker output while mic active can feed back into mic.');

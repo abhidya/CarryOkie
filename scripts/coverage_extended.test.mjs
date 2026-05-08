@@ -132,6 +132,35 @@ test('phone mic publishes filtered WebAudio stream and PeerNode routes filtered 
 });
 
 
+
+
+test('remote singer audio resumes output graph and keeps source nodes alive', async () => {
+  const oldAudioContext = globalThis.AudioContext;
+  const connected = [];
+  let resumeCalls = 0;
+  function node(name){ return { name, gain:{ value:0 }, connect(target){ connected.push([name, target?.name || 'dest']); } }; }
+  globalThis.AudioContext = class {
+    constructor(){ this.destination = { name:'speakers' }; this.state = 'suspended'; }
+    createGain(){ return node('gain'); }
+    createMediaStreamSource(){ return node('remoteSource'); }
+    async resume(){ resumeCalls++; this.state = 'running'; }
+  };
+  try {
+    const logs = [];
+    const audio = new PhoneAudio(msg => logs.push(msg));
+    const stream = { id:'remote-stream' };
+    audio.addRemoteStream(stream, 'singer-1');
+    audio.addRemoteStream(stream, 'singer-1 duplicate');
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(resumeCalls, 1, 'listener audio should resume after a prior user gesture unlocked it');
+    assert.equal(audio.remoteSources.length, 1, 'remote source node must stay referenced once without duplicate playback');
+    assert.ok(connected.some(([from]) => from === 'remoteSource'));
+    assert.ok(logs.includes('Receiving singer-1'));
+  } finally {
+    globalThis.AudioContext = oldAudioContext;
+  }
+});
+
 test('phone backing monitor creates, reuses, retargets, and pauses audio element', async () => {
   const oldAudioContext = globalThis.AudioContext;
   const oldAudio = globalThis.Audio;

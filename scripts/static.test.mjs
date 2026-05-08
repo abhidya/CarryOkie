@@ -34,7 +34,7 @@ checks.push(['5 singer cap', state.includes('MAX_SINGERS = 5')]);
 checks.push(['queue cap 20', state.includes('MAX_QUEUE_ITEMS = 20')]);
 checks.push(['crypto random UUID', state.includes('crypto.randomUUID')]);
 const app = fs.readFileSync('src/app.ts','utf8');
-checks.push(['phone offer creation has WebRTC/local HTTP guidance', webrtc.includes('assertWebRtcSupported') && webrtc.includes('local HTTP hostnames may block offer creation') && app.includes('Create player offer for host') && app.includes('GitHub Pages HTTPS URL')]);
+checks.push(['phone offer creation has WebRTC/local HTTP guidance', webrtc.includes('assertWebRtcSupported') && webrtc.includes('local HTTP hostnames may block offer creation') && app.includes('Create phone pairing code') && app.includes('GitHub Pages HTTPS URL')]);
 checks.push(['host registers ROOM_HELLO players', app.includes('msg.type===RPC.ROOM_HELLO') && app.includes('registerRemotePlayer') && app.includes('addPlayer(room')]);
 checks.push(['host sends queue and singer Cast updates', app.includes('CAST_UPDATE_QUEUE_PREVIEW') && app.includes('CAST_SET_SINGERS')]);
 checks.push(['host exposes pause seek and remote mute controls', app.includes('id="castPause"') && app.includes('id="castSeek"') && app.includes('class="mutePlayer"') && app.includes('type:RPC.MIC_MUTED')]);
@@ -55,7 +55,8 @@ checks.push(['host tracks MIC_ENABLED from players', app.includes('msg.type===RP
 checks.push(['host has reject/remove queue controls', app.includes('rejectQueue') && app.includes('removeQueueItem') && app.includes('class="rejectItem"')]);
 checks.push(['phones can see and self-update titled queue', app.includes("queueHtml(room,'phone')") && app.includes('QUEUE_UPDATE_REQUEST') && app.includes('Add me as singer') && app.includes('songTitle(q.songId)')]);
 checks.push(['phone mic exposes voice filter presets', app.includes('id="voicePreset"') && app.includes('Autotune-style polish') && fs.readFileSync('src/audio.ts','utf8').includes('setVoicePreset') && fs.readFileSync('src/audio.ts','utf8').includes('DynamicsCompressor')]);
-checks.push(['phone UI is mobile-first and touch sized', app.includes('phone-screen') && app.includes('phone-hero') && fs.readFileSync('src/styles.css','utf8').includes('iPhone') === false && fs.readFileSync('src/styles.css','utf8').includes('min-height:var(--tap)') && fs.readFileSync('src/styles.css','utf8').includes('@media (max-width: 520px)')]);
+const styles = fs.readFileSync('src/styles.css','utf8');
+checks.push(['phone UI is mobile-first, touch sized, and non-overlapping', app.includes('phone-screen') && app.includes('phone-hero') && styles.includes('iPhone') === false && /min-height:\s*var\(--tap\)/.test(styles) && styles.includes('@media (max-width: 520px)') && !/\.phone-hero\s*\{[^}]*position:\s*sticky/s.test(styles)]);
 checks.push(['player has reconnect UI', app.includes('reconnectPair') && app.includes('forgetRoom')]);
 checks.push(['debug page exposes connection diagnostics', app.includes('Connection diagnostics') && app.includes('dataChannelPeerIds') && app.includes('clockOffsetMs') && app.includes('micPermission')]);
 const cast = fs.readFileSync('src/cast.ts','utf8');
