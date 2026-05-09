@@ -69,7 +69,6 @@ export class PhoneAudio {
   async requestMic({
     pushToSing = false,
   }: {
-    headphonesConfirmed?: boolean;
     pushToSing?: boolean;
   } = {}): Promise<MediaStream> {
     await this.init();
@@ -237,13 +236,7 @@ export class PhoneAudio {
       this.log(`Receiving ${label}`);
     });
   }
-  async startBackingMonitor(
-    url: string,
-    {
-      headphonesConfirmed = false,
-      speakerAck = false,
-    }: { headphonesConfirmed?: boolean; speakerAck?: boolean } = {},
-  ): Promise<HTMLAudioElement> {
+  async startBackingMonitor(url: string): Promise<HTMLAudioElement> {
     await this.init();
     if (
       !this.backingAudio ||
