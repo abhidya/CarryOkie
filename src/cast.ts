@@ -387,12 +387,20 @@ export function receiverApp(root: HTMLElement): void {
       state.roomCode === "------"
         ? ""
         : qrSvg(playerUrl, { scale: 3, title: "Join CarryOkie room" });
+    const queueSingerLabel = (queueItem: (typeof state.queue)[number]): string =>
+      (
+        queueItem.singerNames?.length
+          ? queueItem.singerNames
+          : (queueItem.singerNumbers || []).map(
+              (singerNumber) => `#${singerNumber}`,
+            )
+      ).join(", ");
     root.querySelector("#queue")!.innerHTML =
       "<h2>Queue</h2><ol>" +
       state.queue
         .map(
           (q) =>
-            `<li>${escapeHtml(q.title || q.songId)} singers ${escapeHtml((q.singerNames?.length ? q.singerNames : (q.singerNumbers || []).map((singerNumber) => `#${singerNumber}`)).join(", "))}</li>`,
+            `<li>${escapeHtml(q.title || q.songId)} singers ${escapeHtml(queueSingerLabel(q))}</li>`,
         )
         .join("") +
       "</ol>";

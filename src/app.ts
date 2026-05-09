@@ -4,6 +4,7 @@ import {
   addPlayer,
   saveRoom,
   loadRoom,
+  type QueueItem,
   queueRequest,
   acceptQueue,
   rejectQueue,
@@ -255,7 +256,7 @@ function songTitle(songId) {
   const song = catalog.find((s) => s.songId === songId);
   return formatSongTitle(song, songId);
 }
-function queueSingerNames(queueItem) {
+function queueSingerNames(queueItem: QueueItem) {
   return queueItem.singerNumbers.map(
     (singerNumber) =>
       room?.players?.find((p) => p.playerNumber === singerNumber)?.displayName ||
@@ -803,19 +804,19 @@ function renderPlayer(main) {
   const roomCode =
     new URLSearchParams(location.search).get("room") || room?.roomCode || "";
   const currentTitle = song
-    ? `${escapeHtml(song.title || song.songId)}${song.artist ? " — " + escapeHtml(song.artist) : ""}`
+    ? `${song.title || song.songId}${song.artist ? " — " + song.artist : ""}`
     : "Pick a song";
   if (!playerIsJoined()) {
     main.innerHTML = joinRoomHtml(roomCode);
     attachJoinHandlers();
     return;
   }
-  main.innerHTML = `<section class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie phone</p><h2>${currentTitle}</h2><p class="subtle">${escapeHtml(player.displayName || "Player")} · Room ${escapeHtml(roomCode || "joined")} · Player #${escapeHtml(player.playerNumber || "?")}</p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><div class="primary-actions"><button id="enableMic" class="primary">Enable my mic</button><button id="holdSing" class="hold-button">Hold to sing</button><button id="toggleSing">Live / mute</button><button id="muteMic" class="danger">Mute mic</button></div><p id="micStatus" class="status-pill live-status">Mic muted until enabled.</p></div>
+  main.innerHTML = `<section class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie phone</p><h2>${escapeHtml(currentTitle)}</h2><p class="subtle">${escapeHtml(player.displayName || "Player")} · Room ${escapeHtml(roomCode || "joined")} · Player #${escapeHtml(player.playerNumber || "?")}</p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><div class="primary-actions"><button id="enableMic" class="primary">Enable my mic</button><button id="holdSing" class="hold-button">Hold to sing</button><button id="toggleSing">Live / mute</button><button id="muteMic" class="danger">Mute mic</button></div><p id="micStatus" class="status-pill live-status">Mic muted until enabled.</p></div>
 <details class="card" open><summary>1. Profile</summary><label>Your name<input id="displayName" value="${escapeHtml(player.displayName || "Player")}" placeholder="Your name"></label></details>
 <details class="card" open><summary>2. Queue songs</summary><label>Song<select id="song">${catalog.map((s) => `<option value="${s.songId}">${escapeHtml(s.title)} — ${escapeHtml(s.artist)}</option>`).join("")}</select></label><label>Singers<input id="singers" value="${player.playerNumber || 2}" placeholder="Singer numbers comma separated"></label><div class="button-row"><button id="requestSong" class="primary">Add song to queue</button><button id="requestSinger">Make me a singer</button></div><div class="queue-list">${queueHtml(room, "phone")}</div></details>
 <details class="card" open><summary>3. Mic setup</summary><p class="warn compact">${singerWarning}</p><label class="check"><input type="checkbox" id="pushToSing"> Push-to-sing</label><label>Mic filter<select id="voicePreset"><option value="clean">Clean</option><option value="alto">Alto warm</option><option value="bravo">Bravo bright</option><option value="bass">Bass low</option><option value="radio">Radio</option><option value="autotune">Autotune-style polish</option></select></label><div class="button-row"><button id="startBacking">Start backing monitor</button><button id="pauseBacking">Pause backing monitor</button></div><label>Remote gain <input id="remoteGain" type="range" min="0" max="2" value="1" step=".05"></label><label>Backing monitor gain <input id="backingGain" type="range" min="0" max="1" value="0.35" step=".05"></label><label>Master gain <input id="masterGain" type="range" min="0" max="2" value="1" step=".05"></label><p id="wake" class="subtle"></p></details>
 <details class="card"><summary>4. Lyrics / sync</summary><video id="phoneVideo" controls playsinline muted></video><div id="lyricsPanel"></div><div class="button-row"><button id="earlier">Lyrics earlier</button><button id="later">Lyrics later</button><button id="resetSync">Reset sync</button></div></details>
-<details class="card"><summary>Debug room state</summary><pre>${JSON.stringify(room || { status: "not paired" }, null, 2)}</pre></details></section>`;
+<details class="card"><summary>Debug room state</summary><pre>${escapeHtml(JSON.stringify(room || { status: "not paired" }, null, 2))}</pre></details></section>`;
   document
     .querySelectorAll("button")
     .forEach((b) => b.addEventListener("click", unlockPhoneAudio));
@@ -1008,7 +1009,7 @@ export async function debugPage(root) {
     localStorage.getItem("carryokie.player") || "null",
   );
   $("#main").innerHTML =
-    `<section class="card"><h2>Local state</h2><button id="refresh">Refresh</button><pre>${JSON.stringify({ room: savedRoom, player: savedPlayer }, null, 2)}</pre><h2>Connection diagnostics</h2><pre>${JSON.stringify({ peerId: savedPlayer?.peerId, hostPeerId: savedRoom?.hostPeerId, dataChannelPeerIds: peerNode ? [...peerNode.peers.keys()] : [], clockOffsetMs: peerNode?.clockOffsetMs ?? null, castState: castController?.state?.() ?? savedRoom?.castState ?? null, micPermission: savedPlayer?.micState?.permissionState ?? "unknown" }, null, 2)}</pre><p>ICE failures mean network may require TURN/different Wi-Fi. Strict MVP uses STUN only.</p><p>Keep phone unlocked and tab open; mobile browsers may suspend audio/WebRTC.</p></section><section class="card"><h2>Manual offer/answer</h2><p>Use these for manual pairing when WebRTC signaling fails.</p><div id="debugRole"></div><button id="debugOffer">Create offer</button><div id="offerOut"></div><textarea id="debugAnswer" placeholder="Paste answer/link/chunks"></textarea><button id="debugImport">Import answer</button><div id="answerOut"></div></section>`;
+    `<section class="card"><h2>Local state</h2><button id="refresh">Refresh</button><pre>${escapeHtml(JSON.stringify({ room: savedRoom, player: savedPlayer }, null, 2))}</pre><h2>Connection diagnostics</h2><pre>${escapeHtml(JSON.stringify({ peerId: savedPlayer?.peerId, hostPeerId: savedRoom?.hostPeerId, dataChannelPeerIds: peerNode ? [...peerNode.peers.keys()] : [], clockOffsetMs: peerNode?.clockOffsetMs ?? null, castState: castController?.state?.() ?? savedRoom?.castState ?? null, micPermission: savedPlayer?.micState?.permissionState ?? "unknown" }, null, 2))}</pre><p>ICE failures mean network may require TURN/different Wi-Fi. Strict MVP uses STUN only.</p><p>Keep phone unlocked and tab open; mobile browsers may suspend audio/WebRTC.</p></section><section class="card"><h2>Manual offer/answer</h2><p>Use these for manual pairing when WebRTC signaling fails.</p><div id="debugRole"></div><button id="debugOffer">Create offer</button><div id="offerOut"></div><textarea id="debugAnswer" placeholder="Paste answer/link/chunks"></textarea><button id="debugImport">Import answer</button><div id="answerOut"></div></section>`;
   $("#refresh").onclick = () => location.reload();
   $("#debugOffer").onclick = async () => {
     try {
