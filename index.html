@@ -7,17 +7,27 @@
     <link rel="stylesheet" href="src/styles.css" />
   </head>
   <body>
-    <main class="shell">
-      <h1>CarryOkie</h1>
-      <p>
-        Chromecast karaoke: TV plays backing track/video; phones carry singer
-        mics.
-      </p>
-      <nav class="cards">
-        <a href="host/">Host room</a>
-        <a href="player/">Join player</a>
-        <a href="receiver/">Cast receiver</a>
-      </nav>
+    <main class="shell landing-shell">
+      <section class="app-hero card">
+        <div class="hero-copy">
+          <p class="eyebrow">Static karaoke room</p>
+          <h1>CarryOkie</h1>
+          <p>
+            Chromecast karaoke: TV plays backing track/video; phones carry singer
+            mics.
+          </p>
+          <nav class="cards hero-actions" aria-label="CarryOkie pages">
+            <a class="primary" href="host/">Host room</a>
+            <a href="player/">Join player</a>
+            <a href="receiver/">Cast receiver</a>
+          </nav>
+        </div>
+        <div class="stage-art" aria-hidden="true">
+          <div class="stage-orb"></div>
+          <div class="stage-mic"></div>
+          <div class="soundwave"><span></span><span></span><span></span><span></span><span></span></div>
+        </div>
+      </section>
     </main>
   </body>
 </html>
