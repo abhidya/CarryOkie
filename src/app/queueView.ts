@@ -7,7 +7,7 @@ function singerNames(room: Room, singerNumbers: number[]): string {
       room.players.find((roomPlayer) => roomPlayer.playerNumber === singerNumber)
         ?.displayName || `#${singerNumber}`,
   );
-  return labels.length ? labels.join(", ") : "Unassigned";
+  return labels.join(", ");
 }
 
 export function queueHtml(
