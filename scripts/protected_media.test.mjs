@@ -82,7 +82,17 @@ assert.match(protectedMedia, /hasWebCryptoAes/);
 assert.match(protectedMedia, /defaultCastMediaUrl/);
 assert.match(protectedMedia, /MEDIA_KEY_B64/);
 const app = fs.readFileSync("src/app.ts", "utf8");
-assert.match(app, /loadProtectedCatalog/);
+const appSources = [
+  "src/app.ts",
+  "src/app/catalog.ts",
+  "src/app/lyricsView.ts",
+  "src/app/queueService.ts",
+  "src/app/queueView.ts",
+]
+  .filter((file) => fs.existsSync(file))
+  .map((file) => fs.readFileSync(file, "utf8"))
+  .join("\n");
+assert.match(appSources, /loadProtectedCatalog/);
 assert.match(app, /phoneVideo/);
 assert.match(app, /Lyric video loaded above/);
 const cast = fs.readFileSync("src/cast.ts", "utf8");

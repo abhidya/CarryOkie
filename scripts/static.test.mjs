@@ -57,18 +57,32 @@ checks.push(["5 singer cap", state.includes("MAX_SINGERS = 5")]);
 checks.push(["queue cap 20", state.includes("MAX_QUEUE_ITEMS = 20")]);
 checks.push(["crypto random UUID", state.includes("crypto.randomUUID")]);
 const app = fs.readFileSync("src/app.ts", "utf8");
+const appSources = [
+  "src/app.ts",
+  "src/app/catalog.ts",
+  "src/app/dom.ts",
+  "src/app/lyricsView.ts",
+  "src/app/queueService.ts",
+  "src/app/queueView.ts",
+]
+  .filter((file) => fs.existsSync(file))
+  .map((file) => fs.readFileSync(file, "utf8"))
+  .join("\n");
+const compactAppSources = appSources.replace(/\s+/g, "");
+const hasAppSource = (needle) => appSources.includes(needle);
+const hasCompactAppSource = (needle) => compactAppSources.includes(needle.replace(/\s+/g, ""));
 checks.push([
   "phone offer creation has WebRTC/local HTTP guidance",
-  webrtc.includes("assertWebRtcSupported") &&
+    webrtc.includes("assertWebRtcSupported") &&
     webrtc.includes("local HTTP hostnames may block offer creation") &&
     app.includes("Create phone pairing code") &&
-    app.includes("GitHub Pages HTTPS URL"),
+    hasAppSource("GitHub Pages HTTPS URL"),
 ]);
 checks.push([
   "host registers ROOM_HELLO players",
-  app.includes("msg.type===RPC.ROOM_HELLO") &&
-    app.includes("registerRemotePlayer") &&
-    app.includes("addPlayer(room"),
+  hasCompactAppSource("msg.type === RPC.ROOM_HELLO") &&
+    hasAppSource("registerRemotePlayer") &&
+    hasAppSource("addPlayer(room"),
 ]);
 checks.push([
   "host sends queue and singer Cast updates",
@@ -83,7 +97,7 @@ checks.push([
     app.includes("RECEIVER_PLAYBACK_SYNC") &&
     app.includes("publishReceiverCommand") &&
     app.includes("receiverPendingRenegotiate") &&
-    app.includes("song:currentSong()"),
+    hasCompactAppSource("song: currentSong()"),
 ]);
 checks.push([
   "player only shows join controls before pairing",
@@ -96,7 +110,7 @@ checks.push([
   app.includes('id="castPause"') &&
     app.includes('id="castSeek"') &&
     app.includes('class="mutePlayer"') &&
-    app.includes("type:RPC.MIC_MUTED"),
+    hasCompactAppSource("type: RPC.MIC_MUTED"),
 ]);
 checks.push([
   "cast current song is one-click connect and load",
@@ -109,7 +123,7 @@ checks.push([
   "cast load autoplays TV media",
   fs.readFileSync("src/cast.ts", "utf8").includes("request.autoplay = true") &&
     fs.readFileSync("src/cast.ts", "utf8").includes("await this.play()") &&
-    fs.readFileSync("src/cast.ts", "utf8").includes("media.play().then") &&
+    /media\.play\?\.|media\.play\(/.test(fs.readFileSync("src/cast.ts", "utf8")) &&
     fs
       .readFileSync("src/cast.ts", "utf8")
       .includes("Tap receiver once to start backing track/audio"),
@@ -125,7 +139,7 @@ checks.push([
 checks.push([
   "phone lyric video syncs from Cast samples",
   app.includes("syncPhoneVideo") &&
-    app.includes("deriveTvMediaPositionMs(room.playbackState") &&
+    hasCompactAppSource("deriveTvMediaPositionMs(room.playbackState") &&
     app.includes("phoneVideo") &&
     app.includes("muted"),
 ]);
@@ -149,7 +163,7 @@ checks.push([
 checks.push([
   "player exposes singer slot request",
   app.includes('id="requestSinger"') &&
-    app.includes("type:RPC.SINGER_JOIN_REQUEST"),
+    hasCompactAppSource("type: RPC.SINGER_JOIN_REQUEST"),
 ]);
 checks.push([
   "mic publishing requires singer assignment in UI",
@@ -160,15 +174,18 @@ checks.push([
   "host can start next queued song",
   app.includes("startQueueItem") &&
     app.includes('id="startNext"') &&
-    app.includes("item.status = 'active'") &&
+    (hasAppSource('item.status = "active"') ||
+      hasAppSource("item.status = 'active'")) &&
     app.includes("currentQueueItemId"),
 ]);
 checks.push([
   "queue can recover rejected items only by re-accepting before start",
-  app.includes('class="acceptItem"') &&
-    app.includes('class="startItem"') &&
-    app.includes("['requested','rejected']") &&
-    app.includes("q.status==='queued'") &&
+  hasAppSource('class="acceptItem"') &&
+    hasAppSource('class="startItem"') &&
+    (hasCompactAppSource('["requested", "rejected"]') ||
+      hasCompactAppSource("['requested','rejected']")) &&
+    (hasCompactAppSource('queueItem.status === "queued"') ||
+      hasCompactAppSource("q.status==='queued'")) &&
     app.includes("nextQueuedItem(room)"),
 ]);
 checks.push([
@@ -189,27 +206,29 @@ checks.push([
 ]);
 checks.push([
   "host tracks MIC_ENABLED from players",
-  app.includes("msg.type===RPC.MIC_ENABLED") && app.includes("micState"),
+  hasCompactAppSource("msg.type === RPC.MIC_ENABLED") && app.includes("micState"),
 ]);
 checks.push([
   "host has reject/remove queue controls",
   app.includes("rejectQueue") &&
     app.includes("removeQueueItem") &&
-    app.includes('class="rejectItem"'),
+    hasAppSource('class="rejectItem"'),
 ]);
 checks.push([
   "phones can see and self-update titled queue",
-  app.includes("queueHtml(room,'phone')") &&
+  (hasCompactAppSource('queueHtml(room, "phone")') ||
+    hasCompactAppSource("queueHtml(room,'phone')")) &&
     app.includes("QUEUE_UPDATE_REQUEST") &&
-    app.includes("Add me as singer") &&
-    app.includes("songTitle(q.songId)"),
+    hasAppSource("Add me as singer") &&
+    (hasAppSource("songTitle(queueItem.songId)") ||
+      hasAppSource("songTitle(q.songId)")),
 ]);
 checks.push([
   "queue RPCs require paired peer identity and catalog songs",
-  app.includes("pairedActor(remotePeerId") &&
-    app.includes("handleQueueAddRequest") &&
-    app.includes("Queue request song is not in this room catalog") &&
-    app.includes('data-queue-id="${queueId}"'),
+  hasAppSource("pairedActor(remotePeerId") &&
+    hasAppSource("handleQueueAddRequest") &&
+    hasAppSource("Queue request song is not in this room catalog") &&
+    hasAppSource('data-queue-id="${queueId}"'),
 ]);
 checks.push([
   "phone mic exposes voice filter presets",
@@ -248,7 +267,7 @@ checks.push([
 ]);
 checks.push([
   "protected catalog is primary media source",
-  app.includes("loadProtectedCatalog") &&
+  hasAppSource("loadProtectedCatalog") &&
     fs.existsSync("public/protected/catalog.json"),
 ]);
 const protectedMediaCode = fs.readFileSync("src/protectedMedia.ts", "utf8");

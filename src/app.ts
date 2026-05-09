@@ -8,10 +8,7 @@ import {
   acceptQueue,
   rejectQueue,
   removeQueueItem,
-  enqueueRequest,
   nextQueuedItem,
-  addSingerToQueueItem,
-  removeSingerFromQueueItem,
   assignSingers,
   MAX_SINGERS,
   lockHostLost,
@@ -32,10 +29,21 @@ import { PhoneAudio, singerWarning } from "./audio.ts";
 import { CastController, receiverApp } from "./cast.ts";
 import { deriveTvMediaPositionMs } from "./sync.ts";
 import {
-  loadProtectedCatalog,
   resolvePlayableMediaUrl,
   isProtectedMedia,
 } from "./protectedMedia.ts";
+import { $, commonChrome, escapeHtml, logToPage } from "./app/dom.ts";
+import {
+  formatSongTitle,
+  loadSongCatalog,
+} from "./app/catalog.ts";
+import { lyricView } from "./app/lyricsView.ts";
+import {
+  applyPhoneQueueUpdate as applyPhoneQueueUpdateToRoom,
+  handleQueueAddRequest as handleQueueAddRequestForRoom,
+  pairedActor as findPairedActor,
+} from "./app/queueService.ts";
+import { queueHtml as renderQueueHtml } from "./app/queueView.ts";
 let room = loadRoom();
 let player = JSON.parse(localStorage.getItem("carryokie.player") || "null");
 let peerNode;
@@ -51,69 +59,20 @@ let receiverAudioDirty = false;
 let receiverNegotiating = false;
 let receiverPendingRenegotiate = false;
 const receiverStreams = new Set();
-const $ = (s, el = document) => el.querySelector(s);
 function persist() {
   if (room) saveRoom(room);
   if (player) localStorage.setItem("carryokie.player", JSON.stringify(player));
 }
 function log(msg) {
-  const el = $("#log");
-  if (el)
-    el.prepend(
-      Object.assign(document.createElement("div"), {
-        textContent: `${new Date().toLocaleTimeString()} ${msg}`,
-      }),
-    );
-}
-function assetUrl(path) {
-  if (!path) return null;
-  const publicPath = path.startsWith("/public/")
-    ? path.slice("/public".length)
-    : path;
-  return publicPath.startsWith("/")
-    ? new URL(".." + publicPath, import.meta.url).toString()
-    : new URL(publicPath, import.meta.url).toString();
-}
-function normalizeSong(song) {
-  return {
-    ...song,
-    lyricsJsonUrl: assetUrl(song.lyricsJsonUrl),
-    lyricsVttUrl: assetUrl(song.lyricsVttUrl),
-    castMediaUrl: assetUrl(song.castMediaUrl),
-    phoneBackingAudioUrl: assetUrl(song.phoneBackingAudioUrl),
-    thumbnailUrl: assetUrl(song.thumbnailUrl),
-  };
+  logToPage(msg);
 }
 async function loadCatalog() {
-  const protectedSongs = await loadProtectedCatalog();
-  let plainSongs = [];
-  try {
-    plainSongs = await fetch(assetUrl("/songs/catalog.json"))
-      .then((r) => (r.ok ? r.json() : { songs: [] }))
-      .then((j) => (j.songs || []).map(normalizeSong));
-  } catch {
-    plainSongs = [];
-  }
-  catalog = [...protectedSongs, ...plainSongs];
-}
-function lyricView(lines, tMs) {
-  const active =
-    lines.findLast?.((l) => tMs >= l.startMs) ||
-    lines.filter((l) => tMs >= l.startMs).pop() ||
-    lines[0];
-  return `<div>${lines.map((l) => `<p class="${l === active ? "active" : ""}">${l.text}</p>`).join("")}</div>`;
-}
-function localHttpWarning() {
-  const h = location.hostname;
-  return location.protocol === "http:" && h !== "localhost" && h !== "127.0.0.1"
-    ? '<p class="warn">Phone browser is on local HTTP. If offer creation, camera QR, or protected video fails, use the GitHub Pages HTTPS URL for the full flow.</p>'
-    : "";
-}
-function commonChrome(root, title) {
-  root.innerHTML = `<main class="shell"><header><h1>${title}</h1>${localHttpWarning()}</header><section id="main"></section><section><h2>Log</h2><div id="log" class="log"></div></section></main>`;
+  catalog = await loadSongCatalog(import.meta.url);
 }
 function unlockPhoneAudio() {
-  audio?.init().catch(() => {});
+  audio?.init().catch((error) => {
+    log(error?.message || "Phone audio unlock was ignored by the browser.");
+  });
 }
 function setupPeer(localPeerId) {
   peerNode = new PeerNode(localPeerId);
@@ -291,23 +250,15 @@ function setupReceiverBridge() {
     }
   };
 }
-function escapeHtml(value) {
-  return String(value ?? "").replace(
-    /[&<>"']/g,
-    (c) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
-        c
-      ],
-  );
-}
 function songTitle(songId) {
   const song = catalog.find((s) => s.songId === songId);
-  return song
-    ? `${song.title || song.songId}${song.artist ? " — " + song.artist : ""}`
-    : songId;
+  return formatSongTitle(song, songId);
 }
 function queuePreview() {
   return room.queue.map((q) => ({ ...q, title: songTitle(q.songId) }));
+}
+function queueHtml(r, mode = "host") {
+  return renderQueueHtml(r, mode, songTitle, player);
 }
 function publishQueueUpdate() {
   broadcastRoom(RPC.QUEUE_UPDATED);
@@ -459,51 +410,13 @@ function startQueueItem(item) {
   if (castController?.state?.().connected) loadCurrentSongOnTv();
 }
 function pairedActor(remotePeerId, msgPlayerId) {
-  return room?.players?.find(
-    (p) => p.playerId === msgPlayerId && p.peerId === remotePeerId,
-  );
-}
-function validSingerNumbers(numbers) {
-  const inRoom = new Set(
-    room?.players?.map((p) => p.playerNumber).filter(Boolean) || [],
-  );
-  return [
-    ...new Set(
-      (numbers || []).filter((n) => Number.isInteger(n) && inRoom.has(n)),
-    ),
-  ];
+  return findPairedActor(room, remotePeerId, msgPlayerId);
 }
 function handleQueueAddRequest(remotePeerId, msg) {
-  const item = msg.item || {};
-  const actor = pairedActor(remotePeerId, item.requestedByPlayerId);
-  if (!actor?.playerNumber)
-    throw new Error("Queue request needs a paired requester.");
-  if (!catalog.some((s) => s.songId === item.songId))
-    throw new Error("Queue request song is not in this room catalog.");
-  const singerNumbers = validSingerNumbers(item.singerNumbers);
-  enqueueRequest(room, {
-    ...item,
-    requestedByPlayerId: actor.playerId,
-    singerNumbers: singerNumbers.length ? singerNumbers : [actor.playerNumber],
-  });
+  handleQueueAddRequestForRoom(room, catalog, remotePeerId, msg);
 }
 function applyPhoneQueueUpdate(remotePeerId, msg) {
-  const actor = pairedActor(remotePeerId, msg.playerId);
-  if (!actor?.playerNumber)
-    throw new Error("Queue update needs a paired player number.");
-  const item = room.queue.find((q) => q.queueItemId === msg.queueItemId);
-  if (!item) throw new Error("Queue item not found.");
-  if (msg.action === "join")
-    addSingerToQueueItem(room, item.queueItemId, actor.playerNumber);
-  else if (msg.action === "leave")
-    removeSingerFromQueueItem(room, item.queueItemId, actor.playerNumber);
-  else if (
-    msg.action === "remove" &&
-    item.requestedByPlayerId === actor.playerId &&
-    !["active", "ended"].includes(item.status)
-  )
-    removeQueueItem(room, item.queueItemId);
-  else throw new Error("Queue update not allowed.");
+  applyPhoneQueueUpdateToRoom(room, remotePeerId, msg);
 }
 function handleRpc(remotePeerId, msg) {
   log(`${msg.type} from ${remotePeerId}`);
@@ -943,7 +856,9 @@ function renderPlayer(main) {
     e.preventDefault();
     try {
       hold.setPointerCapture?.(e.pointerId);
-    } catch {}
+    } catch (error) {
+      log(error?.message || "Pointer capture unavailable for hold-to-sing.");
+    }
     setOwnMicMuted(false);
   };
   hold.onpointerup = () => setOwnMicMuted(true);
@@ -1052,19 +967,6 @@ async function renderLyricsPanel() {
     (derived.syncDegraded
       ? '<p class="warn">Sync degraded: waiting for actual TV Cast media status.</p>'
       : "") + lyricView(lyrics.lines, t);
-}
-function queueHtml(r, mode = "host") {
-  if (!r?.queue?.length) return "<p>Queue is empty.</p>";
-  return `<ul>${r.queue
-    .map((q) => {
-      const queueId = escapeHtml(q.queueItemId);
-      const hostControls = `${["requested", "rejected"].includes(q.status) ? `<button class="acceptItem" data-queue-id="${queueId}" title="Accept/requeue">Accept</button>` : ""} ${q.status === "queued" ? `<button class="startItem" data-queue-id="${queueId}" title="Start on TV">Start</button>` : ""} ${q.status === "requested" ? `<button class="rejectItem" data-queue-id="${queueId}" title="Reject">Reject</button>` : ""} <button class="removeItem" data-queue-id="${queueId}" title="Remove">Remove</button>`;
-      const phoneControls = !["active", "ended"].includes(q.status)
-        ? `<button class="queueSelf" data-action="join" data-queue-id="${queueId}">Add me as singer</button> <button class="queueSelf" data-action="leave" data-queue-id="${queueId}">Remove me</button> ${q.requestedByPlayerId === player?.playerId ? `<button class="queueSelf" data-action="remove" data-queue-id="${queueId}">Remove request</button>` : ""}`
-        : "";
-      return `<li>${escapeHtml(q.status)}: ${escapeHtml(songTitle(q.songId))} singers ${escapeHtml(q.singerNumbers.join(","))} ${mode === "host" ? hostControls : phoneControls}</li>`;
-    })
-    .join("")}</ul>`;
 }
 export async function debugPage(root) {
   commonChrome(root, "Debug");
