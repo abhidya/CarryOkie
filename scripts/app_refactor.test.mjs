@@ -62,6 +62,8 @@ test("queue view keeps host and phone controls tied to queue status", () => {
   assert.match(hostHtml, /class="acceptItem"/);
   assert.match(hostHtml, /class="rejectItem"/);
   assert.doesNotMatch(hostHtml, /class="startItem"/);
+  assert.match(hostHtml, /singers Singer/);
+  assert.match(hostHtml, /requested by Singer/);
   const phoneHtml = queueHtml(room, "phone", () => "Song One", singer);
   assert.match(phoneHtml, /data-action="join"/);
   assert.match(phoneHtml, /Remove request/);

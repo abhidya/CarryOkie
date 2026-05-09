@@ -125,6 +125,14 @@ export function makeRoomCode(): string {
     words[Math.floor(Math.random() * words.length)]
   );
 }
+export function normalizeDisplayName(
+  displayName: unknown,
+  fallback = "Guest",
+): string {
+  if (typeof displayName !== "string") return fallback;
+  const normalized = displayName.trim().replace(/\s+/g, " ").slice(0, 32);
+  return normalized || fallback;
+}
 export function makePlayer(
   role = "participant",
   displayName = "Guest",
@@ -133,7 +141,7 @@ export function makePlayer(
     peerId: uuid(),
     playerId: uuid(),
     playerNumber: null,
-    displayName,
+    displayName: normalizeDisplayName(displayName, "Guest"),
     role: role as Player["role"],
     isHost: role === "host",
     isSingerForCurrentSong: false,

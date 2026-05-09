@@ -369,19 +369,11 @@ test("phone backing monitor creates, reuses, retargets, and pauses audio element
   };
   try {
     const audio = new PhoneAudio(() => {});
-    await assert.rejects(
-      () => audio.startBackingMonitor("/a.mp4"),
-      /Use headphones/,
-    );
-    const first = await audio.startBackingMonitor("/a.mp4", {
-      headphonesConfirmed: true,
-    });
+    const first = await audio.startBackingMonitor("/a.mp4");
     assert.equal(first.src, "/a.mp4");
     assert.equal(first.crossOrigin, "anonymous");
     assert.equal(audio.backingGain.gain.value, 0.35);
-    const second = await audio.startBackingMonitor("/b.mp4", {
-      headphonesConfirmed: true,
-    });
+    const second = await audio.startBackingMonitor("/b.mp4");
     assert.equal(second, first);
     assert.equal(first.src, "/b.mp4");
     audio.pauseBackingMonitor();
@@ -679,9 +671,50 @@ test("QR scanner reports unsupported browser and insecure media errors", async (
   }
 });
 
-test("mic publishing requires headphones or push-to-sing before getUserMedia", async () => {
-  const audio = new PhoneAudio(() => {});
-  await assert.rejects(() => audio.requestMic(), /TV backing track bleed risk/);
+test("mic publishing can request getUserMedia without a headphone confirmation gate", async () => {
+  const oldAudioContext = globalThis.AudioContext;
+  const oldNavigator = globalThis.navigator;
+  const calls = [];
+  globalThis.AudioContext = class {
+    constructor() {
+      this.destination = {};
+    }
+    createGain() {
+      return { gain: { value: 0 }, connect() {} };
+    }
+    createMediaStreamSource() {
+      return { connect() {} };
+    }
+    createScriptProcessor() {
+      return { connect() {}, onaudioprocess: null };
+    }
+  };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: {
+      mediaDevices: {
+        async getUserMedia(constraints) {
+          calls.push(constraints);
+          return {
+            getAudioTracks() {
+              return [];
+            },
+          };
+        },
+      },
+    },
+  });
+  try {
+    const audio = new PhoneAudio(() => {});
+    await audio.requestMic();
+    assert.equal(calls.length, 1);
+  } finally {
+    globalThis.AudioContext = oldAudioContext;
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: oldNavigator,
+    });
+  }
 });
 
 let failed = 0;

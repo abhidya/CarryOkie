@@ -12,6 +12,7 @@ import {
   assignSingers,
   MAX_SINGERS,
   lockHostLost,
+  normalizeDisplayName,
 } from "./state.ts";
 import {
   PeerNode,
@@ -254,8 +255,19 @@ function songTitle(songId) {
   const song = catalog.find((s) => s.songId === songId);
   return formatSongTitle(song, songId);
 }
+function queueSingerNames(queueItem) {
+  return queueItem.singerNumbers.map(
+    (singerNumber) =>
+      room?.players?.find((p) => p.playerNumber === singerNumber)?.displayName ||
+      `#${singerNumber}`,
+  );
+}
 function queuePreview() {
-  return room.queue.map((q) => ({ ...q, title: songTitle(q.songId) }));
+  return room.queue.map((q) => ({
+    ...q,
+    title: songTitle(q.songId),
+    singerNames: queueSingerNames(q),
+  }));
 }
 function queueHtml(r, mode = "host") {
   return renderQueueHtml(r, mode, songTitle, player);
@@ -314,13 +326,24 @@ function registerRemotePlayer(remotePeerId, remotePlayer) {
       p.peerId === remotePlayer.peerId || p.playerId === remotePlayer.playerId,
   );
   if (existing) {
+    const nextDisplayName = normalizeDisplayName(
+      remotePlayer.displayName,
+      existing.displayName || "Guest",
+    );
+    const changed =
+      existing.displayName !== nextDisplayName ||
+      existing.connectionState !== "connected" ||
+      existing.peerId !== (remotePlayer.peerId || remotePeerId);
+    existing.displayName = nextDisplayName;
+    existing.peerId = remotePlayer.peerId || remotePeerId;
     existing.connectionState = "connected";
     existing.lastSeenAt = Date.now();
-    return false;
+    return changed;
   }
   addPlayer(room, {
     ...remotePlayer,
     peerId: remotePlayer.peerId || remotePeerId,
+    displayName: normalizeDisplayName(remotePlayer.displayName, "Guest"),
     role: "participant",
     isHost: false,
     connectionState: "connected",
@@ -425,6 +448,7 @@ function handleRpc(remotePeerId, msg) {
     peerNode.send(remotePeerId, { type: RPC.ROOM_STATE_SNAPSHOT, room });
     if (changed) {
       broadcastRoom(RPC.PLAYER_JOINED);
+      broadcastRoom();
       persist();
       renderHost($("#main"));
     }
@@ -698,6 +722,8 @@ export async function playerPage(root) {
     player = makePlayer("participant", "Player");
     persist();
   }
+  player.displayName = normalizeDisplayName(player.displayName, "Player");
+  persist();
   setupPeer(player.peerId);
   audio = new PhoneAudio(log);
   commonChrome(root, "Player Phone");
@@ -716,7 +742,22 @@ function joinRoomHtml(roomCode) {
   const reconnect = room?.hostPeerId
     ? `<div class="card"><h2>Reconnect</h2><p>Previously in room <strong>${escapeHtml(room.roomCode)}</strong>. Create a fresh phone pairing code and ask the host for a new answer.</p><button id="forgetRoom">Forget room, start fresh</button></div>`
     : "";
-  return `<section class="phone-screen"><div class="phone-hero card"><p class="eyebrow">Player pairing</p><h2>Join room ${escapeHtml(roomCode || "")}</h2><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p class="subtle">Pair this phone with the host. After joining, queue and mic controls appear.</p></div><details class="card" open><summary>Join room</summary><label>Room code<input id="roomCode" value="${escapeHtml(roomCode)}" placeholder="Room code"></label><button id="makeOffer" class="primary">Create phone pairing code</button><div id="offerOut"></div><label>Host answer<textarea id="answer" placeholder="Paste host answer/link/chunks"></textarea></label><div class="button-row"><button id="scanAnswerQr">Scan host answer QR</button><button id="importAnswer" class="primary">Finish pairing</button></div></details>${reconnect}</section>`;
+  return `<section class="phone-screen"><div class="phone-hero card"><p class="eyebrow">Player pairing</p><h2>Join room ${escapeHtml(roomCode || "")}</h2><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p class="subtle">Pair this phone with the host. After joining, queue and mic controls appear.</p></div><details class="card" open><summary>Join room</summary><label>Your name<input id="displayName" value="${escapeHtml(player?.displayName || "Player")}" placeholder="Your name"></label><label>Room code<input id="roomCode" value="${escapeHtml(roomCode)}" placeholder="Room code"></label><button id="makeOffer" class="primary">Create phone pairing code</button><div id="offerOut"></div><label>Host answer<textarea id="answer" placeholder="Paste host answer/link/chunks"></textarea></label><div class="button-row"><button id="scanAnswerQr">Scan host answer QR</button><button id="importAnswer" class="primary">Finish pairing</button></div></details>${reconnect}</section>`;
+}
+function updatePlayerDisplayName() {
+  if (!player) return;
+  const input = $("#displayName");
+  const nextDisplayName = normalizeDisplayName(input?.value, "Player");
+  if (input) input.value = nextDisplayName;
+  const changed = player.displayName !== nextDisplayName;
+  player = { ...player, displayName: nextDisplayName };
+  persist();
+  if (changed && playerIsJoined() && room?.hostPeerId)
+    peerNode?.send(room.hostPeerId, {
+      type: RPC.ROOM_HELLO,
+      peerId: player.peerId,
+      player,
+    });
 }
 function attachJoinHandlers() {
   document
@@ -724,6 +765,7 @@ function attachJoinHandlers() {
     .forEach((b) => b.addEventListener("click", unlockPhoneAudio));
   $("#makeOffer").onclick = async () => {
     try {
+      updatePlayerDisplayName();
       assertWebRtcSupported();
       const encoded = await peerNode.createManualOffer("host");
       renderPayloadCard($("#offerOut"), encoded, "Player offer");
@@ -740,6 +782,7 @@ function attachJoinHandlers() {
   };
   $("#importAnswer").onclick = async () => {
     try {
+      updatePlayerDisplayName();
       await peerNode.acceptManualAnswer($("#answer").value);
       log("Answer imported. Waiting for DataChannel open.");
     } catch (e) {
@@ -751,6 +794,7 @@ function attachJoinHandlers() {
     localStorage.removeItem("carryokie.player");
     location.reload();
   });
+  $("#displayName")?.addEventListener("change", updatePlayerDisplayName);
 }
 function renderPlayer(main) {
   const song =
@@ -766,14 +810,16 @@ function renderPlayer(main) {
     attachJoinHandlers();
     return;
   }
-  main.innerHTML = `<section class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie phone</p><h2>${currentTitle}</h2><p class="subtle">Room ${escapeHtml(roomCode || "joined")} · Player #${escapeHtml(player.playerNumber || "?")}</p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><div class="primary-actions"><button id="enableMic" class="primary">Enable my mic</button><button id="holdSing" class="hold-button">Hold to sing</button><button id="toggleSing">Live / mute</button><button id="muteMic" class="danger">Mute mic</button></div><p id="micStatus" class="status-pill live-status">Mic muted until enabled.</p></div>
-<details class="card" open><summary>1. Queue songs</summary><label>Song<select id="song">${catalog.map((s) => `<option value="${s.songId}">${escapeHtml(s.title)} — ${escapeHtml(s.artist)}</option>`).join("")}</select></label><label>Singers<input id="singers" value="${player.playerNumber || 2}" placeholder="Singer numbers comma separated"></label><div class="button-row"><button id="requestSong" class="primary">Add song to queue</button><button id="requestSinger">Make me a singer</button></div><div class="queue-list">${queueHtml(room, "phone")}</div></details>
-<details class="card" open><summary>2. Mic setup</summary><p class="warn compact">${singerWarning}</p><label class="check"><input type="checkbox" id="headphones"> Headphones confirmed</label><label class="check"><input type="checkbox" id="pushToSing"> Push-to-sing</label><label>Mic filter<select id="voicePreset"><option value="clean">Clean</option><option value="alto">Alto warm</option><option value="bravo">Bravo bright</option><option value="bass">Bass low</option><option value="radio">Radio</option><option value="autotune">Autotune-style polish</option></select></label><div class="button-row"><button id="startBacking">Start headphone backing monitor</button><button id="pauseBacking">Pause backing monitor</button></div><label>Remote gain <input id="remoteGain" type="range" min="0" max="2" value="1" step=".05"></label><label>Backing monitor gain <input id="backingGain" type="range" min="0" max="1" value="0.35" step=".05"></label><label>Master gain <input id="masterGain" type="range" min="0" max="2" value="1" step=".05"></label><p id="wake" class="subtle"></p></details>
-<details class="card"><summary>3. Lyrics / sync</summary><video id="phoneVideo" controls playsinline muted></video><div id="lyricsPanel"></div><div class="button-row"><button id="earlier">Lyrics earlier</button><button id="later">Lyrics later</button><button id="resetSync">Reset sync</button></div></details>
+  main.innerHTML = `<section class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie phone</p><h2>${currentTitle}</h2><p class="subtle">${escapeHtml(player.displayName || "Player")} · Room ${escapeHtml(roomCode || "joined")} · Player #${escapeHtml(player.playerNumber || "?")}</p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><div class="primary-actions"><button id="enableMic" class="primary">Enable my mic</button><button id="holdSing" class="hold-button">Hold to sing</button><button id="toggleSing">Live / mute</button><button id="muteMic" class="danger">Mute mic</button></div><p id="micStatus" class="status-pill live-status">Mic muted until enabled.</p></div>
+<details class="card" open><summary>1. Profile</summary><label>Your name<input id="displayName" value="${escapeHtml(player.displayName || "Player")}" placeholder="Your name"></label></details>
+<details class="card" open><summary>2. Queue songs</summary><label>Song<select id="song">${catalog.map((s) => `<option value="${s.songId}">${escapeHtml(s.title)} — ${escapeHtml(s.artist)}</option>`).join("")}</select></label><label>Singers<input id="singers" value="${player.playerNumber || 2}" placeholder="Singer numbers comma separated"></label><div class="button-row"><button id="requestSong" class="primary">Add song to queue</button><button id="requestSinger">Make me a singer</button></div><div class="queue-list">${queueHtml(room, "phone")}</div></details>
+<details class="card" open><summary>3. Mic setup</summary><p class="warn compact">${singerWarning}</p><label class="check"><input type="checkbox" id="pushToSing"> Push-to-sing</label><label>Mic filter<select id="voicePreset"><option value="clean">Clean</option><option value="alto">Alto warm</option><option value="bravo">Bravo bright</option><option value="bass">Bass low</option><option value="radio">Radio</option><option value="autotune">Autotune-style polish</option></select></label><div class="button-row"><button id="startBacking">Start backing monitor</button><button id="pauseBacking">Pause backing monitor</button></div><label>Remote gain <input id="remoteGain" type="range" min="0" max="2" value="1" step=".05"></label><label>Backing monitor gain <input id="backingGain" type="range" min="0" max="1" value="0.35" step=".05"></label><label>Master gain <input id="masterGain" type="range" min="0" max="2" value="1" step=".05"></label><p id="wake" class="subtle"></p></details>
+<details class="card"><summary>4. Lyrics / sync</summary><video id="phoneVideo" controls playsinline muted></video><div id="lyricsPanel"></div><div class="button-row"><button id="earlier">Lyrics earlier</button><button id="later">Lyrics later</button><button id="resetSync">Reset sync</button></div></details>
 <details class="card"><summary>Debug room state</summary><pre>${JSON.stringify(room || { status: "not paired" }, null, 2)}</pre></details></section>`;
   document
     .querySelectorAll("button")
     .forEach((b) => b.addEventListener("click", unlockPhoneAudio));
+  $("#displayName").addEventListener("change", updatePlayerDisplayName);
   $("#requestSong").onclick = () => {
     const item = queueRequest(
       $("#song").value,
@@ -814,15 +860,6 @@ function renderPlayer(main) {
   };
   $("#enableMic").onclick = async () => {
     try {
-      const self = room?.players?.find((p) => p.playerId === player.playerId);
-      if (!self?.isSingerForCurrentSong) {
-        $("#micStatus").textContent =
-          "Ask the host to assign you as a singer before publishing.";
-        log(
-          "Mic blocked: ask the host to assign you as a singer before publishing.",
-        );
-        return;
-      }
       const pushToSing = $("#pushToSing").checked;
       const status = await audio.tryWakeLock();
       $("#wake").textContent =
@@ -830,10 +867,7 @@ function renderPlayer(main) {
           ? "Wake lock active"
           : "Keep this phone unlocked and tab open during song. Wake lock: " +
             status;
-      const stream = await audio.requestMic({
-        headphonesConfirmed: $("#headphones").checked,
-        pushToSing,
-      });
+      const stream = await audio.requestMic({ pushToSing });
       peerNode.addLocalStream(stream);
       player.micState = {
         ...player.micState,
@@ -870,9 +904,7 @@ function renderPlayer(main) {
   $("#muteMic").onclick = () => setOwnMicMuted(true);
   $("#startBacking").onclick = async () =>
     audio
-      ?.startBackingMonitor(await resolvePlayableMediaUrl(song), {
-        headphonesConfirmed: $("#headphones").checked,
-      })
+      ?.startBackingMonitor(await resolvePlayableMediaUrl(song))
       .catch((e) => {
         $("#micStatus").textContent = e.message;
         log(e.message);

@@ -67,16 +67,11 @@ export class PhoneAudio {
       await this.ctx.resume?.().catch(() => {});
   }
   async requestMic({
-    headphonesConfirmed = false,
     pushToSing = false,
   }: {
     headphonesConfirmed?: boolean;
     pushToSing?: boolean;
   } = {}): Promise<MediaStream> {
-    if (!headphonesConfirmed && !pushToSing)
-      throw new Error(
-        "TV backing track bleed risk. Use headphones or enable push-to-sing before mic publishing.",
-      );
     await this.init();
     this.pushToSing = pushToSing;
     this.localStream = await navigator.mediaDevices.getUserMedia({
@@ -249,10 +244,6 @@ export class PhoneAudio {
       speakerAck = false,
     }: { headphonesConfirmed?: boolean; speakerAck?: boolean } = {},
   ): Promise<HTMLAudioElement> {
-    if (!headphonesConfirmed && !speakerAck)
-      throw new Error(
-        "Use headphones before phone backing monitor. Speaker output while mic active can feed back into mic.",
-      );
     await this.init();
     if (
       !this.backingAudio ||
@@ -373,4 +364,4 @@ export class PhoneAudio {
   }
 }
 export const singerWarning: string =
-  "Your phone mic can hear the TV backing track. Use headphones or push-to-sing to avoid sending backing track to everyone.";
+  "TV backing track bleed risk: your phone mic can hear the TV backing track. Use headphones or push-to-sing to avoid sending backing track to everyone.";
