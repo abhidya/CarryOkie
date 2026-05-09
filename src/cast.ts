@@ -514,22 +514,38 @@ export function receiverApp(root: HTMLElement): void {
     }
     render();
   }
+  const liveMicStream = new MediaStream();
+  const liveMicTrackIds = new Set<string>();
+  let liveMicAudio: HTMLAudioElement | null = null;
+  function ensureLiveMicAudio(): HTMLAudioElement {
+    if (liveMicAudio) return liveMicAudio;
+    liveMics.innerHTML =
+      '<h2>Live mics</h2><p class="subtle">Playing all forwarded singer mics.</p>';
+    liveMicAudio = document.createElement("audio");
+    liveMicAudio.autoplay = true;
+    liveMicAudio.controls = true;
+    liveMicAudio.srcObject = liveMicStream;
+    liveMics.appendChild(liveMicAudio);
+    return liveMicAudio;
+  }
   function addLiveMic(stream: MediaStream): void {
-    if (!liveMics.querySelector("audio"))
-      liveMics.innerHTML = "<h2>Live mics</h2>";
-    const audio = document.createElement("audio");
-    audio.autoplay = true;
-    audio.controls = true;
-    audio.srcObject = stream;
-    liveMics.appendChild(audio);
+    const audioTracks = stream.getAudioTracks?.() ||
+      stream.getTracks().filter((track) => track.kind === "audio");
+    for (const track of audioTracks) {
+      if (liveMicTrackIds.has(track.id)) continue;
+      liveMicTrackIds.add(track.id);
+      liveMicStream.addTrack(track);
+    }
+    if (!audioTracks.length) return;
+    const audio = ensureLiveMicAudio();
     audio
       .play()
       .then(() => {
-        state.status = "Live mic connected.";
+        state.status = `Playing ${liveMicTrackIds.size} live mic${liveMicTrackIds.size === 1 ? "" : "s"}.`;
         render();
       })
       .catch(() => {
-        state.status = "Tap receiver once to start live mic audio.";
+        state.status = "Tap receiver once to start all live mic audio.";
         render();
       });
   }
@@ -548,6 +564,7 @@ export function receiverApp(root: HTMLElement): void {
         pc.ontrack = (event) => {
           const stream = event.streams[0];
           if (stream) addLiveMic(stream);
+          else if (event.track) addLiveMic(new MediaStream([event.track]));
         };
         await pc.setRemoteDescription(msg.description);
         const answer = await pc.createAnswer();

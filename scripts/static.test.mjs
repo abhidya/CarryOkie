@@ -291,6 +291,9 @@ checks.push([
     cast.includes("receiverId") &&
     cast.includes("RECEIVER_OFFER") &&
     cast.includes("RECEIVER_PLAYBACK_SYNC") &&
+    cast.includes("Playing all forwarded singer mics") &&
+    cast.includes("liveMicStream.addTrack") &&
+    cast.includes("getAudioTracks") &&
     cast.includes("CAST_SET_SINGERS") &&
     cast.includes("CAST_SYNC_PLAYBACK_STATE") &&
     cast.includes("loadLyrics") &&
