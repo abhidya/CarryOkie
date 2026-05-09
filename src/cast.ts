@@ -346,7 +346,12 @@ export function receiverApp(root: HTMLElement): void {
     roomCode: string;
     song: Song | null;
     singers: Array<{ playerNumber: number | null; displayName: string }>;
-    queue: Array<{ songId: string; title?: string; singerNumbers: number[] }>;
+    queue: Array<{
+      songId: string;
+      title?: string;
+      singerNumbers: number[];
+      singerNames?: string[];
+    }>;
     mediaTimeMs: number;
     lines: Array<{ startMs: number; endMs: number; text: string }>;
     status: string;
@@ -382,12 +387,20 @@ export function receiverApp(root: HTMLElement): void {
       state.roomCode === "------"
         ? ""
         : qrSvg(playerUrl, { scale: 3, title: "Join CarryOkie room" });
+    const queueSingerLabel = (queueItem: (typeof state.queue)[number]): string =>
+      (
+        queueItem.singerNames?.length
+          ? queueItem.singerNames
+          : (queueItem.singerNumbers || []).map(
+              (singerNumber) => `#${singerNumber}`,
+            )
+      ).join(", ");
     root.querySelector("#queue")!.innerHTML =
       "<h2>Queue</h2><ol>" +
       state.queue
         .map(
           (q) =>
-            `<li>${escapeHtml(q.title || q.songId)} singers ${(q.singerNumbers || []).join(", ")}</li>`,
+            `<li>${escapeHtml(q.title || q.songId)} singers ${escapeHtml(queueSingerLabel(q))}</li>`,
         )
         .join("") +
       "</ol>";

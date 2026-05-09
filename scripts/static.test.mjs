@@ -166,9 +166,10 @@ checks.push([
     hasCompactAppSource("type: RPC.SINGER_JOIN_REQUEST"),
 ]);
 checks.push([
-  "mic publishing requires singer assignment in UI",
-  app.includes("Mic blocked: ask the host to assign you as a singer") &&
-    app.includes("isSingerForCurrentSong"),
+  "players can set their own name and publish mic directly",
+  app.includes('id="displayName"') &&
+    hasCompactAppSource("normalizeDisplayName") &&
+    !app.includes("Mic blocked: ask the host to assign you as a singer"),
 ]);
 checks.push([
   "host can start next queued song",
@@ -215,13 +216,14 @@ checks.push([
     hasAppSource('class="rejectItem"'),
 ]);
 checks.push([
-  "phones can see and self-update titled queue",
+  "phones can see and self-update titled queue with player names",
   (hasCompactAppSource('queueHtml(room, "phone")') ||
     hasCompactAppSource("queueHtml(room,'phone')")) &&
     app.includes("QUEUE_UPDATE_REQUEST") &&
     hasAppSource("Add me as singer") &&
     (hasAppSource("songTitle(queueItem.songId)") ||
-      hasAppSource("songTitle(q.songId)")),
+      hasAppSource("songTitle(q.songId)")) &&
+    (hasAppSource("requested by") || hasAppSource("singerNames")),
 ]);
 checks.push([
   "queue RPCs require paired peer identity and catalog songs",
