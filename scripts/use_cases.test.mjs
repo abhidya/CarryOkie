@@ -187,9 +187,16 @@ test('required RPC messages exist', () => {
   }
 });
 
-test('receiver stays out of live mic/WebRTC path', () => {
+test('tab-cast receiver accepts host-forwarded live audio without requesting mic', () => {
   const receiver = fs.readFileSync('receiver/index.html','utf8') + fs.readFileSync('src/cast.ts','utf8');
-  assert.equal(/RTCPeerConnection|getUserMedia/.test(receiver), false);
+  assert.equal(/getUserMedia/.test(receiver), false);
+  assert.match(receiver, /BroadcastChannel/);
+  assert.match(receiver, /RECEIVER_OFFER/);
+  assert.match(receiver, /RECEIVER_PLAYBACK_SYNC/);
+  assert.match(receiver, /receiverId/);
+  const host = fs.readFileSync('src/app.ts','utf8');
+  assert.match(host, /receiverPendingRenegotiate/);
+  assert.match(host, /publishReceiverCommand/);
 });
 
 test('protected catalog includes songs with encrypted media', () => {

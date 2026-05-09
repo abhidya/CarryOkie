@@ -1,5 +1,10 @@
 import { qrSvg } from './qr.ts';
 import { resolvePlayableMediaUrl, resolveDefaultCastMediaUrl, resolveDefaultCastMediaType, isProtectedMedia } from './protectedMedia.ts';
+import { rtcConfig, waitForIceComplete } from './webrtc.ts';
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+}
 
 declare namespace chrome.cast {
   class AutoJoinPolicy { static ORIGIN_SCOPED: string; }
@@ -170,38 +175,85 @@ export class CastController extends EventTarget {
 }
 
 export function receiverApp(root: HTMLElement): void {
-  const state: { roomCode: string; song: Song | null; singers: Array<{ playerNumber: number | null; displayName: string }>; queue: Array<{ songId: string; title?: string; singerNumbers: number[] }>; mediaTimeMs: number; lines: Array<{ startMs: number; endMs: number; text: string }> } = { roomCode: '------', song: null, singers: [], queue: [], mediaTimeMs: 0, lines: [] };
-  root.innerHTML = `<main class="tv"><section><h1>CarryOkie</h1><div class="room" id="room">------</div><div id="joinQr"></div><p>Scan/open /player. TV plays backing track/video only — no live mic routed here.</p><section id="singers"></section></section><section><video id="media" class="castMediaElement" controls playsinline></video><section id="lyrics" class="lyrics big"></section><section id="queue"></section></section></main>`;
+  const initialRoomCode = new URLSearchParams(location.search).get('room') || '------';
+  const state: { roomCode: string; song: Song | null; singers: Array<{ playerNumber: number | null; displayName: string }>; queue: Array<{ songId: string; title?: string; singerNumbers: number[] }>; mediaTimeMs: number; lines: Array<{ startMs: number; endMs: number; text: string }>; status: string } = { roomCode: initialRoomCode, song: null, singers: [], queue: [], mediaTimeMs: 0, lines: [], status: 'Waiting for host tab…' };
+  root.innerHTML = `<main class="tv"><section><h1>CarryOkie</h1><div class="room" id="room">${escapeHtml(initialRoomCode)}</div><div id="joinQr"></div><p>Scan/open /player. Tab-cast receiver mirrors host room, queue, singers, backing track, and live singer mics.</p><section id="singers"></section><section id="receiverStatus"></section><section id="liveMics"><h2>Live mics</h2><p>Waiting for host tab audio…</p></section></section><section><video id="media" class="castMediaElement" controls playsinline></video><section id="lyrics" class="lyrics big"></section><section id="queue"></section></section></main>`;
   const media = root.querySelector<HTMLVideoElement>('#media')!;
+  const liveMics = root.querySelector<HTMLElement>('#liveMics')!;
+  const receiverId = crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+  let loadedSongId = '';
   function activeLine(): typeof state.lines[0] | undefined { const t = state.mediaTimeMs; return state.lines.findLast?.(l => t >= l.startMs) || state.lines.filter(l => t >= l.startMs).pop() || state.lines[0]; }
   function render(): void {
     root.querySelector('#room')!.textContent = state.roomCode;
     const playerUrl = new URL(`../player/?room=${encodeURIComponent(state.roomCode)}`, location.href).toString();
     root.querySelector('#joinQr')!.innerHTML = state.roomCode === '------' ? '' : qrSvg(playerUrl, { scale: 3, title: 'Join CarryOkie room' });
-    root.querySelector('#queue')!.innerHTML = '<h2>Queue</h2><ol>' + state.queue.map(q => `<li>${q.title || q.songId} singers ${(q.singerNumbers || []).join(', ')}</li>`).join('') + '</ol>';
-    root.querySelector('#singers')!.innerHTML = '<h2>Singers</h2>' + ((state.singers || []).map(p => `<p>#${p.playerNumber} ${p.displayName}</p>`).join('') || '<p>No active singers</p>');
+    root.querySelector('#queue')!.innerHTML = '<h2>Queue</h2><ol>' + state.queue.map(q => `<li>${escapeHtml(q.title || q.songId)} singers ${(q.singerNumbers || []).join(', ')}</li>`).join('') + '</ol>';
+    root.querySelector('#singers')!.innerHTML = '<h2>Singers</h2>' + ((state.singers || []).map(p => `<p>#${escapeHtml(p.playerNumber)} ${escapeHtml(p.displayName)}</p>`).join('') || '<p>No active singers</p>');
+    root.querySelector('#receiverStatus')!.innerHTML = `<p class="status-pill">${escapeHtml(state.status)}</p>`;
     const active = activeLine();
-    root.querySelector('#lyrics')!.innerHTML = state.lines.length ? state.lines.map(l => `<p class="${l === active ? 'active' : ''}">${l.text}</p>`).join('') : '<p>Waiting for lyrics…</p>';
+    root.querySelector('#lyrics')!.innerHTML = state.lines.length ? state.lines.map(l => `<p class="${l === active ? 'active' : ''}">${escapeHtml(l.text)}</p>`).join('') : '<p>Waiting for lyrics…</p>';
   }
   async function loadLyrics(song: Song | null): Promise<void> {
-    if (isProtectedMedia(song!)) { state.lines = []; render(); return; }
+    if (isProtectedMedia(song as Parameters<typeof isProtectedMedia>[0])) { state.lines = []; render(); return; }
     if (!song?.lyricsJsonUrl) return;
-    try { state.lines = (await fetch(song.lyricsJsonUrl).then(r => r.json()) as { lines: typeof state.lines[0] }).lines || []; } catch { state.lines = []; }
+    try { state.lines = (await fetch(song.lyricsJsonUrl).then(r => r.json()) as { lines: typeof state.lines }).lines || []; } catch { state.lines = []; state.status = 'Lyrics unavailable; backing track still loaded.'; }
     render();
+  }
+  function loadSong(song: Song | null, roomCode?: string): void {
+    if (!song) return;
+    state.song = song;
+    state.roomCode = roomCode || state.roomCode;
+    if ((song as Song).songId === loadedSongId) { render(); return; }
+    loadedSongId = (song as Song).songId;
+    state.status = 'Loading backing track…';
+    resolvePlayableMediaUrl(song as Parameters<typeof resolvePlayableMediaUrl>[0]).then(url => {
+      if (!url) { state.status = 'No playable media for receiver tab.'; render(); return; }
+      media.src = url;
+      media.play().then(() => { state.status = 'Backing track playing.'; render(); }).catch(() => { state.status = 'Tap receiver once to start backing track/audio.'; render(); });
+    }).catch(error => { state.status = error?.message || 'Failed to load backing track.'; render(); });
+    loadLyrics(song);
   }
   function unpack(data: unknown): Record<string, unknown> | null { try { return typeof data === 'string' ? JSON.parse(data) : data as Record<string, unknown>; } catch { return null; } }
   function handle(raw: unknown): void {
     const msg = unpack(raw); if (!msg?.type) return;
     const payload = (msg as Record<string, unknown>).payload as Record<string, unknown> | undefined;
-    if (msg.type === 'CAST_LOAD_SONG' && payload) { state.song = payload.song as Song; state.roomCode = (payload.roomCode as string) ?? state.roomCode; resolvePlayableMediaUrl(state.song!).then(url => { if (url) { media.src = url; media.play().catch(() => {}); } }); loadLyrics(state.song); }
+    if (msg.type === 'CAST_LOAD_SONG' && payload) loadSong(payload.song as Song, payload.roomCode as string);
     if (msg.type === 'CAST_PLAY') media.play();
     if (msg.type === 'CAST_PAUSE') media.pause();
     if (msg.type === 'CAST_SEEK' && payload) media.currentTime = payload.seconds as number;
     if (msg.type === 'CAST_SET_SINGERS' && payload) state.singers = (payload.players || payload.singers) as typeof state.singers;
-    if (msg.type === 'CAST_SYNC_PLAYBACK_STATE' && payload) state.mediaTimeMs = (payload.tvMediaTimeMs as number) || 0;
+    if ((msg.type === 'CAST_SYNC_PLAYBACK_STATE' || msg.type === 'RECEIVER_PLAYBACK_SYNC') && payload) state.mediaTimeMs = (payload.tvMediaTimeMs as number) || 0;
     if (msg.type === 'CAST_SHOW_JOIN_QR' && payload) state.roomCode = payload.roomCode as string;
     if (msg.type === 'CAST_UPDATE_QUEUE_PREVIEW' && payload) state.queue = (payload.queue as typeof state.queue) || [];
+    if (msg.type === 'RECEIVER_STATE' && payload) { state.roomCode = (payload.roomCode as string) || state.roomCode; state.queue = (payload.queue as typeof state.queue) || state.queue; state.singers = (payload.singers as typeof state.singers) || state.singers; state.mediaTimeMs = ((payload.playbackState as Record<string, unknown>)?.tvMediaTimeMs as number) || state.mediaTimeMs; loadSong(payload.song as Song | null, payload.roomCode as string); }
     render();
+  }
+  function addLiveMic(stream: MediaStream): void {
+    if (!liveMics.querySelector('audio')) liveMics.innerHTML = '<h2>Live mics</h2>';
+    const audio = document.createElement('audio');
+    audio.autoplay = true; audio.controls = true; audio.srcObject = stream;
+    liveMics.appendChild(audio);
+    audio.play().then(() => { state.status = 'Live mic connected.'; render(); }).catch(() => { state.status = 'Tap receiver once to start live mic audio.'; render(); });
+  }
+  if (typeof BroadcastChannel !== 'undefined') {
+    const channel = new BroadcastChannel('carryokie.receiver');
+    let pc: RTCPeerConnection | null = null;
+    channel.onmessage = async ev => {
+      const msg = ev.data || {};
+      if (msg.type === 'RECEIVER_STATE') handle(msg);
+      if (msg.type === 'RECEIVER_OFFER' && (!msg.receiverId || msg.receiverId === receiverId)) {
+        pc?.close?.();
+        pc = new RTCPeerConnection(rtcConfig);
+        pc.ontrack = event => { const stream = event.streams[0]; if (stream) addLiveMic(stream); };
+        await pc.setRemoteDescription(msg.description);
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        await waitForIceComplete(pc);
+        channel.postMessage({type:'RECEIVER_ANSWER', receiverId, description:pc.localDescription});
+      }
+    };
+    channel.postMessage({type:'RECEIVER_READY', receiverId, roomCode:state.roomCode});
+    setInterval(() => channel.postMessage({type:'RECEIVER_READY', receiverId, roomCode:state.roomCode}), 3000);
   }
   window.addEventListener('message', ev => handle(ev.data));
   media.addEventListener('timeupdate', () => { state.mediaTimeMs = Math.round(media.currentTime * 1000); render(); });

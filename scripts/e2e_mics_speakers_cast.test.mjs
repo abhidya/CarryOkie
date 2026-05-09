@@ -270,9 +270,11 @@ test('E2E: Full room with 3 singers, 2 listeners, and Chromecast', async () => {
   await new Promise(resolve => setTimeout(resolve, 120));
   assert.equal(remotePlayer.playerState, 'PLAYING', 'TV should be playing media');
 
-  // Design Req #15: TV never receives live mic audio
+  // Design Req #15: Default Chromecast path never requests a mic; Chrome tab-cast receiver can receive host-forwarded live mic audio.
   const receiverCode = fs.readFileSync('receiver/index.html', 'utf8') + fs.readFileSync('src/cast.ts', 'utf8');
-  assert.equal(/RTCPeerConnection|getUserMedia/.test(receiverCode), false, 'Receiver should not have WebRTC or mic code');
+  assert.equal(/getUserMedia/.test(receiverCode), false, 'Receiver should never request a local mic');
+  assert.match(receiverCode, /RECEIVER_OFFER/, 'Tab-cast receiver should accept host-forwarded live mic tracks');
+  assert.match(receiverCode, /RECEIVER_PLAYBACK_SYNC/, 'Tab-cast receiver should mirror host playback samples');
 
   // Setup: Create WebRTC mesh between all participants
   const peerNodes = new Map();
@@ -403,7 +405,7 @@ test('E2E: Full room with 3 singers, 2 listeners, and Chromecast', async () => {
   console.log('✓ Design Req #12: Singer enables mic with explicit permission');
   console.log('✓ Design Req #13: Listener phone hears singer mic over WebRTC');
   console.log('✓ Design Req #14: Singer does not hear own mic by default');
-  console.log('✓ Design Req #15: TV never receives live mic audio');
+  console.log('✓ Design Req #15: Tab-cast receiver can receive live mic audio without requesting a TV mic');
   console.log('✓ Design Req #16: TV continues to show lyrics/video/backing track');
   console.log('✓ Design Req #17: Phones mirror lyrics from host playback state');
   console.log('✓ Design Req #18: Spotify is not used');

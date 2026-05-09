@@ -41,7 +41,7 @@ test('manual WebRTC offer-answer flow uses complete ICE payloads', async () => {
   globalThis.RTCPeerConnection = FakePc;
   try {
     const player = new PeerNode('player');
-    const host = new PeerNode('host');
+    const host = new PeerNode('host-peer');
     const offer = await player.createManualOffer('host');
     const offerEdge = player.peers.get('host');
     assert.equal(offerEdge.pc.iceGatheringState, 'complete');
@@ -55,6 +55,29 @@ test('manual WebRTC offer-answer flow uses complete ICE payloads', async () => {
     const decoded = await player.acceptManualAnswer(answer.url);
     assert.equal(decoded.kind, 'answer');
     assert.equal(offerEdge.pc.remoteDescription.type, 'answer');
+    assert.equal(player.peers.has(host.localPeerId), true, 'player should re-key the host alias to the actual host peer id');
+    assert.equal(player.peers.has('host'), false, 'literal host alias must not swallow later renegotiation offers');
+  } finally {
+    globalThis.RTCPeerConnection = old;
+  }
+});
+
+test('post-pairing mic renegotiation targets the actual host peer id', async () => {
+  const old = globalThis.RTCPeerConnection;
+  globalThis.RTCPeerConnection = FakePc;
+  try {
+    const player = new PeerNode('player-peer');
+    const host = new PeerNode('host-peer');
+    const offer = await player.createManualOffer('host');
+    const answer = await host.acceptManualOffer(offer.url);
+    await player.acceptManualAnswer(answer.url);
+    const edge = player.peers.get('host-peer');
+    const track = { kind:'audio', id:'mic-track', enabled:true };
+    const stream = { id:'mic-stream', getTracks(){ return [track]; } };
+    player.addLocalStream(stream);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(edge.dc.sent.at(-1).type, RPC.SIGNAL_RELAY_OFFER);
+    assert.equal(edge.dc.sent.at(-1).toPeerId, 'host-peer');
   } finally {
     globalThis.RTCPeerConnection = old;
   }

@@ -141,9 +141,16 @@ export class PeerNode extends EventTarget {
   async acceptManualAnswer(text: string) {
     const payload = await decodeSignalPayload(joinChunks(text));
     if (payload.kind !== 'answer') throw new Error('Expected answer payload.');
-    const edge = this.peers.get(payload.fromPeerId) || this.peers.get(payload.toPeerId) || [...this.peers.values()].find(e => e.initiator && e.pc.signalingState !== 'stable');
+    const edge = (payload.fromPeerId ? this.peers.get(payload.fromPeerId) : undefined) || (payload.toPeerId ? this.peers.get(payload.toPeerId) : undefined) || [...this.peers.values()].find(e => e.initiator && e.pc.signalingState !== 'stable');
     if (!edge) throw new Error('No pending offer for this answer.');
-    await edge.pc.setRemoteDescription(payload.description as RTCSessionDescriptionInit); return payload;
+    if (payload.fromPeerId && edge.remotePeerId !== payload.fromPeerId) {
+      this.peers.delete(edge.remotePeerId);
+      edge.remotePeerId = payload.fromPeerId;
+      this.peers.set(edge.remotePeerId, edge);
+    }
+    await edge.pc.setRemoteDescription(payload.description as RTCSessionDescriptionInit);
+    if (edge.streams.length) this.requestNegotiation(edge);
+    return payload;
   }
   addLocalStream(stream: MediaStream): void { if (!this.localStreams.includes(stream)) this.localStreams.push(stream); for (const edge of this.peers.values()) { this.addStreamToEdge(edge, stream); this.requestNegotiation(edge); } }
   relayRemoteStream(sourcePeerId: string, stream: MediaStream): void {
