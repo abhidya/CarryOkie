@@ -1,33 +1,33 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from "vite";
 
-const allowedHosts = ['abdulrehmans-macbook-pro.local'];
+const allowedHosts = ["abdulrehmans-macbook-pro.local"];
 
 export default defineConfig({
-  base: './',
-  preview: { host: '0.0.0.0', port: 4174, strictPort: true, allowedHosts },
-  root: '.',
+  base: "./",
+  preview: { host: "0.0.0.0", port: 4174, strictPort: true, allowedHosts },
+  root: ".",
   build: {
-    outDir: 'dist',
+    outDir: "dist",
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: 'index.html',
-        host: 'host/index.html',
-        player: 'player/index.html',
-        receiver: 'receiver/index.html',
-        debug: 'debug/index.html',
+        main: "index.html",
+        host: "host/index.html",
+        player: "player/index.html",
+        receiver: "receiver/index.html",
+        debug: "debug/index.html",
       },
       output: {
-        entryFileNames: 'assets/[name].js',
-        chunkFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name].[ext]',
+        entryFileNames: "assets/[name].js",
+        chunkFileNames: "assets/[name].js",
+        assetFileNames: "assets/[name].[ext]",
       },
     },
   },
   server: {
     port: 4174,
     strictPort: true,
-    host: '0.0.0.0',
+    host: "0.0.0.0",
     allowedHosts,
   },
 });

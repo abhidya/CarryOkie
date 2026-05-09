@@ -1,109 +1,109 @@
 - main [ref=e3]:
-  - heading "Player Phone" [level=1] [ref=e5]
-  - generic [ref=e7]:
-    - generic [ref=e8]:
-      - heading "Join" [level=2] [ref=e9]
-      - paragraph [ref=e10]: Room code opens UI only. WebRTC needs offer/answer exchange.
-      - textbox "Room code" [ref=e11]: MINTKITE
-      - button "Create host offer after complete ICE" [ref=e12] [cursor=pointer]
-      - textbox "Paste host answer/link/chunks" [ref=e13]
-      - button "Import answer" [ref=e14] [cursor=pointer]
-    - generic [ref=e15]:
-      - heading "Queue request" [level=2] [ref=e16]
-      - combobox [ref=e17]:
-        - option "10s Karaoke Songs Vol. 1 — Unknown" [selected]
-        - text: ","
-        - option "20s Karaoke Songs Vol. 1 — Unknown"
-        - text: ","
-        - option "A Horse with No Name (Karaoke Version) — America"
-        - text: ","
-        - option "Choka Choka (Karaoke Version) — Anitta Shakira"
-        - text: ","
-        - option "Bad Angel with LISA (Karaoke Version) — Anyma"
-        - text: ","
-        - option "Aliens (Karaoke Version) — BTS"
-        - text: ","
-        - option "Motion Party (Karaoke Version) — BossMan Dlow"
-        - text: ","
-        - option "Dynamite (Karaoke Version) — China Anne McClain"
-        - text: ","
-        - option "Country Boy s Dream Girl (Karaoke Version) — Ella Langley"
-        - text: ","
-        - option "I Can t Help Myself Sugar Pie Honey Bunch (Karaoke Version) — Four Tops"
-        - text: ","
-        - option "Beauty Pageant (Karaoke Version) — Holly Humberstone"
-        - text: ","
-        - option "Cruel World (Karaoke Version) — Holly Humberstone"
-        - text: ","
-        - option "Back and Forth feat. Missy Elliott (Karaoke Version) — Kehlani"
-        - text: ","
-        - option "Alright (Karaoke Version) — Kendrick Lamar"
-        - text: ","
-        - option "Eins Zwei Drei (Karaoke Version) — LOOK MUM NO COMPUTER"
-        - text: ","
-        - option "RUNWAY (Karaoke Version) — Lady Gaga Doechii"
-        - text: ","
-        - option "Madwoman (Karaoke Version) — Laufey"
-        - text: ","
-        - option "What You Saying (Karaoke Version) — Lil Uzi Vert"
-        - text: ","
-        - option "Liekinheitin (Karaoke Version) — Linda Lampenius"
-        - text: ","
-        - option "UNO (Karaoke Version) — Little Big"
-        - text: ","
-        - option "Days Like These (Karaoke Version) — Luke Combs"
-        - text: ","
-        - option "Lucky Again (Karaoke Version) — Lykke Li"
-        - text: ","
-        - option "My Mess (Karaoke Version) — Myles Smith"
-        - text: ","
-        - option "drop dead (Karaoke Version) — Olivia Rodrigo"
-        - text: ","
-        - option "Fire (Karaoke Version) — Sarah Engels"
-        - text: ","
-        - option "Every Little Thing She Does Is Magic (Karaoke Version) — The Police"
-        - text: ","
-        - option "Happy Together (Karaoke Version) — The Turtles"
-        - text: ","
-        - option "Ends of the Earth (Karaoke Version) — Ty Myers"
-        - text: ","
-        - option "Dancing Lasha Tumbai (Karaoke Version) — Verka Serduchka"
-        - text: ","
-        - option "Just the Way You Are Sing King Soundcheck (Karaoke Version) — Why is THIS 2002 Song Everywhere Milky"
-      - textbox "Singer numbers comma separated" [ref=e18]: "2"
-      - button "Request song" [ref=e19] [cursor=pointer]
-      - button "Request singer slot" [ref=e20] [cursor=pointer]
-    - generic [ref=e21]:
-      - heading "Mic" [level=2] [ref=e22]
-      - paragraph [ref=e23]: Your phone mic can hear the TV backing track. Use headphones or push-to-sing to avoid sending backing track to everyone.
-      - generic [ref=e24]:
-        - checkbox "Headphones confirmed" [ref=e25]
-        - text: Headphones confirmed
-      - generic [ref=e26]:
-        - checkbox "Push-to-sing" [ref=e27]
-        - text: Push-to-sing
-      - button "Enable mic" [ref=e28] [cursor=pointer]
-      - button "Hold/toggle sing" [ref=e29] [cursor=pointer]
-      - button "Mute own mic" [ref=e30] [cursor=pointer]
-      - button "Start headphone backing monitor" [ref=e31] [cursor=pointer]
-      - button "Pause backing monitor" [ref=e32] [cursor=pointer]
-      - generic [ref=e33]:
-        - text: Remote gain
-        - slider "Remote gain" [ref=e34]: "1"
-      - generic [ref=e35]:
-        - text: Backing monitor gain
-        - slider "Backing monitor gain" [ref=e36]: "0.35"
-      - generic [ref=e37]:
-        - text: Master gain
-        - slider "Master gain" [ref=e38]: "1"
-      - paragraph
-    - generic [ref=e39]:
-      - heading "Lyrics / lyric video" [level=2] [ref=e40]
-      - paragraph [ref=e43]: Lyric video loaded above. No separate lyric file needed.
-      - button "lyrics -250ms" [ref=e44] [cursor=pointer]
-      - button "lyrics +250ms" [ref=e45] [cursor=pointer]
-      - button "reset sync" [ref=e46] [cursor=pointer]
-    - generic [ref=e47]:
-      - heading "Room" [level=2] [ref=e48]
-      - generic [ref=e49]: "{ \"roomId\": \"9b227d8d-16b5-4f2c-97f5-d3e45689ae63\", \"roomCode\": \"MINTKITE\", \"hostPeerId\": \"6bcf8ef6-2552-453c-b471-8556139cb27f\", \"hostPlayerId\": \"b8d65d6a-4027-48e3-9ce5-4943f69955f0\", \"createdAt\": 1778148220285, \"playerCount\": 1, \"maxPlayers\": 5, \"currentSongId\": \"song_002\", \"currentQueueItemId\": null, \"playbackState\": { \"songId\": \"song_002\", \"status\": \"idle\", \"startedAtHostMs\": null, \"pausedAtSongMs\": 0, \"seekOffsetMs\": 0, \"playbackRate\": 1, \"lastUpdatedAtHostMs\": 1778148220285, \"tvMediaTimeMs\": 0, \"tvMediaTimeSampledAtHostMs\": null, \"syncDegraded\": true }, \"players\": [ { \"peerId\": \"6bcf8ef6-2552-453c-b471-8556139cb27f\", \"playerId\": \"b8d65d6a-4027-48e3-9ce5-4943f69955f0\", \"playerNumber\": 1, \"displayName\": \"Host\", \"role\": \"host\", \"isHost\": true, \"isSingerForCurrentSong\": false, \"micState\": { \"permissionState\": \"prompt\", \"enabled\": false, \"muted\": true, \"publishing\": false, \"receivingPeerIds\": [], \"remoteGain\": 1, \"localMonitorGain\": 0, \"backingGain\": 0, \"masterGain\": 1 }, \"monitorState\": { \"headphonesConfirmed\": false, \"phoneSpeakerOutputAck\": false, \"keepAwake\": \"unknown\" }, \"connectionState\": \"new\", \"lastSeenAt\": 1778148220285 } ], \"queue\": [], \"castState\": { \"available\": false, \"connected\": false, \"receiverReady\": false, \"currentMediaLoaded\": false, \"lastCommandAt\": null, \"lastReceiverAckAt\": null, \"error\": null }, \"meshState\": { \"edges\": {}, \"failures\": [] }, \"limits\": { \"maxPlayers\": 5, \"maxSingers\": 5 } }"
-  - heading "Log" [level=2] [ref=e51]
+    - heading "Player Phone" [level=1] [ref=e5]
+    - generic [ref=e7]:
+        - generic [ref=e8]:
+            - heading "Join" [level=2] [ref=e9]
+            - paragraph [ref=e10]: Room code opens UI only. WebRTC needs offer/answer exchange.
+            - textbox "Room code" [ref=e11]: MINTKITE
+            - button "Create host offer after complete ICE" [ref=e12] [cursor=pointer]
+            - textbox "Paste host answer/link/chunks" [ref=e13]
+            - button "Import answer" [ref=e14] [cursor=pointer]
+        - generic [ref=e15]:
+            - heading "Queue request" [level=2] [ref=e16]
+            - combobox [ref=e17]:
+                - option "10s Karaoke Songs Vol. 1 — Unknown" [selected]
+                - text: ","
+                - option "20s Karaoke Songs Vol. 1 — Unknown"
+                - text: ","
+                - option "A Horse with No Name (Karaoke Version) — America"
+                - text: ","
+                - option "Choka Choka (Karaoke Version) — Anitta Shakira"
+                - text: ","
+                - option "Bad Angel with LISA (Karaoke Version) — Anyma"
+                - text: ","
+                - option "Aliens (Karaoke Version) — BTS"
+                - text: ","
+                - option "Motion Party (Karaoke Version) — BossMan Dlow"
+                - text: ","
+                - option "Dynamite (Karaoke Version) — China Anne McClain"
+                - text: ","
+                - option "Country Boy s Dream Girl (Karaoke Version) — Ella Langley"
+                - text: ","
+                - option "I Can t Help Myself Sugar Pie Honey Bunch (Karaoke Version) — Four Tops"
+                - text: ","
+                - option "Beauty Pageant (Karaoke Version) — Holly Humberstone"
+                - text: ","
+                - option "Cruel World (Karaoke Version) — Holly Humberstone"
+                - text: ","
+                - option "Back and Forth feat. Missy Elliott (Karaoke Version) — Kehlani"
+                - text: ","
+                - option "Alright (Karaoke Version) — Kendrick Lamar"
+                - text: ","
+                - option "Eins Zwei Drei (Karaoke Version) — LOOK MUM NO COMPUTER"
+                - text: ","
+                - option "RUNWAY (Karaoke Version) — Lady Gaga Doechii"
+                - text: ","
+                - option "Madwoman (Karaoke Version) — Laufey"
+                - text: ","
+                - option "What You Saying (Karaoke Version) — Lil Uzi Vert"
+                - text: ","
+                - option "Liekinheitin (Karaoke Version) — Linda Lampenius"
+                - text: ","
+                - option "UNO (Karaoke Version) — Little Big"
+                - text: ","
+                - option "Days Like These (Karaoke Version) — Luke Combs"
+                - text: ","
+                - option "Lucky Again (Karaoke Version) — Lykke Li"
+                - text: ","
+                - option "My Mess (Karaoke Version) — Myles Smith"
+                - text: ","
+                - option "drop dead (Karaoke Version) — Olivia Rodrigo"
+                - text: ","
+                - option "Fire (Karaoke Version) — Sarah Engels"
+                - text: ","
+                - option "Every Little Thing She Does Is Magic (Karaoke Version) — The Police"
+                - text: ","
+                - option "Happy Together (Karaoke Version) — The Turtles"
+                - text: ","
+                - option "Ends of the Earth (Karaoke Version) — Ty Myers"
+                - text: ","
+                - option "Dancing Lasha Tumbai (Karaoke Version) — Verka Serduchka"
+                - text: ","
+                - option "Just the Way You Are Sing King Soundcheck (Karaoke Version) — Why is THIS 2002 Song Everywhere Milky"
+            - textbox "Singer numbers comma separated" [ref=e18]: "2"
+            - button "Request song" [ref=e19] [cursor=pointer]
+            - button "Request singer slot" [ref=e20] [cursor=pointer]
+        - generic [ref=e21]:
+            - heading "Mic" [level=2] [ref=e22]
+            - paragraph [ref=e23]: Your phone mic can hear the TV backing track. Use headphones or push-to-sing to avoid sending backing track to everyone.
+            - generic [ref=e24]:
+                - checkbox "Headphones confirmed" [ref=e25]
+                - text: Headphones confirmed
+            - generic [ref=e26]:
+                - checkbox "Push-to-sing" [ref=e27]
+                - text: Push-to-sing
+            - button "Enable mic" [ref=e28] [cursor=pointer]
+            - button "Hold/toggle sing" [ref=e29] [cursor=pointer]
+            - button "Mute own mic" [ref=e30] [cursor=pointer]
+            - button "Start headphone backing monitor" [ref=e31] [cursor=pointer]
+            - button "Pause backing monitor" [ref=e32] [cursor=pointer]
+            - generic [ref=e33]:
+                - text: Remote gain
+                - slider "Remote gain" [ref=e34]: "1"
+            - generic [ref=e35]:
+                - text: Backing monitor gain
+                - slider "Backing monitor gain" [ref=e36]: "0.35"
+            - generic [ref=e37]:
+                - text: Master gain
+                - slider "Master gain" [ref=e38]: "1"
+            - paragraph
+        - generic [ref=e39]:
+            - heading "Lyrics / lyric video" [level=2] [ref=e40]
+            - paragraph [ref=e43]: Lyric video loaded above. No separate lyric file needed.
+            - button "lyrics -250ms" [ref=e44] [cursor=pointer]
+            - button "lyrics +250ms" [ref=e45] [cursor=pointer]
+            - button "reset sync" [ref=e46] [cursor=pointer]
+        - generic [ref=e47]:
+            - heading "Room" [level=2] [ref=e48]
+            - generic [ref=e49]: '{ "roomId": "9b227d8d-16b5-4f2c-97f5-d3e45689ae63", "roomCode": "MINTKITE", "hostPeerId": "6bcf8ef6-2552-453c-b471-8556139cb27f", "hostPlayerId": "b8d65d6a-4027-48e3-9ce5-4943f69955f0", "createdAt": 1778148220285, "playerCount": 1, "maxPlayers": 5, "currentSongId": "song_002", "currentQueueItemId": null, "playbackState": { "songId": "song_002", "status": "idle", "startedAtHostMs": null, "pausedAtSongMs": 0, "seekOffsetMs": 0, "playbackRate": 1, "lastUpdatedAtHostMs": 1778148220285, "tvMediaTimeMs": 0, "tvMediaTimeSampledAtHostMs": null, "syncDegraded": true }, "players": [ { "peerId": "6bcf8ef6-2552-453c-b471-8556139cb27f", "playerId": "b8d65d6a-4027-48e3-9ce5-4943f69955f0", "playerNumber": 1, "displayName": "Host", "role": "host", "isHost": true, "isSingerForCurrentSong": false, "micState": { "permissionState": "prompt", "enabled": false, "muted": true, "publishing": false, "receivingPeerIds": [], "remoteGain": 1, "localMonitorGain": 0, "backingGain": 0, "masterGain": 1 }, "monitorState": { "headphonesConfirmed": false, "phoneSpeakerOutputAck": false, "keepAwake": "unknown" }, "connectionState": "new", "lastSeenAt": 1778148220285 } ], "queue": [], "castState": { "available": false, "connected": false, "receiverReady": false, "currentMediaLoaded": false, "lastCommandAt": null, "lastReceiverAckAt": null, "error": null }, "meshState": { "edges": {}, "failures": [] }, "limits": { "maxPlayers": 5, "maxSingers": 5 } }'
+    - heading "Log" [level=2] [ref=e51]

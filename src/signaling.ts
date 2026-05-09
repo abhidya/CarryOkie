@@ -1,5 +1,6 @@
-import { QR_MAX_TEXT_BYTES, qrSvg } from './qr.ts';
-const enc = new TextEncoder(); const dec = new TextDecoder();
+import { QR_MAX_TEXT_BYTES, qrSvg } from "./qr.ts";
+const enc = new TextEncoder();
+const dec = new TextDecoder();
 
 interface SignalPayload {
   kind?: string;
@@ -17,250 +18,566 @@ interface EncodedPayload {
 
 export class ManualQrSignalingAdapter {
   localPeerId: string;
-  constructor(localPeerId: string) { this.localPeerId = localPeerId; }
-  get name(): string { return 'manual-qr'; }
-  async createOffer(remotePeerId: string, pc: RTCPeerConnection): Promise<EncodedPayload> {
+  constructor(localPeerId: string) {
+    this.localPeerId = localPeerId;
+  }
+  get name(): string {
+    return "manual-qr";
+  }
+  async createOffer(
+    remotePeerId: string,
+    pc: RTCPeerConnection,
+  ): Promise<EncodedPayload> {
     const offer = await pc.createOffer({ offerToReceiveAudio: true });
     await pc.setLocalDescription(offer);
-    return waitForIceAndEncode('offer', this.localPeerId, remotePeerId, pc);
+    return waitForIceAndEncode("offer", this.localPeerId, remotePeerId, pc);
   }
-  async acceptOffer(text: string, pc: RTCPeerConnection): Promise<EncodedPayload> {
+  async acceptOffer(
+    text: string,
+    pc: RTCPeerConnection,
+  ): Promise<EncodedPayload> {
     const payload = await decodeSignalPayload(joinChunks(text));
-    if (payload.kind !== 'offer') throw new Error('Expected offer payload.');
-    await pc.setRemoteDescription(payload.description as RTCSessionDescriptionInit);
+    if (payload.kind !== "offer") throw new Error("Expected offer payload.");
+    await pc.setRemoteDescription(
+      payload.description as RTCSessionDescriptionInit,
+    );
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
-    return waitForIceAndEncode('answer', this.localPeerId, payload.fromPeerId, pc);
+    return waitForIceAndEncode(
+      "answer",
+      this.localPeerId,
+      payload.fromPeerId,
+      pc,
+    );
   }
-  async acceptAnswer(text: string, pc: RTCPeerConnection): Promise<SignalPayload> {
+  async acceptAnswer(
+    text: string,
+    pc: RTCPeerConnection,
+  ): Promise<SignalPayload> {
     const payload = await decodeSignalPayload(joinChunks(text));
-    if (payload.kind !== 'answer') throw new Error('Expected answer payload.');
-    await pc.setRemoteDescription(payload.description as RTCSessionDescriptionInit);
+    if (payload.kind !== "answer") throw new Error("Expected answer payload.");
+    await pc.setRemoteDescription(
+      payload.description as RTCSessionDescriptionInit,
+    );
     return payload;
   }
 }
 
-async function waitForIceAndEncode(kind: string, fromPeerId: string, toPeerId: string, pc: RTCPeerConnection): Promise<EncodedPayload> {
+async function waitForIceAndEncode(
+  kind: string,
+  fromPeerId: string,
+  toPeerId: string,
+  pc: RTCPeerConnection,
+): Promise<EncodedPayload> {
   return new Promise((resolve, reject) => {
-    if (pc.iceGatheringState === 'complete') return encodeSignalPayload({ kind, fromPeerId, toPeerId, description: pc.localDescription }).then(resolve, reject);
-    const done = () => { pc.removeEventListener('icegatheringstatechange', on); clearTimeout(timer); encodeSignalPayload({ kind, fromPeerId, toPeerId, description: pc.localDescription }).then(resolve, reject); };
-    const on = () => { if (pc.iceGatheringState === 'complete') done(); };
+    if (pc.iceGatheringState === "complete")
+      return encodeSignalPayload({
+        kind,
+        fromPeerId,
+        toPeerId,
+        description: pc.localDescription,
+      }).then(resolve, reject);
+    const done = () => {
+      pc.removeEventListener("icegatheringstatechange", on);
+      clearTimeout(timer);
+      encodeSignalPayload({
+        kind,
+        fromPeerId,
+        toPeerId,
+        description: pc.localDescription,
+      }).then(resolve, reject);
+    };
+    const on = () => {
+      if (pc.iceGatheringState === "complete") done();
+    };
     const timer = setTimeout(done, 12000);
-    pc.addEventListener('icegatheringstatechange', on);
+    pc.addEventListener("icegatheringstatechange", on);
   });
 }
 
 export class PeerRelaySignalingAdapter {
   localPeerId: string;
   sendFn: (remotePeerId: string, msg: object) => void;
-  constructor(localPeerId: string, sendFn: (remotePeerId: string, msg: object) => void) { this.localPeerId = localPeerId; this.sendFn = sendFn; }
-  get name(): string { return 'peer-relay'; }
-  createOffer(remotePeerId: string, pc: RTCPeerConnection): Promise<{kind: string; fromPeerId: string; toPeerId: string; description: RTCSessionDescriptionInit | null}> {
-    return this._createAndSend('offer', remotePeerId, pc, () => pc.createOffer({ offerToReceiveAudio: true }));
+  constructor(
+    localPeerId: string,
+    sendFn: (remotePeerId: string, msg: object) => void,
+  ) {
+    this.localPeerId = localPeerId;
+    this.sendFn = sendFn;
   }
-  acceptOffer(_text: string, _pc: RTCPeerConnection): Promise<never> { return Promise.reject(new Error('Relay adapter uses DataChannel, not manual text import.')); }
-  acceptAnswer(_text: string, _pc: RTCPeerConnection): Promise<never> { return Promise.reject(new Error('Relay adapter uses DataChannel, not manual text import.')); }
-  async _createAndSend(kind: string, remotePeerId: string, pc: RTCPeerConnection, createFn: () => Promise<RTCSessionDescriptionInit>): Promise<{kind: string; fromPeerId: string; toPeerId: string; description: RTCSessionDescriptionInit | null}> {
+  get name(): string {
+    return "peer-relay";
+  }
+  createOffer(
+    remotePeerId: string,
+    pc: RTCPeerConnection,
+  ): Promise<{
+    kind: string;
+    fromPeerId: string;
+    toPeerId: string;
+    description: RTCSessionDescriptionInit | null;
+  }> {
+    return this._createAndSend("offer", remotePeerId, pc, () =>
+      pc.createOffer({ offerToReceiveAudio: true }),
+    );
+  }
+  acceptOffer(_text: string, _pc: RTCPeerConnection): Promise<never> {
+    return Promise.reject(
+      new Error("Relay adapter uses DataChannel, not manual text import."),
+    );
+  }
+  acceptAnswer(_text: string, _pc: RTCPeerConnection): Promise<never> {
+    return Promise.reject(
+      new Error("Relay adapter uses DataChannel, not manual text import."),
+    );
+  }
+  async _createAndSend(
+    kind: string,
+    remotePeerId: string,
+    pc: RTCPeerConnection,
+    createFn: () => Promise<RTCSessionDescriptionInit>,
+  ): Promise<{
+    kind: string;
+    fromPeerId: string;
+    toPeerId: string;
+    description: RTCSessionDescriptionInit | null;
+  }> {
     const desc = await createFn();
     await pc.setLocalDescription(desc);
-    return { kind, fromPeerId: this.localPeerId, toPeerId: remotePeerId, description: pc.localDescription };
+    return {
+      kind,
+      fromPeerId: this.localPeerId,
+      toPeerId: remotePeerId,
+      description: pc.localDescription,
+    };
   }
-  relaySignal(type: string, fromPeerId: string, toPeerId: string, signal: unknown): void { this.sendFn(toPeerId, { type, fromPeerId, toPeerId, signal, sentAt: Date.now() }); }
+  relaySignal(
+    type: string,
+    fromPeerId: string,
+    toPeerId: string,
+    signal: unknown,
+  ): void {
+    this.sendFn(toPeerId, {
+      type,
+      fromPeerId,
+      toPeerId,
+      signal,
+      sentAt: Date.now(),
+    });
+  }
 }
 
 export interface SignalingAdapter {
   name: string;
-  createOffer(remotePeerId: string, pc: RTCPeerConnection): Promise<EncodedPayload>;
+  createOffer(
+    remotePeerId: string,
+    pc: RTCPeerConnection,
+  ): Promise<EncodedPayload>;
   acceptOffer(text: string, pc: RTCPeerConnection): Promise<EncodedPayload>;
   acceptAnswer(text: string, pc: RTCPeerConnection): Promise<EncodedPayload>;
-  relaySignal(type: string, fromPeerId: string, toPeerId: string, signal: unknown): void;
+  relaySignal(
+    type: string,
+    fromPeerId: string,
+    toPeerId: string,
+    signal: unknown,
+  ): void;
 }
 
 export class OptionalRemoteSignalingAdapter implements SignalingAdapter {
   localPeerId: string;
   apiBaseUrl: string;
-  constructor(localPeerId: string, apiBaseUrl: string) { this.localPeerId = localPeerId; this.apiBaseUrl = apiBaseUrl; }
-  get name(): string { return 'optional-remote'; }
-  async createOffer(remotePeerId: string, pc: RTCPeerConnection): Promise<EncodedPayload> {
+  constructor(localPeerId: string, apiBaseUrl: string) {
+    this.localPeerId = localPeerId;
+    this.apiBaseUrl = apiBaseUrl;
+  }
+  get name(): string {
+    return "optional-remote";
+  }
+  async createOffer(
+    remotePeerId: string,
+    pc: RTCPeerConnection,
+  ): Promise<EncodedPayload> {
     const offer = await pc.createOffer({ offerToReceiveAudio: true });
     await pc.setLocalDescription(offer);
-    const payload = await waitForIceAndEncode('offer', this.localPeerId, remotePeerId, pc);
-    await fetch(`${this.apiBaseUrl}/rooms/${encodeURIComponent(remotePeerId)}/offer`, {
-      method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' }
-    });
+    const payload = await waitForIceAndEncode(
+      "offer",
+      this.localPeerId,
+      remotePeerId,
+      pc,
+    );
+    await fetch(
+      `${this.apiBaseUrl}/rooms/${encodeURIComponent(remotePeerId)}/offer`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json" },
+      },
+    );
     return payload;
   }
-  async acceptOffer(text: string, pc: RTCPeerConnection): Promise<EncodedPayload> {
+  async acceptOffer(
+    text: string,
+    pc: RTCPeerConnection,
+  ): Promise<EncodedPayload> {
     const payload = await decodeSignalPayload(text);
-    if (payload.kind !== 'offer') throw new Error('Expected offer payload.');
-    await pc.setRemoteDescription(payload.description as RTCSessionDescriptionInit);
+    if (payload.kind !== "offer") throw new Error("Expected offer payload.");
+    await pc.setRemoteDescription(
+      payload.description as RTCSessionDescriptionInit,
+    );
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
-    const answerPayload = await waitForIceAndEncode('answer', this.localPeerId, payload.fromPeerId, pc);
-    await fetch(`${this.apiBaseUrl}/rooms/${encodeURIComponent(payload.fromPeerId)}/answer`, {
-      method: 'POST', body: JSON.stringify(answerPayload), headers: { 'Content-Type': 'application/json' }
-    });
+    const answerPayload = await waitForIceAndEncode(
+      "answer",
+      this.localPeerId,
+      payload.fromPeerId,
+      pc,
+    );
+    await fetch(
+      `${this.apiBaseUrl}/rooms/${encodeURIComponent(payload.fromPeerId)}/answer`,
+      {
+        method: "POST",
+        body: JSON.stringify(answerPayload),
+        headers: { "Content-Type": "application/json" },
+      },
+    );
     return answerPayload;
   }
-  async acceptAnswer(_text: string, _pc: RTCPeerConnection): Promise<EncodedPayload> {
-    throw new Error('Remote adapter uses server relay; poll for answer instead.');
+  async acceptAnswer(
+    _text: string,
+    _pc: RTCPeerConnection,
+  ): Promise<EncodedPayload> {
+    throw new Error(
+      "Remote adapter uses server relay; poll for answer instead.",
+    );
   }
-  relaySignal(type: string, fromPeerId: string, toPeerId: string, signal: unknown): void {
+  relaySignal(
+    type: string,
+    fromPeerId: string,
+    toPeerId: string,
+    signal: unknown,
+  ): void {
     fetch(`${this.apiBaseUrl}/rooms/${encodeURIComponent(toPeerId)}/signal`, {
-      method: 'POST',
-      body: JSON.stringify({ type, fromPeerId, toPeerId, signal, sentAt: Date.now() }),
-      headers: { 'Content-Type': 'application/json' }
+      method: "POST",
+      body: JSON.stringify({
+        type,
+        fromPeerId,
+        toPeerId,
+        signal,
+        sentAt: Date.now(),
+      }),
+      headers: { "Content-Type": "application/json" },
     }).catch(() => {});
   }
 }
 
 function b64url(bytes: Uint8Array): string {
-  let s = ''; bytes.forEach(b => s += String.fromCharCode(b));
-  return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  let s = "";
+  bytes.forEach((b) => (s += String.fromCharCode(b)));
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 function unb64url(s: string): Uint8Array {
-  s = s.replace(/-/g,'+').replace(/_/g,'/'); while (s.length % 4) s += '=';
-  const bin = atob(s); return Uint8Array.from(bin, c => c.charCodeAt(0));
+  s = s.replace(/-/g, "+").replace(/_/g, "/");
+  while (s.length % 4) s += "=";
+  const bin = atob(s);
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
 }
-async function compress(bytes: Uint8Array): Promise<{alg: string; bytes: Uint8Array}> {
-  if (!('CompressionStream' in globalThis)) return { alg:'plain', bytes };
-  const stream = new Blob([bytes as unknown as BlobPart]).stream().pipeThrough(new CompressionStream('deflate'));
-  return { alg:'deflate', bytes: new Uint8Array(await new Response(stream).arrayBuffer()) };
+async function compress(
+  bytes: Uint8Array,
+): Promise<{ alg: string; bytes: Uint8Array }> {
+  if (!("CompressionStream" in globalThis)) return { alg: "plain", bytes };
+  const stream = new Blob([bytes as unknown as BlobPart])
+    .stream()
+    .pipeThrough(new CompressionStream("deflate"));
+  return {
+    alg: "deflate",
+    bytes: new Uint8Array(await new Response(stream).arrayBuffer()),
+  };
 }
 async function decompress(alg: string, bytes: Uint8Array): Promise<Uint8Array> {
-  if (alg === 'plain') return bytes;
-  if (!('DecompressionStream' in globalThis)) throw new Error('Deflate payload unsupported in this runtime. Use a modern browser.');
-  const stream = new Blob([bytes as unknown as BlobPart]).stream().pipeThrough(new DecompressionStream('deflate'));
+  if (alg === "plain") return bytes;
+  if (!("DecompressionStream" in globalThis))
+    throw new Error(
+      "Deflate payload unsupported in this runtime. Use a modern browser.",
+    );
+  const stream = new Blob([bytes as unknown as BlobPart])
+    .stream()
+    .pipeThrough(new DecompressionStream("deflate"));
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 export function stripSdpForManual(sdp: string): string {
-  const normalized = sdp.replace(/\r?\n/g, '\r\n').trim();
-  const rawLines = normalized.split('\r\n').filter(Boolean);
+  const normalized = sdp.replace(/\r?\n/g, "\r\n").trim();
+  const rawLines = normalized.split("\r\n").filter(Boolean);
   const sessionLines: string[] = [];
   const sections: string[][] = [];
   let current: string[] | null = null;
   for (const line of rawLines) {
-    if (line.startsWith('m=')) { current = [line]; sections.push(current); }
-    else if (current) current.push(line);
+    if (line.startsWith("m=")) {
+      current = [line];
+      sections.push(current);
+    } else if (current) current.push(line);
     else sessionLines.push(line);
   }
-  const keptSections = sections.map(minifyMediaSection).filter((section): section is string[] => section.length > 0);
-  const keptMids = keptSections.map(section => section.find(line => line.startsWith('a=mid:'))?.slice(6)).filter(Boolean);
+  const keptSections = sections
+    .map(minifyMediaSection)
+    .filter((section): section is string[] => section.length > 0);
+  const keptMids = keptSections
+    .map((section) =>
+      section.find((line) => line.startsWith("a=mid:"))?.slice(6),
+    )
+    .filter(Boolean);
   const compactSession = sessionLines
-    .map(line => line.startsWith('a=group:BUNDLE') && keptMids.length ? `a=group:BUNDLE ${keptMids.join(' ')}` : line)
-    .filter(line => isSessionLineKept(line));
-  return [...compactSession, ...keptSections.flat()].join('\r\n') + '\r\n';
+    .map((line) =>
+      line.startsWith("a=group:BUNDLE") && keptMids.length
+        ? `a=group:BUNDLE ${keptMids.join(" ")}`
+        : line,
+    )
+    .filter((line) => isSessionLineKept(line));
+  return [...compactSession, ...keptSections.flat()].join("\r\n") + "\r\n";
 }
 function isSessionLineKept(line: string): boolean {
   return /^(v=|o=|s=|t=|a=group:BUNDLE|a=msid-semantic:)/.test(line);
 }
 function minifyCandidate(line: string): string {
   const parts = line.split(/\s+/);
-  const typ = parts.indexOf('typ');
-  return typ > 0 ? parts.slice(0, typ + 2).join(' ') : line;
+  const typ = parts.indexOf("typ");
+  return typ > 0 ? parts.slice(0, typ + 2).join(" ") : line;
 }
 function minifyMediaSection(section: string[]): string[] {
   const m = section[0];
   const kind = m.split(/\s+/)[0].slice(2);
-  if (!['audio','application'].includes(kind)) return [];
-  const mid = section.find(line => line.startsWith('a=mid:'));
-  if (kind === 'application') {
-    return section.filter(line =>
-      line.startsWith('m=') || line === mid || /^(c=|a=ice-ufrag:|a=ice-pwd:|a=fingerprint:|a=setup:|a=sctp-port:|a=max-message-size:|a=candidate:|a=end-of-candidates)/.test(line)
-    ).map(line => line.startsWith('a=candidate:') ? minifyCandidate(line) : line);
+  if (!["audio", "application"].includes(kind)) return [];
+  const mid = section.find((line) => line.startsWith("a=mid:"));
+  if (kind === "application") {
+    return section
+      .filter(
+        (line) =>
+          line.startsWith("m=") ||
+          line === mid ||
+          /^(c=|a=ice-ufrag:|a=ice-pwd:|a=fingerprint:|a=setup:|a=sctp-port:|a=max-message-size:|a=candidate:|a=end-of-candidates)/.test(
+            line,
+          ),
+      )
+      .map((line) =>
+        line.startsWith("a=candidate:") ? minifyCandidate(line) : line,
+      );
   }
-  const opusPayload = section.map(line => line.match(/^a=rtpmap:(\d+) opus\/48000\/2/i)?.[1]).find(Boolean);
-  const header = opusPayload ? m.split(/\s+/).slice(0, 3).concat(opusPayload).join(' ') : m;
-  return section.map(line => line === m ? header : line).filter(line => {
-    if (line.startsWith('a=rtpmap:') || line.startsWith('a=fmtp:') || line.startsWith('a=rtcp-fb:')) return !opusPayload || line.startsWith(`a=rtpmap:${opusPayload} `) || line.startsWith(`a=fmtp:${opusPayload} `);
-    return line.startsWith('m=') || line === mid || /^(c=|a=ice-ufrag:|a=ice-pwd:|a=fingerprint:|a=setup:|a=rtcp-mux|a=sendrecv|a=recvonly|a=sendonly|a=inactive|a=msid:|a=ssrc:|a=candidate:|a=end-of-candidates)/.test(line);
-  }).map(line => line.startsWith('a=candidate:') ? minifyCandidate(line) : line);
+  const opusPayload = section
+    .map((line) => line.match(/^a=rtpmap:(\d+) opus\/48000\/2/i)?.[1])
+    .find(Boolean);
+  const header = opusPayload
+    ? m.split(/\s+/).slice(0, 3).concat(opusPayload).join(" ")
+    : m;
+  return section
+    .map((line) => (line === m ? header : line))
+    .filter((line) => {
+      if (
+        line.startsWith("a=rtpmap:") ||
+        line.startsWith("a=fmtp:") ||
+        line.startsWith("a=rtcp-fb:")
+      )
+        return (
+          !opusPayload ||
+          line.startsWith(`a=rtpmap:${opusPayload} `) ||
+          line.startsWith(`a=fmtp:${opusPayload} `)
+        );
+      return (
+        line.startsWith("m=") ||
+        line === mid ||
+        /^(c=|a=ice-ufrag:|a=ice-pwd:|a=fingerprint:|a=setup:|a=rtcp-mux|a=sendrecv|a=recvonly|a=sendonly|a=inactive|a=msid:|a=ssrc:|a=candidate:|a=end-of-candidates)/.test(
+          line,
+        )
+      );
+    })
+    .map((line) =>
+      line.startsWith("a=candidate:") ? minifyCandidate(line) : line,
+    );
 }
-export async function encodeSignalPayload(payload: Record<string, unknown>): Promise<EncodedPayload> {
-  const body = { v:1, app:'carryokie', createdAt:Date.now(), ...payload };
-  if (typeof body.description === 'object' && body.description !== null && 'sdp' in (body.description as object)) (body.description as {sdp: string}).sdp = stripSdpForManual((body.description as {sdp: string}).sdp);
+export async function encodeSignalPayload(
+  payload: Record<string, unknown>,
+): Promise<EncodedPayload> {
+  const body = { v: 1, app: "carryokie", createdAt: Date.now(), ...payload };
+  if (
+    typeof body.description === "object" &&
+    body.description !== null &&
+    "sdp" in (body.description as object)
+  )
+    (body.description as { sdp: string }).sdp = stripSdpForManual(
+      (body.description as { sdp: string }).sdp,
+    );
   const packed = await compress(enc.encode(JSON.stringify(body)));
   const token = `ck1.${packed.alg}.${b64url(packed.bytes)}`;
-  const loc = globalThis.location || { origin: 'http://localhost', pathname: '/player/' };
-  return { token, url: `${loc.origin}${loc.pathname}#signal=${token}`, chunks: chunkToken(token) };
+  const loc = globalThis.location || {
+    origin: "http://localhost",
+    pathname: "/player/",
+  };
+  return {
+    token,
+    url: `${loc.origin}${loc.pathname}#signal=${token}`,
+    chunks: chunkToken(token),
+  };
 }
-export async function decodeSignalPayload(input: string): Promise<SignalPayload> {
+export async function decodeSignalPayload(
+  input: string,
+): Promise<SignalPayload> {
   const token = extractToken(input);
-  const parts = token.split('.');
-  if (parts.length !== 3 || parts[0] !== 'ck1') throw new Error('Signal import failed: unsupported CarryOkie payload.');
+  const parts = token.split(".");
+  if (parts.length !== 3 || parts[0] !== "ck1")
+    throw new Error("Signal import failed: unsupported CarryOkie payload.");
   const bytes = await decompress(parts[1], unb64url(parts[2]));
   const payload = JSON.parse(dec.decode(bytes)) as SignalPayload;
-  if (payload.app !== 'carryokie') throw new Error('Signal import failed: not a CarryOkie payload.');
+  if (payload.app !== "carryokie")
+    throw new Error("Signal import failed: not a CarryOkie payload.");
   return payload;
 }
 export function extractToken(input: string): string {
-  input = (input || '').trim();
-  if (input.startsWith('chunk:')) throw new Error('Paste all chunks into the multi-chunk field before import.');
-  try { const u = new URL(input); const hash = new URLSearchParams(u.hash.slice(1)); if (hash.get('signal')) return hash.get('signal')!; } catch {}
-  const m = input.match(/ck1\.[a-z]+\.[A-Za-z0-9_-]+/); if (!m) throw new Error('Signal import failed: no payload found.');
+  input = (input || "").trim();
+  if (input.startsWith("chunk:"))
+    throw new Error(
+      "Paste all chunks into the multi-chunk field before import.",
+    );
+  try {
+    const u = new URL(input);
+    const hash = new URLSearchParams(u.hash.slice(1));
+    if (hash.get("signal")) return hash.get("signal")!;
+  } catch {}
+  const m = input.match(/ck1\.[a-z]+\.[A-Za-z0-9_-]+/);
+  if (!m) throw new Error("Signal import failed: no payload found.");
   return m[0];
 }
 export function chunkToken(token: string, size = 240): string[] {
   let n = Math.ceil(token.length / size);
   const maxPrefix = `chunk:${n}/${n}:`.length;
-  if (size + maxPrefix > QR_MAX_TEXT_BYTES) size = Math.max(1, QR_MAX_TEXT_BYTES - maxPrefix);
+  if (size + maxPrefix > QR_MAX_TEXT_BYTES)
+    size = Math.max(1, QR_MAX_TEXT_BYTES - maxPrefix);
   n = Math.ceil(token.length / size);
-  return Array.from({length:n}, (_,i) => `chunk:${i+1}/${n}:${token.slice(i*size,(i+1)*size)}`);
+  return Array.from(
+    { length: n },
+    (_, i) => `chunk:${i + 1}/${n}:${token.slice(i * size, (i + 1) * size)}`,
+  );
 }
 export function joinChunks(text: string): string {
-  const lines = text.split(/\n+/).map(s => s.trim()).filter(Boolean);
-  const parts = lines.map(l => { const m = l.match(/^chunk:(\d+)\/(\d+):(.+)$/); if (!m) return null; return {i:+m[1], n:+m[2], data:m[3]}; });
-  if (parts.some(p => !p)) return text;
-  const n = parts[0]!.n; if (parts.length !== n) throw new Error(`Need ${n} chunks, got ${parts.length}.`);
-  return parts.sort((a,b) => a!.i - b!.i).map(p => p!.data).join('');
+  const lines = text
+    .split(/\n+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const parts = lines.map((l) => {
+    const m = l.match(/^chunk:(\d+)\/(\d+):(.+)$/);
+    if (!m) return null;
+    return { i: +m[1], n: +m[2], data: m[3] };
+  });
+  if (parts.some((p) => !p)) return text;
+  const n = parts[0]!.n;
+  if (parts.length !== n)
+    throw new Error(`Need ${n} chunks, got ${parts.length}.`);
+  return parts
+    .sort((a, b) => a!.i - b!.i)
+    .map((p) => p!.data)
+    .join("");
 }
-export function renderPayloadCard(target: HTMLElement, encoded: EncodedPayload, label = 'Signal payload'): void {
+export function renderPayloadCard(
+  target: HTMLElement,
+  encoded: EncodedPayload,
+  label = "Signal payload",
+): void {
   let index = 0;
   const renderQr = () => {
-    const qr = target.querySelector('[data-single-qr]') as HTMLElement | null;
-    const count = target.querySelector('[data-qr-count]') as HTMLElement | null;
+    const qr = target.querySelector("[data-single-qr]") as HTMLElement | null;
+    const count = target.querySelector("[data-qr-count]") as HTMLElement | null;
     if (qr) qr.innerHTML = qrSvg(encoded.chunks[index]);
     if (count) count.textContent = `QR ${index + 1}/${encoded.chunks.length}`;
   };
-  target.innerHTML = `<div class="payload"><h3>${label}</h3><p>One QR code is shown at a time. Scan it, then use Next only if this payload needs another local chunk. Link/share/copy remains available.</p><figure><figcaption data-qr-count></figcaption><div data-single-qr></div></figure><div class="actions"><button data-prev>Prev QR</button><button data-next>Next QR</button><button data-copy>Copy link</button><button data-share>Share</button></div><textarea readonly>${encoded.url}</textarea><details><summary>Text fallback (${encoded.chunks.length} local chunk${encoded.chunks.length === 1 ? '' : 's'})</summary><textarea readonly>${encoded.chunks.join('\n')}</textarea></details></div>`;
+  target.innerHTML = `<div class="payload"><h3>${label}</h3><p>One QR code is shown at a time. Scan it, then use Next only if this payload needs another local chunk. Link/share/copy remains available.</p><figure><figcaption data-qr-count></figcaption><div data-single-qr></div></figure><div class="actions"><button data-prev>Prev QR</button><button data-next>Next QR</button><button data-copy>Copy link</button><button data-share>Share</button></div><textarea readonly>${encoded.url}</textarea><details><summary>Text fallback (${encoded.chunks.length} local chunk${encoded.chunks.length === 1 ? "" : "s"})</summary><textarea readonly>${encoded.chunks.join("\n")}</textarea></details></div>`;
   renderQr();
-  const syncButtons = () => { (target.querySelector('[data-prev]') as HTMLButtonElement)!.disabled = index === 0; (target.querySelector('[data-next]') as HTMLButtonElement)!.disabled = index === encoded.chunks.length - 1; };
+  const syncButtons = () => {
+    (target.querySelector("[data-prev]") as HTMLButtonElement)!.disabled =
+      index === 0;
+    (target.querySelector("[data-next]") as HTMLButtonElement)!.disabled =
+      index === encoded.chunks.length - 1;
+  };
   syncButtons();
-  target.querySelector('[data-prev]')!.onclick = () => { index = Math.max(0, index - 1); renderQr(); syncButtons(); };
-  target.querySelector('[data-next]')!.onclick = () => { index = Math.min(encoded.chunks.length - 1, index + 1); renderQr(); syncButtons(); };
-  target.querySelector('[data-copy]')!.onclick = () => navigator.clipboard.writeText(encoded.url);
-  target.querySelector('[data-share]')!.onclick = async () => navigator.share ? await navigator.share({title:'CarryOkie signal', text:encoded.url}) : navigator.clipboard.writeText(encoded.url);
+  target.querySelector("[data-prev]")!.onclick = () => {
+    index = Math.max(0, index - 1);
+    renderQr();
+    syncButtons();
+  };
+  target.querySelector("[data-next]")!.onclick = () => {
+    index = Math.min(encoded.chunks.length - 1, index + 1);
+    renderQr();
+    syncButtons();
+  };
+  target.querySelector("[data-copy]")!.onclick = () =>
+    navigator.clipboard.writeText(encoded.url);
+  target.querySelector("[data-share]")!.onclick = async () =>
+    navigator.share
+      ? await navigator.share({ title: "CarryOkie signal", text: encoded.url })
+      : navigator.clipboard.writeText(encoded.url);
 }
 
-export async function scanQrInto(target: HTMLTextAreaElement, log: (message: string) => void = () => {}): Promise<string> {
-  const Detector = (globalThis as unknown as { BarcodeDetector?: new (opts: {formats: string[]}) => { detect(video: HTMLVideoElement): Promise<Array<{rawValue: string}>> } }).BarcodeDetector;
-  if (!Detector) throw new Error('Camera QR import needs Chrome/Android BarcodeDetector support. Use copy/paste fallback on this browser.');
-  if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera QR import needs camera permission and HTTPS.');
-  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-  const video = document.createElement('video');
-  video.playsInline = true; video.muted = true; video.autoplay = true; video.srcObject = stream;
-  video.style.cssText = 'width:100%;max-height:280px;background:#000;border-radius:12px;margin:.5rem 0';
-  target.insertAdjacentElement('beforebegin', video);
+export async function scanQrInto(
+  target: HTMLTextAreaElement,
+  log: (message: string) => void = () => {},
+): Promise<string> {
+  const Detector = (
+    globalThis as unknown as {
+      BarcodeDetector?: new (opts: { formats: string[] }) => {
+        detect(video: HTMLVideoElement): Promise<Array<{ rawValue: string }>>;
+      };
+    }
+  ).BarcodeDetector;
+  if (!Detector)
+    throw new Error(
+      "Camera QR import needs Chrome/Android BarcodeDetector support. Use copy/paste fallback on this browser.",
+    );
+  if (!navigator.mediaDevices?.getUserMedia)
+    throw new Error("Camera QR import needs camera permission and HTTPS.");
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "environment" },
+    audio: false,
+  });
+  const video = document.createElement("video");
+  video.playsInline = true;
+  video.muted = true;
+  video.autoplay = true;
+  video.srcObject = stream;
+  video.style.cssText =
+    "width:100%;max-height:280px;background:#000;border-radius:12px;margin:.5rem 0";
+  target.insertAdjacentElement("beforebegin", video);
   await video.play();
-  const detector = new Detector({ formats: ['qr_code'] });
-  log('Scanning QR with camera…');
+  const detector = new Detector({ formats: ["qr_code"] });
+  log("Scanning QR with camera…");
   return new Promise((resolve, reject) => {
-    const stop = () => { stream.getTracks().forEach(t => t.stop()); video.remove(); };
-    const timeout = window.setTimeout(() => { stop(); reject(new Error('No QR found. Try brighter light or paste the link/chunks.')); }, 30000);
+    const stop = () => {
+      stream.getTracks().forEach((t) => t.stop());
+      video.remove();
+    };
+    const timeout = window.setTimeout(() => {
+      stop();
+      reject(
+        new Error("No QR found. Try brighter light or paste the link/chunks."),
+      );
+    }, 30000);
     const tick = async () => {
       try {
         const codes = await detector.detect(video);
         const raw = codes[0]?.rawValue?.trim();
         if (raw) {
-          window.clearTimeout(timeout); stop();
-          target.value = raw.startsWith('chunk:') && target.value.trim() ? `${target.value.trim()}\n${raw}` : raw;
-          target.dispatchEvent(new Event('input', { bubbles: true }));
-          log('QR imported.');
+          window.clearTimeout(timeout);
+          stop();
+          target.value =
+            raw.startsWith("chunk:") && target.value.trim()
+              ? `${target.value.trim()}\n${raw}`
+              : raw;
+          target.dispatchEvent(new Event("input", { bubbles: true }));
+          log("QR imported.");
           resolve(raw);
           return;
         }
         requestAnimationFrame(tick);
-      } catch (e) { window.clearTimeout(timeout); stop(); reject(e); }
+      } catch (e) {
+        window.clearTimeout(timeout);
+        stop();
+        reject(e);
+      }
     };
     tick();
   });

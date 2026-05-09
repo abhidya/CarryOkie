@@ -1,9 +1,6 @@
 {
   "generatedAt": "2026-05-07T09:38:42.246Z",
-  "sources": [
-    "public/songs",
-    "downloads/mp4"
-  ],
+  "sources": ["public/songs", "downloads/mp4"],
   "songs": [
     {
       "songId": "yt_K2qERDVrs60",

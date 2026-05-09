@@ -1,27 +1,27 @@
 - main [ref=e3]:
-  - heading "Host Controller" [level=1] [ref=e5]
-  - generic [ref=e7]:
-    - generic [ref=e8]:
-      - heading "Room MINTKITE" [level=2] [ref=e9]
-      - paragraph [ref=e10]: Players 1/5. Active singers max 5.
-      - paragraph [ref=e11]:
-        - link "Player join link" [ref=e12] [cursor=pointer]:
-          - /url: ../player/?room=MINTKITE
-      - button "New room" [ref=e13] [cursor=pointer]
-    - generic [ref=e14]:
-      - heading "Cast to TV" [level=2] [ref=e15]
-      - paragraph [ref=e16]: "{\"available\":false,\"connected\":false,\"receiverReady\":false,\"currentMediaLoaded\":false,\"defaultMediaReceiver\":true,\"error\":null}"
-      - button "Cast to TV" [ref=e17] [cursor=pointer]
-    - generic [ref=e18]:
-      - heading "Queue" [level=2] [ref=e19]
-      - list
-      - button "Accept all" [ref=e20] [cursor=pointer]
-      - button "Start next queued" [ref=e21] [cursor=pointer]
-    - generic [ref=e22]:
-      - heading "Singers" [level=2] [ref=e23]
-      - generic [ref=e24]:
-        - checkbox "#1 Host" [ref=e25]
-        - text: "#1 Host"
-      - 'button "Mute #1" [ref=e26] [cursor=pointer]'
-      - button "Set singers" [ref=e27] [cursor=pointer]
-  - heading "Log" [level=2] [ref=e29]
+    - heading "Host Controller" [level=1] [ref=e5]
+    - generic [ref=e7]:
+        - generic [ref=e8]:
+            - heading "Room MINTKITE" [level=2] [ref=e9]
+            - paragraph [ref=e10]: Players 1/5. Active singers max 5.
+            - paragraph [ref=e11]:
+                - link "Player join link" [ref=e12] [cursor=pointer]:
+                    - /url: ../player/?room=MINTKITE
+            - button "New room" [ref=e13] [cursor=pointer]
+        - generic [ref=e14]:
+            - heading "Cast to TV" [level=2] [ref=e15]
+            - paragraph [ref=e16]: '{"available":false,"connected":false,"receiverReady":false,"currentMediaLoaded":false,"defaultMediaReceiver":true,"error":null}'
+            - button "Cast to TV" [ref=e17] [cursor=pointer]
+        - generic [ref=e18]:
+            - heading "Queue" [level=2] [ref=e19]
+            - list
+            - button "Accept all" [ref=e20] [cursor=pointer]
+            - button "Start next queued" [ref=e21] [cursor=pointer]
+        - generic [ref=e22]:
+            - heading "Singers" [level=2] [ref=e23]
+            - generic [ref=e24]:
+                - checkbox "#1 Host" [ref=e25]
+                - text: "#1 Host"
+            - 'button "Mute #1" [ref=e26] [cursor=pointer]'
+            - button "Set singers" [ref=e27] [cursor=pointer]
+    - heading "Log" [level=2] [ref=e29]

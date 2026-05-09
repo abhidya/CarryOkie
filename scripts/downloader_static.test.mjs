@@ -1,12 +1,16 @@
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import { spawnSync } from "node:child_process";
 
-const script = fs.readFileSync('scripts/download_youtube_karaoke.sh', 'utf8');
-const readme = fs.readFileSync('README.md', 'utf8');
-const links = fs.readFileSync('links.txt', 'utf8').trim().split(/\n+/);
+const script = fs.readFileSync("scripts/download_youtube_karaoke.sh", "utf8");
+const readme = fs.readFileSync("README.md", "utf8");
+const links = fs.readFileSync("links.txt", "utf8").trim().split(/\n+/);
 
-const syntax = spawnSync('bash', ['-n', 'scripts/download_youtube_karaoke.sh'], { encoding:'utf8' });
+const syntax = spawnSync(
+  "bash",
+  ["-n", "scripts/download_youtube_karaoke.sh"],
+  { encoding: "utf8" },
+);
 assert.equal(syntax.status, 0, syntax.stderr);
 assert.match(script, /command -v "\$1"/);
 assert.match(script, /need_cmd yt-dlp/);
@@ -32,9 +36,14 @@ assert.match(script, /MP4 SUCCESS/);
 assert.match(script, /MP4 FAILURE/);
 assert.match(script, /MP3 SUCCESS/);
 assert.match(script, /MP3 FAILURE/);
-assert.ok(links.length > 0, 'links.txt should include at least one YouTube URL');
-assert.ok(links.every(url => /^https:\/\/www\.youtube\.com\/watch\?v=/.test(url)));
+assert.ok(
+  links.length > 0,
+  "links.txt should include at least one YouTube URL",
+);
+assert.ok(
+  links.every((url) => /^https:\/\/www\.youtube\.com\/watch\?v=/.test(url)),
+);
 assert.match(readme, /brew install yt-dlp ffmpeg/);
 assert.match(readme, /python3 -m pip install -U "yt-dlp\[default\]"/);
 assert.match(readme, /Exact commands run per URL/);
-console.log('PASS downloader static contract');
+console.log("PASS downloader static contract");

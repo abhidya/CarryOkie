@@ -68,12 +68,14 @@ The strict GitHub Pages-only mode uses QR/link/manual WebRTC signaling plus peer
    - The app MUST wait for `iceGatheringState === "complete"` before encoding manual offer/answer payloads.
 
 10. **Chromecast playback time is the source of truth for song position.**
-   - The host MUST NOT assume playback starts when the host sends `CAST_PLAY` or `CAST_LOAD_SONG`.
-   - The host MUST derive current media time from Cast Sender / Receiver media status updates and broadcast that state to phones.
+
+- The host MUST NOT assume playback starts when the host sends `CAST_PLAY` or `CAST_LOAD_SONG`.
+- The host MUST derive current media time from Cast Sender / Receiver media status updates and broadcast that state to phones.
 
 11. **Active singers must prevent TV-audio bleed.**
-   - Browser AEC cannot cancel backing audio played by the TV because that audio is not produced by the phone browser.
-   - Active singers MUST use headphones OR the app MUST enforce push-to-sing / noise-gated capture to limit TV backing-track bleed into the mic stream.
+
+- Browser AEC cannot cancel backing audio played by the TV because that audio is not produced by the phone browser.
+- Active singers MUST use headphones OR the app MUST enforce push-to-sing / noise-gated capture to limit TV backing-track bleed into the mic stream.
 
 ---
 
@@ -1120,6 +1122,7 @@ MVP is accepted only when all of these pass:
 20. Strict mode configures public STUN and displays clear ICE failure errors when P2P cannot connect.
 21. Phones derive lyric timing from actual Cast media status, not from guessed host click time.
 22. Active singers get headphone / push-to-sing / TV-bleed warnings before publishing mic.
+
 ---
 
 ## 20. Known Limitations to Display or Document
