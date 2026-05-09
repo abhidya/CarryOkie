@@ -892,8 +892,10 @@ function renderPlayer(main) {
     }
   };
   const hold = $("#holdSing");
+  let holding = false;
   hold.onpointerdown = (e) => {
     e.preventDefault();
+    holding = true;
     try {
       hold.setPointerCapture?.(e.pointerId);
     } catch (error) {
@@ -901,11 +903,11 @@ function renderPlayer(main) {
     }
     setOwnMicMuted(false);
   };
-  hold.onpointerup = () => setOwnMicMuted(true);
-  hold.onpointercancel = () => setOwnMicMuted(true);
-  hold.onpointerleave = () => setOwnMicMuted(true);
+  hold.onpointerup = () => { holding = false; setOwnMicMuted(true); };
+  hold.onpointercancel = () => { holding = false; setOwnMicMuted(true); };
+  hold.onpointerleave = () => { if (holding) { holding = false; setOwnMicMuted(true); } };
   $("#toggleSing").onclick = () =>
-    setOwnMicMuted(!(player?.micState?.muted === false));
+    setOwnMicMuted(!player?.micState?.muted);
   $("#muteMic").onclick = () => setOwnMicMuted(true);
   $("#startBacking").onclick = async () =>
     audio

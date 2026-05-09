@@ -369,6 +369,8 @@ export function receiverApp(root: HTMLElement): void {
   const liveMics = root.querySelector<HTMLElement>("#liveMics")!;
   const receiverId = crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
   let loadedSongId = "";
+  let mediaReady = false;
+  let pendingPlay = false;
   function activeLine(): (typeof state.lines)[0] | undefined {
     const t = state.mediaTimeMs;
     return (
@@ -453,6 +455,7 @@ export function receiverApp(root: HTMLElement): void {
       return;
     }
     loadedSongId = (song as Song).songId;
+    mediaReady = false;
     state.status = "Loading backing track…";
     resolvePlayableMediaUrl(
       song as Parameters<typeof resolvePlayableMediaUrl>[0],
@@ -464,13 +467,25 @@ export function receiverApp(root: HTMLElement): void {
           return;
         }
         media.src = url;
+        const attemptPlay = () => {
+          mediaReady = true;
+          if (pendingPlay) {
+            pendingPlay = false;
+            media.play().catch(() => {
+              state.status = "Tap receiver once to start backing track/audio.";
+              render();
+            });
+          }
+        };
         media
           .play()
           .then(() => {
             state.status = "Backing track playing.";
+            attemptPlay();
             render();
           })
           .catch(() => {
+            attemptPlay();
             state.status = "Tap receiver once to start backing track/audio.";
             render();
           });
@@ -498,8 +513,12 @@ export function receiverApp(root: HTMLElement): void {
       | undefined;
     if (msg.type === "CAST_LOAD_SONG" && payload)
       loadSong(payload.song as Song, payload.roomCode as string);
-    if (msg.type === "CAST_PLAY") media.play();
-    if (msg.type === "CAST_PAUSE") media.pause();
+    if (msg.type === "CAST_PLAY") {
+      if (!media.src && state.song) loadSong(state.song, state.roomCode);
+      if (media.src) media.play().catch(() => {});
+      else pendingPlay = true;
+    }
+    if (msg.type === "CAST_PAUSE" && media.src) media.pause();
     if (msg.type === "CAST_SEEK" && payload)
       media.currentTime = payload.seconds as number;
     if (msg.type === "CAST_SET_SINGERS" && payload)

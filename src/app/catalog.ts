@@ -45,13 +45,14 @@ export async function loadSongCatalog(
   const protectedSongs = await loadProtectedCatalog();
   let plainSongs: SongCatalogItem[] = [];
   try {
-    plainSongs = await fetch(assetUrl("/songs/catalog.json", baseUrl)!)
-      .then((response) => (response.ok ? response.json() : { songs: [] }))
-      .then((catalogJson) =>
-        (catalogJson.songs || []).map((song: SongCatalogItem) =>
-          normalizeSong(song, baseUrl),
-        ),
+    const plainUrl = assetUrl("/songs/catalog.json", baseUrl);
+    const plainRes = plainUrl ? await fetch(plainUrl) : null;
+    if (plainRes?.ok) {
+      const catalogJson = await plainRes.json();
+      plainSongs = (catalogJson.songs || []).map((song: SongCatalogItem) =>
+        normalizeSong(song, baseUrl),
       );
+    }
   } catch {
     // Plain imported songs are optional; protected catalog entries remain usable.
     plainSongs = [];
