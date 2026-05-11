@@ -14,6 +14,9 @@ import {
   MAX_SINGERS,
   lockHostLost,
   normalizeDisplayName,
+  makePeerJsRoomCode,
+  PEERJS_ROOM_ALPHABET,
+  PEERJS_ROOM_LENGTH,
 } from "./state.ts";
 import {
   PeerNode,
@@ -46,9 +49,14 @@ import {
   pairedActor as findPairedActor,
 } from "./app/queueService.ts";
 import { queueHtml as renderQueueHtml } from "./app/queueView.ts";
+import {
+  PeerJsRoomTransport,
+  type RoomMessage,
+} from "./peer/PeerJsRoomTransport.ts";
 let room = loadRoom();
 let player = JSON.parse(localStorage.getItem("carryokie.player") || "null");
 let peerNode;
+let peerJsTransport: PeerJsRoomTransport | null = null;
 let audio;
 let catalog = [];
 let castController;

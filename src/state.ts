@@ -107,6 +107,9 @@ export function uuid(): string {
 export function nowMs(): number {
   return Date.now();
 }
+export const PEERJS_ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+export const PEERJS_ROOM_LENGTH = 5;
+
 export function makeRoomCode(): string {
   const words = [
     "BLUE",
@@ -124,6 +127,16 @@ export function makeRoomCode(): string {
     words[Math.floor(Math.random() * words.length)] +
     words[Math.floor(Math.random() * words.length)]
   );
+}
+
+export function makePeerJsRoomCode(): string {
+  const chars = PEERJS_ROOM_ALPHABET;
+  let code = "";
+  const arr = new Uint8Array(PEERJS_ROOM_LENGTH);
+  crypto.getRandomValues(arr);
+  for (let i = 0; i < PEERJS_ROOM_LENGTH; i++)
+    code += chars[arr[i] % chars.length];
+  return code;
 }
 export function normalizeDisplayName(
   displayName: unknown,
