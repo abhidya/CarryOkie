@@ -68,6 +68,7 @@ let receiverSessionId = null;
 let receiverAudioDirty = false;
 let receiverNegotiating = false;
 let receiverPendingRenegotiate = false;
+let receiverNegotiationTimer: ReturnType<typeof setTimeout> | null = null;
 const receiverStreams = new Set();
 function persist() {
   if (room) saveRoom(room);
@@ -198,6 +199,8 @@ function resetReceiverAudio(receiverId) {
   receiverSessionId = receiverId;
   receiverAudioDirty = true;
   receiverPendingRenegotiate = false;
+  clearTimeout(receiverNegotiationTimer ?? undefined);
+  receiverNegotiationTimer = null;
 }
 async function negotiateReceiverAudio() {
   if (!player?.isHost || !receiverPc || !peerNode || !receiverAudioDirty)
@@ -226,6 +229,14 @@ async function negotiateReceiverAudio() {
       description: receiverPc.localDescription,
     });
     offerSent = true;
+    clearTimeout(receiverNegotiationTimer ?? undefined);
+    receiverNegotiationTimer = setTimeout(() => {
+      if (receiverNegotiating) {
+        receiverNegotiating = false;
+        if (receiverPendingRenegotiate || receiverAudioDirty)
+          negotiateReceiverAudio().catch((e) => log(e.message));
+      }
+    }, 15000);
   } finally {
     if (!offerSent) receiverNegotiating = false;
   }
@@ -254,6 +265,7 @@ function setupReceiverBridge() {
       await receiverPc
         .setRemoteDescription(msg.description)
         .catch((e) => log(e.message));
+      clearTimeout(receiverNegotiationTimer ?? undefined);
       receiverNegotiating = false;
       if (receiverPendingRenegotiate || receiverAudioDirty)
         negotiateReceiverAudio().catch((e) => log(e.message));

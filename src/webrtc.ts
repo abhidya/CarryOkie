@@ -43,6 +43,7 @@ interface PeerEdge {
   initiator: boolean;
   negotiating?: boolean;
   needsNegotiation?: boolean;
+  negotiationTimer?: ReturnType<typeof setTimeout>;
 }
 
 interface RelayedStream {
@@ -118,7 +119,13 @@ export class PeerNode extends EventTarget {
     };
     pc.ondatachannel = (ev) => this.attachChannel(edge, ev.channel);
     pc.onnegotiationneeded = () => {
-      void this.negotiate(edge);
+      if (edge.negotiating) {
+        edge.needsNegotiation = true;
+        return;
+      }
+      this.negotiate(edge).catch((e) =>
+        this.emit("error", { message: `Renegotiation failed: ${(e as Error).message}`, remotePeerId: edge.remotePeerId }),
+      );
     };
     if (initiator)
       this.attachChannel(
@@ -237,6 +244,7 @@ export class PeerNode extends EventTarget {
     const edge = this.peers.get(remotePeerId);
     if (!edge) throw new Error("No peer connection for renegotiation answer.");
     await edge.pc.setRemoteDescription(this.signalDescription(msg));
+    clearTimeout(edge.negotiationTimer);
     edge.negotiating = false;
     if (edge.needsNegotiation) this.requestNegotiation(edge);
   }
@@ -250,7 +258,9 @@ export class PeerNode extends EventTarget {
       edge.needsNegotiation = true;
       return;
     }
-    void this.negotiate(edge);
+    this.negotiate(edge).catch((e) =>
+      this.emit("error", { message: `Renegotiation failed: ${(e as Error).message}`, remotePeerId: edge.remotePeerId }),
+    );
   }
   async negotiate(edge: PeerEdge): Promise<void> {
     if (
@@ -274,6 +284,13 @@ export class PeerNode extends EventTarget {
         toPeerId: edge.remotePeerId,
         signal: edge.pc.localDescription,
       });
+      clearTimeout(edge.negotiationTimer);
+      edge.negotiationTimer = setTimeout(() => {
+        if (edge.negotiating) {
+          edge.negotiating = false;
+          if (edge.needsNegotiation) this.requestNegotiation(edge);
+        }
+      }, 15000);
     } catch (err) {
       edge.negotiating = false;
       throw err;

@@ -581,6 +581,17 @@ export function receiverApp(root: HTMLElement): void {
         render();
       });
   }
+  function removeStaleLiveMicTracks(): void {
+    const currentIds = new Set<string>();
+    for (const track of liveMicStream.getTracks()) {
+      if (track.readyState === "ended") {
+        liveMicStream.removeTrack(track);
+        liveMicTrackIds.delete(track.id);
+      } else {
+        currentIds.add(track.id);
+      }
+    }
+  }
   if (typeof BroadcastChannel !== "undefined") {
     const channel = new BroadcastChannel("carryokie.receiver");
     let pc: RTCPeerConnection | null = null;
@@ -591,22 +602,32 @@ export function receiverApp(root: HTMLElement): void {
         msg.type === "RECEIVER_OFFER" &&
         (!msg.receiverId || msg.receiverId === receiverId)
       ) {
-        pc?.close?.();
-        pc = new RTCPeerConnection(rtcConfig);
-        pc.ontrack = (event) => {
-          const stream = event.streams[0];
-          if (stream) addLiveMic(stream);
-          else if (event.track) addLiveMic(new MediaStream([event.track]));
-        };
-        await pc.setRemoteDescription(msg.description);
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        await waitForIceComplete(pc);
-        channel.postMessage({
-          type: "RECEIVER_ANSWER",
-          receiverId,
-          description: pc.localDescription,
-        });
+        try {
+          if (!pc || pc.signalingState === "closed") {
+            pc?.close?.();
+            pc = new RTCPeerConnection(rtcConfig);
+            pc.ontrack = (event) => {
+              const stream = event.streams[0];
+              if (stream) addLiveMic(stream);
+              else if (event.track) addLiveMic(new MediaStream([event.track]));
+            };
+          }
+          removeStaleLiveMicTracks();
+          await pc.setRemoteDescription(msg.description);
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          await waitForIceComplete(pc);
+          channel.postMessage({
+            type: "RECEIVER_ANSWER",
+            receiverId,
+            description: pc.localDescription,
+          });
+        } catch (err: unknown) {
+          state.status = `Receiver audio error: ${(err as Error).message}`;
+          render();
+          pc?.close?.();
+          pc = null;
+        }
       }
     };
     channel.postMessage({
