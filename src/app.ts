@@ -112,9 +112,11 @@ function setupPeer(localPeerId) {
   );
   peerNode.addEventListener("error", (e) => log(e.detail.message));
   peerNode.addEventListener("track", (e) => {
-    audio?.addRemoteStream(e.detail.stream, e.detail.remotePeerId);
+    const remoteStream = e.detail.stream || (e.detail.track ? new MediaStream([e.detail.track]) : null);
+    if (!remoteStream) return;
+    audio?.addRemoteStream(remoteStream, e.detail.remotePeerId);
     if (player?.isHost) {
-      peerNode.relayRemoteStream(e.detail.remotePeerId, e.detail.stream);
+      peerNode.relayRemoteStream(e.detail.remotePeerId, remoteStream);
       receiverAudioDirty = true;
       negotiateReceiverAudio().catch((err) => log(err.message));
     }
@@ -230,9 +232,13 @@ async function negotiateReceiverAudio() {
     });
     offerSent = true;
     clearTimeout(receiverNegotiationTimer ?? undefined);
-    receiverNegotiationTimer = setTimeout(() => {
+    receiverNegotiationTimer = setTimeout(async () => {
       if (receiverNegotiating) {
         receiverNegotiating = false;
+        try {
+          if (receiverPc?.signalingState === "have-local-offer")
+            await receiverPc.setLocalDescription({ type: "rollback" });
+        } catch { /* best-effort rollback */ }
         if (receiverPendingRenegotiate || receiverAudioDirty)
           negotiateReceiverAudio().catch((e) => log(e.message));
       }
@@ -264,7 +270,14 @@ function setupReceiverBridge() {
     ) {
       await receiverPc
         .setRemoteDescription(msg.description)
-        .catch((e) => log(e.message));
+        .catch(async (e) => {
+          log(e.message);
+          try {
+            if (receiverPc?.signalingState === "have-local-offer")
+              await receiverPc.setLocalDescription({ type: "rollback" });
+          } catch { /* best-effort rollback */ }
+          receiverNegotiating = false;
+        });
       clearTimeout(receiverNegotiationTimer ?? undefined);
       receiverNegotiating = false;
       if (receiverPendingRenegotiate || receiverAudioDirty)

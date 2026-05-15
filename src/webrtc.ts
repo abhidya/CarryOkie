@@ -109,13 +109,14 @@ export class PeerNode extends EventTarget {
         });
     };
     pc.ontrack = (ev) => {
+      const stream = ev.streams[0] || (ev.track ? new MediaStream([ev.track]) : undefined);
       this.emit("track", {
         remotePeerId,
-        stream: ev.streams[0],
+        stream,
         track: ev.track,
       });
-      if (ev.streams[0])
-        this.emit("duet", { remotePeerId, stream: ev.streams[0] });
+      if (stream)
+        this.emit("duet", { remotePeerId, stream });
     };
     pc.ondatachannel = (ev) => this.attachChannel(edge, ev.channel);
     pc.onnegotiationneeded = () => {
@@ -226,6 +227,8 @@ export class PeerNode extends EventTarget {
     const edge =
       this.peers.get(remotePeerId) ||
       this.makeConnection(remotePeerId, { manual: false, initiator: false });
+    if (edge.pc.signalingState === "have-local-offer")
+      await edge.pc.setLocalDescription({ type: "rollback" });
     await edge.pc.setRemoteDescription(this.signalDescription(msg));
     const answer = await edge.pc.createAnswer();
     await edge.pc.setLocalDescription(answer);
@@ -285,9 +288,13 @@ export class PeerNode extends EventTarget {
         signal: edge.pc.localDescription,
       });
       clearTimeout(edge.negotiationTimer);
-      edge.negotiationTimer = setTimeout(() => {
+      edge.negotiationTimer = setTimeout(async () => {
         if (edge.negotiating) {
           edge.negotiating = false;
+          try {
+            if (edge.pc.signalingState === "have-local-offer")
+              await edge.pc.setLocalDescription({ type: "rollback" });
+          } catch { /* best-effort rollback */ }
           if (edge.needsNegotiation) this.requestNegotiation(edge);
         }
       }, 15000);
