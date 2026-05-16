@@ -335,12 +335,21 @@ export function stripSdpForManual(sdp: string): string {
   return [...compactSession, ...keptSections.flat()].join("\r\n") + "\r\n";
 }
 function isSessionLineKept(line: string): boolean {
-  return /^(v=|o=|s=|t=|a=group:BUNDLE|a=msid-semantic:)/.test(line);
+  return /^(v=|o=|s=|t=|a=group:BUNDLE|a=msid-semantic:|a=ice-ufrag:|a=ice-pwd:|a=ice-options:|a=fingerprint:|a=setup:)/.test(
+    line,
+  );
 }
 function minifyCandidate(line: string): string {
   const parts = line.split(/\s+/);
-  const typ = parts.indexOf("typ");
-  return typ > 0 ? parts.slice(0, typ + 2).join(" ") : line;
+  return parts
+    .filter(
+      (part, index) =>
+        !["generation", "network-id", "network-cost"].includes(part) &&
+        !["generation", "network-id", "network-cost"].includes(
+          parts[index - 1],
+        ),
+    )
+    .join(" ");
 }
 function minifyMediaSection(section: string[]): string[] {
   const m = section[0];
@@ -400,10 +409,13 @@ export async function encodeSignalPayload(
     typeof body.description === "object" &&
     body.description !== null &&
     "sdp" in (body.description as object)
-  )
-    (body.description as { sdp: string }).sdp = stripSdpForManual(
-      (body.description as { sdp: string }).sdp,
-    );
+  ) {
+    const description = body.description as RTCSessionDescriptionInit;
+    body.description = {
+      type: description.type,
+      sdp: stripSdpForManual(description.sdp || ""),
+    };
+  }
   const packed = await compress(enc.encode(JSON.stringify(body)));
   const token = `ck1.${packed.alg}.${b64url(packed.bytes)}`;
   const loc = globalThis.location || {
@@ -505,12 +517,30 @@ export function renderPayloadCard(
     renderQr();
     syncButtons();
   };
-  target.querySelector("[data-copy]")!.onclick = () =>
-    navigator.clipboard.writeText(encoded.url);
-  target.querySelector("[data-share]")!.onclick = async () =>
-    navigator.share
-      ? await navigator.share({ title: "CarryOkie signal", text: encoded.url })
-      : navigator.clipboard.writeText(encoded.url);
+  target.querySelector("[data-copy]")!.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(encoded.url);
+      const btn = target.querySelector("[data-copy]") as HTMLButtonElement;
+      const originalText = btn.textContent;
+      btn.textContent = "Copied!";
+      setTimeout(() => (btn.textContent = originalText), 1500);
+    } catch (err) {
+      console.error("Copy failed:", err);
+      alert("Copy requires HTTPS. Select and copy the link manually.");
+    }
+  };
+  target.querySelector("[data-share]")!.onclick = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "CarryOkie signal", text: encoded.url });
+      } else {
+        await navigator.clipboard.writeText(encoded.url);
+      }
+    } catch (err) {
+      console.error("Share failed:", err);
+      alert("Copy requires HTTPS. Select and copy the link manually.");
+    }
+  };
 }
 
 export async function scanQrInto(
@@ -528,7 +558,9 @@ export async function scanQrInto(
     throw new Error(
       "Camera QR import needs Chrome/Android BarcodeDetector support. Use copy/paste fallback on this browser.",
     );
-  if (!navigator.mediaDevices?.getUserMedia)
+  if (!navigator.mediaDevices)
+    throw new Error("Camera QR import needs camera permission and HTTPS.");
+  if (!navigator.mediaDevices.getUserMedia)
     throw new Error("Camera QR import needs camera permission and HTTPS.");
   const stream = await navigator.mediaDevices.getUserMedia({
     video: { facingMode: "environment" },

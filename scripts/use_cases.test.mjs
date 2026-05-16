@@ -299,6 +299,61 @@ test("manual payload round-trips compressed/base64url and preserves valid SDP", 
   assert.doesNotMatch(decoded.description.sdp, /PCMU|VP8|network-cost/);
 });
 
+test("manual SDP strip preserves srflx candidate raddr/rport", () => {
+  const sdp = [
+    "v=0",
+    "o=- 0 0 IN IP4 127.0.0.1",
+    "s=-",
+    "t=0 0",
+    "a=group:BUNDLE 0",
+    "m=application 9 UDP/DTLS/SCTP webrtc-datachannel",
+    "c=IN IP4 0.0.0.0",
+    "a=mid:0",
+    "a=ice-ufrag:abc",
+    "a=ice-pwd:def",
+    "a=fingerprint:sha-256 00",
+    "a=setup:actpass",
+    "a=sctp-port:5000",
+    "a=candidate:1 1 udp 1677729535 69.14.212.122 57887 typ srflx raddr 0.0.0.0 rport 0 generation 0 network-cost 999",
+  ].join("\r\n");
+  const stripped = stripSdpForManual(sdp);
+  assert.match(stripped, /typ srflx raddr 0\.0\.0\.0 rport 0/);
+  assert.doesNotMatch(stripped, /generation|network-cost/);
+});
+
+test("manual payload encoder does not mutate readonly RTC descriptions", async () => {
+  const description = {};
+  Object.defineProperties(description, {
+    type: { value: "offer", enumerable: false },
+    sdp: {
+      value: [
+        "v=0",
+        "o=- 0 0 IN IP4 127.0.0.1",
+        "s=-",
+        "t=0 0",
+        "m=application 9 UDP/DTLS/SCTP webrtc-datachannel",
+        "a=mid:0",
+        "a=ice-ufrag:abc",
+        "a=ice-pwd:def",
+        "a=fingerprint:sha-256 00",
+        "a=setup:actpass",
+        "a=sctp-port:5000",
+      ].join("\r\n"),
+      enumerable: false,
+      writable: false,
+    },
+  });
+  const encoded = await encodeSignalPayload({
+    kind: "offer",
+    fromPeerId: "a",
+    toPeerId: "b",
+    description,
+  });
+  const decoded = await decodeSignalPayload(encoded.url);
+  assert.equal(decoded.description.type, "offer");
+  assert.match(decoded.description.sdp, /m=application/);
+});
+
 test("chunked signaling rejoins", () => {
   const chunks = chunkToken("ck1.plain." + "x".repeat(2500), 500);
   assert.ok(chunks.length > 1);

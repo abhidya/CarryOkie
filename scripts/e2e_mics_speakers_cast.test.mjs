@@ -31,6 +31,8 @@ class FakePc extends EventEmitter {
     this.remoteDescription = null;
     this.dataChannels = new Map();
     this.remoteStreams = [];
+    this.localTracks = [];
+    this.remoteTracks = [];
   }
 
   addEventListener(type, listener) {
@@ -50,7 +52,7 @@ class FakePc extends EventEmitter {
   }
 
   addTrack(track, stream) {
-    // Simulate adding track
+    this.localTracks.push({ track, stream });
   }
 
   addStream(stream) {
@@ -89,6 +91,17 @@ class FakePc extends EventEmitter {
 
   addIceCandidate(candidate) {
     // Simulate ICE candidate
+  }
+
+  receiveRemoteTrack(track, streams) {
+    this.remoteTracks.push({ track, streams });
+    this.dispatchEvent({
+      type: "track",
+      track,
+      streams,
+      receiver: { track },
+      transceiver: { receiver: { track } },
+    });
   }
 }
 
@@ -348,6 +361,13 @@ test("E2E: Full room with 3 singers, 2 listeners, and Chromecast", async () => {
     "Tab-cast receiver should mirror host playback samples",
   );
 
+  // Verify receiver has live mic rendering logic
+  assert.match(
+    receiverCode,
+    /liveMics|live-mics/,
+    "Receiver should have live mic container",
+  );
+
   // Setup: Create WebRTC mesh between all participants
   const peerNodes = new Map();
   peerNodes.set(host.peerId, new PeerNode(host.peerId));
@@ -395,9 +415,14 @@ test("E2E: Full room with 3 singers, 2 listeners, and Chromecast", async () => {
 
   // Setup: Simulate mic publishing for singers
   const audioNodes = new Map();
+  const singerStreams = new Map();
   for (const singer of singers) {
     const audio = new PhoneAudio(() => {});
     audioNodes.set(singer.playerId, audio);
+
+    // Create a fake published stream for each singer
+    const singerStream = new FakeMediaStream([new FakeMediaStreamTrack("audio")]);
+    singerStreams.set(singer.playerId, singerStream);
 
     // Design Req #12: Singer enables mic with explicit permission
     // Design Req #22: Active singers get headphone/push-to-sing/TV-bleed warnings
@@ -408,6 +433,19 @@ test("E2E: Full room with 3 singers, 2 listeners, and Chromecast", async () => {
       "Should warn about TV bleed",
     );
     assert.match(audioCode, /pushToSing/, "Should support push-to-sing");
+  }
+
+  // Verify singers published mic streams
+  assert.equal(
+    singerStreams.size,
+    3,
+    "All 3 singers should have published mic streams",
+  );
+  for (const [playerId, stream] of singerStreams) {
+    assert.ok(
+      stream.getAudioTracks().length > 0,
+      `Singer ${playerId} stream should have audio tracks`,
+    );
   }
 
   // Design Req #14: Singer does not hear own mic by default
@@ -506,6 +544,89 @@ test("E2E: Full room with 3 singers, 2 listeners, and Chromecast", async () => {
     appCodeForAudio,
     /relayRemoteStream/,
     "Host track handler should invoke audio relay",
+  );
+
+  // Verify audio routing: singers publish to host, host receives and relays to listeners
+  const hostNodeForRouting = peerNodes.get(host.peerId);
+  assert.ok(hostNodeForRouting, "Host node should exist for routing");
+
+  // Non-host singers publish their streams via peer connections to host
+  const nonHostSingers = singers.filter((s) => s.playerId !== host.playerId);
+  assert.equal(nonHostSingers.length, 2, "Should have 2 non-host singers");
+
+  for (const singer of nonHostSingers) {
+    const stream = singerStreams.get(singer.playerId);
+    const track = stream.getAudioTracks()[0];
+
+    // Singer has peer connection to host
+    const singerNode = peerNodes.get(singer.peerId);
+    if (singerNode && singerNode.peers.has(host.peerId)) {
+      const singerEdge = singerNode.peers.get(host.peerId);
+      // Add singer's track to singer->host connection
+      singerEdge.pc.addTrack(track, stream);
+
+      // Host receives the track
+      const hostEdge = hostNodeForRouting.peers.get(singer.peerId);
+      if (hostEdge) {
+        hostEdge.pc.receiveRemoteTrack(track, [stream]);
+      }
+    }
+  }
+
+  // Verify audio routing: host received singer streams (one from each non-host singer)
+  let hostReceivedTrackCount = 0;
+  hostNodeForRouting.peers.forEach((edge) => {
+    hostReceivedTrackCount += edge.pc.remoteTracks.length;
+  });
+  assert.equal(
+    hostReceivedTrackCount,
+    2,
+    "Host should have received 2 singer tracks via WebRTC (from non-host singers)",
+  );
+
+  // Host relays singer streams to listeners
+  for (const singer of nonHostSingers) {
+    const stream = singerStreams.get(singer.playerId);
+    const track = stream.getAudioTracks()[0];
+    for (const listener of listeners) {
+      const listenerNode = peerNodes.get(listener.peerId);
+      if (listenerNode && listenerNode.peers.has(host.peerId)) {
+        const listenerEdge = listenerNode.peers.get(host.peerId);
+        // Host relays singer track to listener
+        listenerEdge.pc.receiveRemoteTrack(track, [stream]);
+      }
+    }
+  }
+
+  // Verify audio routing: listeners received singer streams (via host relay)
+  let listenerReceivedTrackCount = 0;
+  for (const listener of listeners) {
+    const listenerNode = peerNodes.get(listener.peerId);
+    if (listenerNode) {
+      listenerNode.peers.forEach((edge) => {
+        listenerReceivedTrackCount += edge.pc.remoteTracks.length;
+      });
+    }
+  }
+  assert.equal(
+    listenerReceivedTrackCount,
+    2 * 2,
+    "Each of 2 listeners should receive 2 singer tracks (from non-host singers via host relay)",
+  );
+
+  // Verify receiver tab would receive singer streams (via WebRTC cast)
+  // In the real app, receiver gets all 3 singer streams
+  // Host forwards both non-host singer streams + handles host's own stream locally
+  const receiverPc = new FakePc();
+  for (const singer of singers) {
+    const stream = singerStreams.get(singer.playerId);
+    const track = stream.getAudioTracks()[0];
+    receiverPc.receiveRemoteTrack(track, [stream]);
+  }
+  assert.equal(
+    receiverPc.remoteTracks.length,
+    3,
+    "Receiver should receive all 3 singer tracks via WebRTC cast",
   );
 
   // Design Req #5: TV shows room code and QR

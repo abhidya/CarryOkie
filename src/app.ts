@@ -194,6 +194,11 @@ function sendCastRoomUpdate(type, payload = {}) {
   castController?.sendSafe?.(type, payload);
   publishReceiverState();
 }
+function plainRtcDescription(description: RTCSessionDescription | null) {
+  return description
+    ? { type: description.type, sdp: description.sdp }
+    : null;
+}
 function resetReceiverAudio(receiverId) {
   receiverPc?.close?.();
   receiverPc = null;
@@ -228,7 +233,7 @@ async function negotiateReceiverAudio() {
     receiverChannel?.postMessage({
       type: "RECEIVER_OFFER",
       receiverId: receiverSessionId,
-      description: receiverPc.localDescription,
+      description: plainRtcDescription(receiverPc.localDescription),
     });
     offerSent = true;
     clearTimeout(receiverNegotiationTimer ?? undefined);
@@ -797,13 +802,29 @@ function attachJoinHandlers() {
     .querySelectorAll("button")
     .forEach((b) => b.addEventListener("click", unlockPhoneAudio));
   $("#makeOffer").onclick = async () => {
+    const button = $("#makeOffer") as HTMLButtonElement | null;
     try {
+      if (button) {
+        button.disabled = true;
+        button.textContent = "Creating code...";
+      }
+      const offerOut = $("#offerOut");
+      if (offerOut) offerOut.textContent = "Creating phone pairing code...";
+      log("Creating phone pairing code...");
       updatePlayerDisplayName();
       assertWebRtcSupported();
       const encoded = await peerNode.createManualOffer("host");
       renderPayloadCard($("#offerOut"), encoded, "Player offer");
+      log("Phone pairing code ready.");
     } catch (e) {
-      log(e.message);
+      const offerOut = $("#offerOut");
+      if (offerOut) offerOut.textContent = (e as Error).message;
+      log((e as Error).message);
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Create phone pairing code";
+      }
     }
   };
   $("#scanAnswerQr").onclick = async () => {

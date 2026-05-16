@@ -293,6 +293,9 @@ checks.push([
     cast.includes("receiverId") &&
     cast.includes("RECEIVER_OFFER") &&
     cast.includes("RECEIVER_PLAYBACK_SYNC") &&
+    cast.includes("plainRtcDescription") &&
+    app.includes("plainRtcDescription(receiverPc.localDescription)") &&
+    cast.includes("plainRtcDescription(pc.localDescription)") &&
     cast.includes("Playing all forwarded singer mics") &&
     cast.includes("liveMicStream.addTrack") &&
     cast.includes("getAudioTracks") &&

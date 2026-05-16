@@ -419,19 +419,29 @@ export class PeerNode extends EventTarget {
 }
 export function waitForIceComplete(
   pc: RTCPeerConnection,
-  timeoutMs = 12000,
+  timeoutMs = 4000,
+  idleMs = 1000,
 ): Promise<void> {
   if (pc.iceGatheringState === "complete") return Promise.resolve();
   return new Promise((resolve) => {
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
     const done = () => {
       pc.removeEventListener("icegatheringstatechange", on);
+      pc.removeEventListener("icecandidate", onCandidate);
       clearTimeout(timer);
+      clearTimeout(idleTimer ?? undefined);
       resolve();
     };
     const on = () => {
       if (pc.iceGatheringState === "complete") done();
     };
+    const onCandidate = (event: RTCPeerConnectionIceEvent) => {
+      if (!event.candidate) return;
+      clearTimeout(idleTimer ?? undefined);
+      idleTimer = setTimeout(done, idleMs);
+    };
     const timer = setTimeout(done, timeoutMs);
     pc.addEventListener("icegatheringstatechange", on);
+    pc.addEventListener("icecandidate", onCandidate);
   });
 }

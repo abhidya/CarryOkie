@@ -592,6 +592,11 @@ export function receiverApp(root: HTMLElement): void {
       }
     }
   }
+  function plainRtcDescription(description: RTCSessionDescription | null) {
+    return description
+      ? { type: description.type, sdp: description.sdp }
+      : null;
+  }
   if (typeof BroadcastChannel !== "undefined") {
     const channel = new BroadcastChannel("carryokie.receiver");
     let pc: RTCPeerConnection | null = null;
@@ -620,7 +625,7 @@ export function receiverApp(root: HTMLElement): void {
           channel.postMessage({
             type: "RECEIVER_ANSWER",
             receiverId,
-            description: pc.localDescription,
+            description: plainRtcDescription(pc.localDescription),
           });
         } catch (err: unknown) {
           state.status = `Receiver audio error: ${(err as Error).message}`;
