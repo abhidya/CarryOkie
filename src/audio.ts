@@ -71,6 +71,13 @@ export class PhoneAudio {
   }: {
     pushToSing?: boolean;
   } = {}): Promise<MediaStream> {
+    if (!navigator.mediaDevices) {
+      throw new Error("Mic requires HTTPS. Connect via GitHub Pages or localhost.");
+    }
+    if (!navigator.mediaDevices.getUserMedia) {
+      throw new Error("Browser doesn't support getUserMedia API.");
+    }
+
     await this.init();
     this.pushToSing = pushToSing;
     this.localStream = await navigator.mediaDevices.getUserMedia({
