@@ -3,7 +3,7 @@ import { chromium } from "playwright";
 
 const baseUrl = process.env.E2E_BASE_URL || "http://localhost:4174/";
 const headed = process.env.HEADLESS !== "1";
-const keepBrowserOpen = process.env.KEEP_BROWSER_OPEN === "1";
+const keepBrowserOpen = true;
 const browser = await chromium.launch({
   headless: !headed,
   slowMo: headed ? 150 : 0,
@@ -86,10 +86,10 @@ try {
   await host.waitForSelector(".acceptItem", { timeout: 10000 });
   await host.click(".acceptItem");
   await host.waitForSelector(".startItem", { timeout: 10000 });
-  await player.waitForSelector("text=queued:", { timeout: 10000 });
+  await player.waitForSelector(".queue-status-queued", { timeout: 10000 });
   await host.click(".startItem");
-  await host.waitForSelector("text=active:", { timeout: 10000 });
-  await player.waitForSelector("text=active:", { timeout: 10000 });
+await host.waitForSelector(".queue-status-active", { timeout: 10000 });
+await player.waitForSelector(".queue-status-active", { timeout: 10000 });
   await receiver.waitForSelector("text=singers Real E2E", { timeout: 15000 });
 
   await player.click("#enableMic");
@@ -117,7 +117,8 @@ try {
   await player.click("#toggleSing");
   await player.waitForSelector("text=Mic live.", { timeout: 5000 });
   await host.waitForSelector("text=MIC_UNMUTED", { timeout: 10000 });
-  await player.locator("#remoteGain").fill("1.5");
+  await player.click("text=Advanced audio");
+await player.locator("#remoteGain").fill("1.5");
   await player.locator("#backingGain").fill("0.5");
   await player.locator("#masterGain").fill("1.2");
   await player.click("#muteMic");

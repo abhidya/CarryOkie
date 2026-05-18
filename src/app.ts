@@ -130,6 +130,19 @@ function setupPeer(localPeerId) {
     }
   });
   setInterval(() => peerNode?.pingAll(), 5000);
+  setInterval(() => {
+    if (player?.isHost && room?.playbackState && !room.playbackState.paused && receiverChannel) {
+      const now = Date.now();
+      const derived = deriveTvMediaPositionMs(room.playbackState, now, 0);
+      room.playbackState = {
+        ...room.playbackState,
+        tvMediaTimeMs: derived.positionMs,
+        tvMediaTimeSampledAtHostMs: now,
+        lastUpdatedAtHostMs: now,
+      };
+      publishReceiverPlayback(room.playbackState);
+    }
+  }, 2000);
   return peerNode;
 }
 function isHostEdge(remotePeerId) {
@@ -247,7 +260,7 @@ async function negotiateReceiverAudio() {
       stream.getTracks().forEach((t) => receiverPc.addTrack(t, stream));
     }
     if (!receiverStreams.size) return;
-    const offer = await receiverPc.createOffer({ offerToReceiveAudio: false });
+    const offer = await receiverPc.createOffer({ offerToReceiveAudio: true });
     await receiverPc.setLocalDescription(offer);
     await waitForIceComplete(receiverPc);
     receiverChannel?.postMessage({
@@ -450,10 +463,17 @@ async function loadCurrentSongOnTv() {
 }
 function pauseCurrentPlayback() {
   if (!room?.playbackState) return;
+  const derived = deriveTvMediaPositionMs(
+    room.playbackState,
+    Date.now(),
+    0,
+  );
   room.playbackState = {
     ...room.playbackState,
     paused: true,
     status: "paused",
+    pausedAtSongMs: derived.positionMs,
+    tvMediaTimeMs: derived.positionMs,
     lastUpdatedAtHostMs: Date.now(),
   };
   publishReceiverPlayback(room.playbackState);
@@ -462,11 +482,18 @@ function pauseCurrentPlayback() {
 }
 function resumeCurrentPlayback() {
   if (!room?.playbackState) return;
+  const now = Date.now();
+  const wasAt = room.playbackState.pausedAtSongMs || 0;
   room.playbackState = {
     ...room.playbackState,
     paused: false,
     status: "playing",
-    lastUpdatedAtHostMs: Date.now(),
+    startedAtHostMs: now,
+    tvMediaTimeMs: wasAt,
+    tvMediaTimeSampledAtHostMs: now,
+    pausedAtSongMs: 0,
+    syncDegraded: false,
+    lastUpdatedAtHostMs: now,
   };
   publishReceiverPlayback(room.playbackState);
   broadcastRoom(RPC.PLAYBACK_STARTED);
@@ -514,6 +541,9 @@ function startQueueItem(item) {
   persist();
   publishReceiverState();
   if (castController?.state?.().connected) loadCurrentSongOnTv();
+  /* Auto-resume so receiver tab and phones start playing immediately.
+     In Cast mode the playbackSample event will override this shortly. */
+  resumeCurrentPlayback();
 }
 function pairedActor(remotePeerId, msgPlayerId) {
   return findPairedActor(room, remotePeerId, msgPlayerId);
@@ -819,6 +849,18 @@ function renderHost(main) {
     const seconds = +$("#castSeekSeconds").value || 0;
     publishReceiverCommand("CAST_SEEK", { seconds });
     cast.seek(seconds);
+    if (room?.playbackState) {
+      const now = Date.now();
+      room.playbackState = {
+        ...room.playbackState,
+        tvMediaTimeMs: seconds * 1000,
+        tvMediaTimeSampledAtHostMs: now,
+        seekOffsetMs: 0,
+        lastUpdatedAtHostMs: now,
+      };
+      publishReceiverPlayback(room.playbackState);
+      persist();
+    }
   };
 }
 export async function playerPage(root) {

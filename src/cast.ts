@@ -7,6 +7,7 @@ import {
   isProtectedMedia,
 } from "./protectedMedia.ts";
 import { rtcConfig, waitForIceComplete } from "./webrtc.ts";
+import { deriveTvMediaPositionMs } from "./sync.ts";
 
 function escapeHtml(value: unknown): string {
   return String(value ?? "").replace(
@@ -414,6 +415,7 @@ export function receiverApp(root: HTMLElement): void {
     mediaTimeMs: number;
     lines: Array<{ startMs: number; endMs: number; text: string }>;
     status: string;
+    playbackState: Record<string, unknown> | null;
   } = {
     roomCode: initialRoomCode,
     song: null,
@@ -422,6 +424,7 @@ export function receiverApp(root: HTMLElement): void {
     mediaTimeMs: 0,
     lines: [],
     status: "Waiting for host tab…",
+    playbackState: null,
   };
   root.innerHTML = `<main class="tv"><section class="tv-info"><p class="eyebrow">CarryOkie receiver</p><h1>CarryOkie</h1><div class="stage-art receiver-stage" aria-hidden="true"><div class="stage-orb"></div><div class="stage-mic"></div><div class="soundwave"><span></span><span></span><span></span><span></span><span></span></div></div><div class="room" id="room">${escapeHtml(initialRoomCode)}</div><div id="joinQr"></div><p>Scan/open /player. Tab-cast receiver mirrors host room, queue, singers, backing track, and live singer mics.</p><section id="singers"></section><section id="receiverStatus"></section><section id="liveMics"><h2>Live mics</h2><p>Waiting for host tab audio…</p><button id="retryLiveMics">Start / retry live mics</button></section></section><section class="tv-stage"><video id="media" class="castMediaElement" controls playsinline></video><section id="lyrics" class="lyrics big"></section><section id="queue"></section></section></main>`;
   const media = root.querySelector<HTMLVideoElement>("#media")!;
@@ -588,8 +591,13 @@ export function receiverApp(root: HTMLElement): void {
       (msg.type === "CAST_SYNC_PLAYBACK_STATE" ||
         msg.type === "RECEIVER_PLAYBACK_SYNC") &&
       payload
-    )
-      state.mediaTimeMs = (payload.tvMediaTimeMs as number) || 0;
+    ) {
+      state.playbackState = payload as Record<string, unknown>;
+      const derived = deriveTvMediaPositionMs(
+        payload as Parameters<typeof deriveTvMediaPositionMs>[0],
+      );
+      state.mediaTimeMs = derived.positionMs;
+    }
     if (msg.type === "CAST_SHOW_JOIN_QR" && payload)
       state.roomCode = payload.roomCode as string;
     if (msg.type === "CAST_UPDATE_QUEUE_PREVIEW" && payload)
@@ -599,9 +607,13 @@ export function receiverApp(root: HTMLElement): void {
       state.queue = (payload.queue as typeof state.queue) || state.queue;
       state.singers =
         (payload.singers as typeof state.singers) || state.singers;
-      state.mediaTimeMs =
-        ((payload.playbackState as Record<string, unknown>)
-          ?.tvMediaTimeMs as number) || state.mediaTimeMs;
+      if (payload.playbackState) {
+        state.playbackState = payload.playbackState as Record<string, unknown>;
+        const derived = deriveTvMediaPositionMs(
+          payload.playbackState as Parameters<typeof deriveTvMediaPositionMs>[0],
+        );
+        state.mediaTimeMs = derived.positionMs;
+      }
       loadSong(payload.song as Song | null, payload.roomCode as string);
     }
     render();
@@ -683,6 +695,11 @@ export function receiverApp(root: HTMLElement): void {
               else if (event.track) addLiveMic(new MediaStream([event.track]));
             };
           }
+          /* Rollback any leftover local offer so setRemoteDescription can
+             succeed when the host sends a fresh offer (renegotiation). */
+          if (pc.signalingState === "have-local-offer") {
+            await pc.setLocalDescription({ type: "rollback" });
+          }
           removeStaleLiveMicTracks();
           await pc.setRemoteDescription(msg.description);
           const answer = await pc.createAnswer();
@@ -723,8 +740,29 @@ export function receiverApp(root: HTMLElement): void {
     if (liveMicTrackIds.size) void tryPlayLiveMics();
   });
   window.addEventListener("message", (ev) => handle(ev.data));
+  function syncReceiverVideo() {
+    if (!state.playbackState || !media.src || media.readyState < 1) return;
+    const derived = deriveTvMediaPositionMs(
+      state.playbackState as Parameters<typeof deriveTvMediaPositionMs>[0],
+    );
+    const seconds = Math.max(0, derived.positionMs / 1000);
+    if (
+      Number.isFinite(seconds) &&
+      Math.abs((media.currentTime || 0) - seconds) > 0.75
+    )
+      media.currentTime = seconds;
+  const paused =
+    !!state.playbackState.paused ||
+    ["paused", "idle", "ended", "host_lost", "error"].includes(
+      (state.playbackState.status as string) || "",
+    );
+    if (!paused) media.play().catch(() => {});
+    else media.pause();
+  }
+  setInterval(syncReceiverVideo, 500);
   media.addEventListener("timeupdate", () => {
-    state.mediaTimeMs = Math.round(media.currentTime * 1000);
+    if (!state.playbackState)
+      state.mediaTimeMs = Math.round(media.currentTime * 1000);
     render();
   });
   async function startCastReceiverFramework(): Promise<void> {
