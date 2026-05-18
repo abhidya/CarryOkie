@@ -115,6 +115,21 @@ h2 {
   color: var(--muted);
   font-size: 0.94rem;
 }
+.quickstart {
+  margin: 0.85rem 0 0;
+  padding-left: 1.15rem;
+  color: var(--text);
+}
+.quickstart li + li {
+  margin-top: 0.35rem;
+}
+.inline-choice {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  margin: 0.5rem 0;
+}
 .notice,
 .warn {
   border: 1px solid #7b6321;
@@ -150,6 +165,47 @@ h2 {
   border-radius: var(--radius);
   padding: 16px;
   box-shadow: var(--shadow);
+}
+.queue-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.queue-item {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #0f1a2d;
+}
+.queue-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.queue-status {
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 0.8rem;
+  text-transform: capitalize;
+  color: var(--muted);
+}
+.queue-status-requested,
+.queue-status-rejected {
+  color: var(--warn);
+  border-color: #7b6321;
+}
+.queue-status-queued,
+.queue-status-active {
+  color: var(--accent-2);
+  border-color: #2f7f64;
+}
+.queue-actions {
+  margin-top: 10px;
 }
 .phone-hero {
   position: relative;

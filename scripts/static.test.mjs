@@ -114,7 +114,7 @@ checks.push([
 ]);
 checks.push([
   "cast current song is one-click connect and load",
-  app.includes("Cast current song to TV") &&
+  app.includes("Connect TV / cast current song") &&
     app.includes("Connecting to Chromecast") &&
     app.includes("await cast.init()") &&
     app.includes("await loadCurrentSongOnTv()"),
@@ -175,6 +175,8 @@ checks.push([
   "host can start next queued song",
   app.includes("startQueueItem") &&
     app.includes('id="startNext"') &&
+    app.includes('id="pauseSong"') &&
+    app.includes('id="resumeSong"') &&
     (hasAppSource('item.status = "active"') ||
       hasAppSource("item.status = 'active'")) &&
     app.includes("currentQueueItemId"),
@@ -213,14 +215,17 @@ checks.push([
   "host has reject/remove queue controls",
   app.includes("rejectQueue") &&
     app.includes("removeQueueItem") &&
-    hasAppSource('class="rejectItem"'),
+    app.includes("moveQueueItem") &&
+    hasAppSource('class="rejectItem"') &&
+    hasAppSource('class="moveUpItem"') &&
+    hasAppSource('class="moveDownItem"'),
 ]);
 checks.push([
   "phones can see and self-update titled queue with player names",
   (hasCompactAppSource('queueHtml(room, "phone")') ||
     hasCompactAppSource("queueHtml(room,'phone')")) &&
     app.includes("QUEUE_UPDATE_REQUEST") &&
-    hasAppSource("Add me as singer") &&
+    hasAppSource("Add me") &&
     (hasAppSource("songTitle(queueItem.songId)") ||
       hasAppSource("songTitle(q.songId)")) &&
     (hasAppSource("requested by") || hasAppSource("singerNames")),
@@ -289,6 +294,7 @@ checks.push([
   cast.includes("import { qrSvg }") &&
     cast.includes('id="joinQr"') &&
     cast.includes('id="liveMics"') &&
+    cast.includes('id="retryLiveMics"') &&
     cast.includes('id="receiverStatus"') &&
     cast.includes("receiverId") &&
     cast.includes("RECEIVER_OFFER") &&
@@ -310,8 +316,10 @@ checks.push([
   !receiver.includes("RTCPeerConnection") && !receiver.includes("getUserMedia"),
 ]);
 checks.push([
-  "receiver loads CAF framework",
-  receiver.includes("cast_receiver_framework.js") &&
+  "receiver loads CAF framework only for Cast runtime",
+  !receiver.includes("cast_receiver_framework.js") &&
+    cast.includes("cast_receiver_framework.js") &&
+    cast.includes("shouldLoadCastReceiverFramework") &&
     cast.includes("addCustomMessageListener"),
 ]);
 const audio = fs.readFileSync("src/audio.ts", "utf8");

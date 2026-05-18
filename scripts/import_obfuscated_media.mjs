@@ -47,6 +47,17 @@ function videoIdFromFilename(file) {
   const match = path.basename(file).match(/\[([A-Za-z0-9_-]{6,})\]\.mp4$/);
   return match?.[1] || null;
 }
+function isMp4File(file) {
+  try {
+    const fd = fs.openSync(file, "r");
+    const header = Buffer.alloc(12);
+    fs.readSync(fd, header, 0, header.length, 0);
+    fs.closeSync(fd);
+    return header.subarray(4, 8).toString("utf8") === "ftyp";
+  } catch {
+    return false;
+  }
+}
 function localPathFromPublicUrl(url) {
   if (!url) return null;
   const decoded = decodeURIComponent(url);
@@ -68,9 +79,13 @@ function encryptFile(file, key) {
   };
 }
 function writeEncrypted(file, key, mimeType) {
-  const encryptedName = `${crypto.randomBytes(16).toString("hex")}.bin`;
-  const outPath = path.join(MEDIA_DIR, encryptedName);
   const encrypted = encryptFile(file, key);
+  const encryptedName = `${crypto
+    .createHash("sha256")
+    .update(`${mimeType}:${encrypted.plainSha256}`)
+    .digest("hex")
+    .slice(0, 32)}.bin`;
+  const outPath = path.join(MEDIA_DIR, encryptedName);
   fs.writeFileSync(outPath, encrypted.encrypted);
   return {
     url: `/public/protected/media/${encryptedName}`,
@@ -92,6 +107,10 @@ function collectDownloadMp4() {
       const file = path.join(DOWNLOAD_MP4_DIR, name);
       const videoId = videoIdFromFilename(file);
       if (!videoId) return null;
+      if (!isMp4File(file)) {
+        console.warn(`SKIP ${videoId}: not a playable MP4 file (${file})`);
+        return null;
+      }
       const parsed = parseArtistTitle(titleCaseFromFilename(file));
       return {
         source: "downloads/mp4",

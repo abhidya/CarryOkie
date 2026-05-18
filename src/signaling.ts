@@ -404,7 +404,12 @@ function minifyMediaSection(section: string[]): string[] {
 export async function encodeSignalPayload(
   payload: Record<string, unknown>,
 ): Promise<EncodedPayload> {
-  const body = { v: 1, app: "carryokie", createdAt: Date.now(), ...payload };
+  const body: Record<string, unknown> = {
+    v: 1,
+    app: "carryokie",
+    createdAt: Date.now(),
+    ...payload,
+  };
   if (
     typeof body.description === "object" &&
     body.description !== null &&
@@ -491,6 +496,31 @@ export function renderPayloadCard(
   encoded: EncodedPayload,
   label = "Signal payload",
 ): void {
+  const urlField = () =>
+    target.querySelector("textarea") as HTMLTextAreaElement | null;
+  const flashButton = (selector: string, text: string) => {
+    const button = target.querySelector(selector) as HTMLButtonElement | null;
+    if (!button) return;
+    const originalText = button.textContent;
+    button.textContent = text;
+    setTimeout(() => (button.textContent = originalText), 1500);
+  };
+  const selectLinkFallback = () => {
+    const field = urlField();
+    if (!field) return false;
+    field.focus();
+    field.select();
+    field.setSelectionRange?.(0, field.value.length);
+    return true;
+  };
+  const tryLegacyCopy = () => {
+    if (!selectLinkFallback()) return false;
+    try {
+      return !!document.execCommand?.("copy");
+    } catch {
+      return false;
+    }
+  };
   let index = 0;
   const renderQr = () => {
     const qr = target.querySelector("[data-single-qr]") as HTMLElement | null;
@@ -507,38 +537,47 @@ export function renderPayloadCard(
       index === encoded.chunks.length - 1;
   };
   syncButtons();
-  target.querySelector("[data-prev]")!.onclick = () => {
+  (target.querySelector("[data-prev]") as HTMLButtonElement)!.onclick = () => {
     index = Math.max(0, index - 1);
     renderQr();
     syncButtons();
   };
-  target.querySelector("[data-next]")!.onclick = () => {
+  (target.querySelector("[data-next]") as HTMLButtonElement)!.onclick = () => {
     index = Math.min(encoded.chunks.length - 1, index + 1);
     renderQr();
     syncButtons();
   };
-  target.querySelector("[data-copy]")!.onclick = async () => {
+  (target.querySelector("[data-copy]") as HTMLButtonElement)!.onclick = async () => {
     try {
       await navigator.clipboard.writeText(encoded.url);
-      const btn = target.querySelector("[data-copy]") as HTMLButtonElement;
-      const originalText = btn.textContent;
-      btn.textContent = "Copied!";
-      setTimeout(() => (btn.textContent = originalText), 1500);
+      flashButton("[data-copy]", "Copied!");
     } catch (err) {
       console.error("Copy failed:", err);
-      alert("Copy requires HTTPS. Select and copy the link manually.");
+      if (tryLegacyCopy()) {
+        flashButton("[data-copy]", "Copied!");
+        return;
+      }
+      selectLinkFallback();
+      flashButton("[data-copy]", "Press ⌘/Ctrl+C");
     }
   };
-  target.querySelector("[data-share]")!.onclick = async () => {
+  (target.querySelector("[data-share]") as HTMLButtonElement)!.onclick = async () => {
     try {
       if (navigator.share) {
         await navigator.share({ title: "CarryOkie signal", text: encoded.url });
+        flashButton("[data-share]", "Shared!");
       } else {
         await navigator.clipboard.writeText(encoded.url);
+        flashButton("[data-share]", "Copied!");
       }
     } catch (err) {
       console.error("Share failed:", err);
-      alert("Copy requires HTTPS. Select and copy the link manually.");
+      if (tryLegacyCopy()) {
+        flashButton("[data-share]", "Copied!");
+        return;
+      }
+      selectLinkFallback();
+      flashButton("[data-share]", "Press ⌘/Ctrl+C");
     }
   };
 }

@@ -8,7 +8,7 @@ interface EncryptedMedia {
   plainSha256?: string;
 }
 
-interface ProtectedSong {
+export interface ProtectedSong {
   songId: string;
   title?: string;
   artist?: string;
@@ -37,9 +37,11 @@ function hasWebCryptoAes(): boolean {
   );
 }
 
-function b64ToBytes(value: string): Uint8Array {
+function b64ToBytes(value: string): Uint8Array<ArrayBuffer> {
   const bin = atob(value);
-  return Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
+  const bytes = new Uint8Array(bin.length) as Uint8Array<ArrayBuffer>;
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
 }
 
 function resolveAppAssetUrl(url: string | null | undefined): string | null {
@@ -90,7 +92,7 @@ async function importMediaKey(): Promise<CryptoKey> {
     );
   keyPromise ||= globalThis.crypto.subtle.importKey(
     "raw",
-    b64ToBytes(MEDIA_KEY_B64) as unknown as ArrayBufferSource,
+    b64ToBytes(MEDIA_KEY_B64) as BufferSource,
     { name: "AES-GCM" },
     false,
     ["decrypt"],
@@ -120,7 +122,9 @@ export async function decryptProtectedMedia(
   const response = await fetch(resolveAppAssetUrl(media.url)!);
   if (!response.ok)
     throw new Error(`Protected media fetch failed: ${response.status}`);
-  const encrypted = new Uint8Array(await response.arrayBuffer());
+  const encrypted = new Uint8Array(
+    await response.arrayBuffer(),
+  ) as Uint8Array<ArrayBuffer>;
   const key = await importMediaKey();
   const plain = await globalThis.crypto.subtle.decrypt(
     {
@@ -129,7 +133,7 @@ export async function decryptProtectedMedia(
       tagLength: (media.tagBytesAppended || 16) * 8,
     },
     key,
-    encrypted as unknown as BufferSource,
+    encrypted,
   );
   const blobUrl = URL.createObjectURL(
     new Blob([plain], { type: media.mimeType || "video/mp4" }),

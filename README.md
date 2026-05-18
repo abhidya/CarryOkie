@@ -1,6 +1,6 @@
 # CarryOkie
 
-CarryOkie is a static GitHub Pages karaoke room prototype for `design.md` Option 1: the TV/Chromecast path plays backing track/video and displays room context, while participant phones carry room controls and live singer mic streams over WebRTC.
+CarryOkie is a static GitHub Pages karaoke room prototype for `DESIGN.md` Option 1: the TV/Chromecast path plays backing track/video and displays room context, while participant phones carry room controls and live singer mic streams over WebRTC.
 
 The implementation intentionally stays static: no backend, no TURN server, no required production runtime beyond built HTML/CSS/JS assets.
 
@@ -22,12 +22,12 @@ The implementation intentionally stays static: no backend, no TURN server, no re
 | Chromecast control uses the Cast sender SDK and a Default Media Receiver compatibility path. | `src/cast.ts` exports `CastController`, `DEFAULT_MEDIA_RECEIVER_APP_ID = "CC1AD845"`, `CAST_NAMESPACE`, `loadSong`, `play`, `pause`, and `seek`; `scripts/cast_ui.test.mjs` verifies Cast load/control behavior with a fake Cast SDK. |
 | Phones derive lyric/video sync from Cast media status samples, not local click time. | `src/cast.ts` emits playback samples from Cast media status/current time; `src/sync.ts` derives TV media position; `src/app.ts` calls `deriveTvMediaPositionMs` for phone video and lyrics; `scripts/sync_and_webrtc.test.mjs` verifies the math. |
 | Local protected media is obfuscated, not DRM. | `src/protectedMedia.ts` decrypts AES-GCM media with Web Crypto using the client key from `src/mediaKey.ts`; `scripts/import_obfuscated_media.mjs` writes encrypted blobs and `scripts/export_cast_media.mjs` writes clear Cast-compatible MP4s. |
-| Spotify and unlicensed streaming APIs are excluded. | `scripts/static.test.mjs` and `scripts/import_media_e2e.test.mjs` verify catalog/source constraints; `README.md` and `design.md` document licensed/local media only. |
+| Spotify and unlicensed streaming APIs are excluded. | `scripts/static.test.mjs` and `scripts/import_media_e2e.test.mjs` verify catalog/source constraints; `README.md` and `DESIGN.md` document licensed/local media only. |
 | The UI is responsive and code-native, with no raster art dependency. | `src/styles.css`, `index.html`, `src/app.ts`, `src/app/dom.ts`, and `src/cast.ts` define the shell, cards, phone layout, receiver TV layout, stage/soundwave visuals, and reduced-motion behavior. |
 
-## How the implementation compares to `design.md`
+## How the implementation compares to `DESIGN.md`
 
-`design.md` is the build spec for “Chromecast Karaoke App — Option 1.” The current repo tracks that spec closely, with automated coverage summarized in `design-coverage.json`.
+`DESIGN.md` is the build spec for “Chromecast Karaoke App — Option 1.” The current repo tracks that spec closely, with automated coverage summarized in `design-coverage.json`.
 
 | Design area | Design intent | Current implementation | Evidence / status |
 | --- | --- | --- | --- |
@@ -89,9 +89,12 @@ npm run build
 ```bash
 npm test
 npm run build
+npm run test:e2e
 ```
 
 The test suite includes static route checks, state/use-case tests, Cast UI tests with a fake SDK, WebRTC/sync tests with fakes, protected-media tests, design coverage checks, and import-media E2E checks.
+
+`npm run test:e2e` builds, starts a local Vite preview on `127.0.0.1:4180` by default, runs the host/player/receiver browser flow headless, then closes the browser and server. Override with `E2E_PORT=4174` when needed. For manual debugging, run `KEEP_BROWSER_OPEN=1 npm run test:e2e:headed`.
 
 ## MVP caveats
 

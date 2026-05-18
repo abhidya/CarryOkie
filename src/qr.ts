@@ -14,7 +14,7 @@ function pushBits(bits: number[], value: number, length: number): void {
   for (let i = length - 1; i >= 0; i--) bits.push((value >>> i) & 1);
 }
 function bitsToBytes(bits: number[]): number[] {
-  const out = [];
+  const out: number[] = [];
   for (let i = 0; i < bits.length; i += 8)
     out.push(bits.slice(i, i + 8).reduce((a, b) => (a << 1) | b, 0));
   return out;
@@ -28,7 +28,7 @@ function gfMul(x: number, y: number): number {
   return z;
 }
 function rsGenerator(degree: number): number[] {
-  let poly = [1];
+  let poly: number[] = [1];
   let root = 1;
   for (let i = 0; i < degree; i++) {
     const next = Array(poly.length + 1).fill(0);
@@ -57,7 +57,7 @@ function encodeData(text: string): number[] {
     throw new Error(
       `QR chunk too large (${bytes.length} bytes). Use smaller chunks.`,
     );
-  const bits = [];
+  const bits: number[] = [];
   pushBits(bits, 0b0100, 4); // byte mode
   pushBits(bits, bytes.length, 16); // version 10 byte count indicator
   bytes.forEach((b) => pushBits(bits, b, 8));
@@ -70,14 +70,14 @@ function encodeData(text: string): number[] {
 }
 function makeCodewords(text: string): number[] {
   const data = encodeData(text);
-  const blocks = [];
+  const blocks: Array<{ data: number[]; ec: number[] }> = [];
   let off = 0;
   for (const size of BLOCK_SIZES) {
     const dat = data.slice(off, off + size);
     off += size;
     blocks.push({ data: dat, ec: rsRemainder(dat, EC_CODEWORDS_PER_BLOCK) });
   }
-  const out = [];
+  const out: number[] = [];
   for (let i = 0; i < Math.max(...BLOCK_SIZES); i++)
     for (const b of blocks) if (i < b.data.length) out.push(b.data[i]);
   for (let i = 0; i < EC_CODEWORDS_PER_BLOCK; i++)
@@ -161,7 +161,7 @@ function addFunctionPatterns(m: (boolean | null)[][]): void {
   }
 }
 function placeData(m: (boolean | null)[][], codewords: number[]): void {
-  const bits = [];
+  const bits: number[] = [];
   codewords.forEach((b) => pushBits(bits, b, 8));
   let idx = 0,
     upward = true;
@@ -172,7 +172,7 @@ function placeData(m: (boolean | null)[][], codewords: number[]): void {
       for (let c = col; c >= col - 1; c--)
         if (m[row][c] === null) {
           const raw = bits[idx++] || 0;
-          const masked = raw ^ ((row + c) % 2 === 0 ? 1 : 0);
+          const masked = (raw ^ ((row + c) % 2 === 0 ? 1 : 0)) === 1;
           set(m, row, c, masked);
         }
     }
@@ -181,7 +181,7 @@ function placeData(m: (boolean | null)[][], codewords: number[]): void {
 }
 function addFormat(m: (boolean | null)[][]): void {
   const format = bch(0b01000, 0x537, 10) ^ 0x5412; // ECC L, mask 0
-  const bit = (i) => ((format >>> i) & 1) === 1;
+  const bit = (i: number): boolean => ((format >>> i) & 1) === 1;
   const a = [
     [8, 0],
     [8, 1],
@@ -228,11 +228,11 @@ export function qrMatrix(text: string): boolean[][] {
 }
 export function qrSvg(
   text: string,
-  { scale = 4, quiet = 4, title = "CarryOkie QR" } = {},
+  { scale = 4, quiet = 4, title = "CarryOkie QR" }: { scale?: number; quiet?: number; title?: string } = {},
 ): string {
   const m = qrMatrix(text);
   const n = m.length + quiet * 2;
-  const rects = [];
+  const rects: string[] = [];
   m.forEach((row, r) =>
     row.forEach((v, c) => {
       if (v)

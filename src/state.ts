@@ -291,6 +291,19 @@ export function removeQueueItem(room: Room, queueItemId: string): Room {
   if (room.currentQueueItemId === queueItemId) room.currentQueueItemId = null;
   return room;
 }
+export function moveQueueItem(
+  room: Room,
+  queueItemId: string,
+  direction: -1 | 1,
+): Room {
+  const index = room.queue.findIndex((q) => q.queueItemId === queueItemId);
+  if (index < 0) return room;
+  const nextIndex = index + direction;
+  if (nextIndex < 0 || nextIndex >= room.queue.length) return room;
+  const [item] = room.queue.splice(index, 1);
+  room.queue.splice(nextIndex, 0, item);
+  return room;
+}
 function safeClientQueueId(id: unknown): id is string {
   return typeof id === "string" && /^[a-zA-Z0-9_-]{8,80}$/.test(id);
 }

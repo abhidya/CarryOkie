@@ -13,14 +13,28 @@ assert.equal(key.length, 32);
 const catalog = JSON.parse(
   fs.readFileSync("public/protected/catalog.json", "utf8"),
 );
+function isPlayableMp4(file) {
+  const fd = fs.openSync(file, "r");
+  try {
+    const header = Buffer.alloc(12);
+    fs.readSync(fd, header, 0, header.length, 0);
+    return header.subarray(4, 8).toString("utf8") === "ftyp";
+  } finally {
+    fs.closeSync(fd);
+  }
+}
 assert.ok(
   catalog.songs.length > 0,
   "protected catalog imports encrypted media",
 );
 if (fs.existsSync("downloads/mp4")) {
+  const playableDownloads = fs
+    .readdirSync("downloads/mp4")
+    .filter((f) => f.endsWith(".mp4"))
+    .filter((f) => isPlayableMp4(path.join("downloads/mp4", f)));
   assert.equal(
     catalog.songs.length,
-    fs.readdirSync("downloads/mp4").filter((f) => f.endsWith(".mp4")).length,
+    playableDownloads.length,
   );
 }
 

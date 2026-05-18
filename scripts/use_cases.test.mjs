@@ -13,6 +13,7 @@ import {
   acceptQueue,
   rejectQueue,
   removeQueueItem,
+  moveQueueItem,
   enqueueRequest,
   nextQueuedItem,
   addSingerToQueueItem,
@@ -229,6 +230,27 @@ test("removeQueueItem removes item from queue", () => {
   assert.equal(room.queue.length, 1);
   removeQueueItem(room, item.queueItemId);
   assert.equal(room.queue.length, 0);
+});
+
+test("moveQueueItem reorders queue without dropping items", () => {
+  const host = makePlayer("host", "Host");
+  const room = makeRoom(host);
+  const a = queueRequest("song_a", [1], host.playerId, 0);
+  const b = queueRequest("song_b", [1], host.playerId, 1);
+  const c = queueRequest("song_c", [1], host.playerId, 2);
+  room.queue.push(a, b, c);
+  moveQueueItem(room, c.queueItemId, -1);
+  assert.deepEqual(room.queue.map((item) => item.songId), [
+    "song_a",
+    "song_c",
+    "song_b",
+  ]);
+  moveQueueItem(room, a.queueItemId, 1);
+  assert.deepEqual(room.queue.map((item) => item.songId), [
+    "song_c",
+    "song_a",
+    "song_b",
+  ]);
 });
 
 test("host loss locks room authority", () => {

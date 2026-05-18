@@ -671,6 +671,79 @@ test("QR scanner reports unsupported browser and insecure media errors", async (
   }
 });
 
+test("payload card falls back to selecting text when clipboard/share are unavailable", async () => {
+  const oldNavigator = globalThis.navigator;
+  const oldDocument = globalThis.document;
+  try {
+    let selected = 0;
+    let focused = 0;
+    const elements = new Map();
+    const makeButton = () => ({ textContent: "", onclick: null, disabled: false });
+    const urlTextarea = {
+      value: "https://x/#signal=fallback",
+      focus() {
+        focused++;
+      },
+      select() {
+        selected++;
+      },
+      setSelectionRange() {
+        selected++;
+      },
+    };
+    elements.set("[data-single-qr]", { innerHTML: "" });
+    elements.set("[data-qr-count]", { textContent: "" });
+    elements.set("[data-prev]", makeButton());
+    elements.set("[data-next]", makeButton());
+    elements.set("[data-copy]", makeButton());
+    elements.set("[data-share]", makeButton());
+    elements.set("textarea", urlTextarea);
+    const target = {
+      querySelector(selector) {
+        return elements.get(selector) || null;
+      },
+      set innerHTML(_value) {},
+    };
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: {
+        clipboard: {
+          async writeText() {
+            throw new Error("blocked");
+          },
+        },
+        async share() {
+          throw new Error("blocked");
+        },
+      },
+    });
+    globalThis.document = {
+      execCommand() {
+        return false;
+      },
+    };
+    renderPayloadCard(
+      target,
+      {
+        url: "https://x/#signal=fallback",
+        token: "fallback",
+        chunks: ["one"],
+      },
+      "Fallback payload",
+    );
+    await target.querySelector("[data-copy]").onclick();
+    await target.querySelector("[data-share]").onclick();
+    assert.ok(focused >= 2);
+    assert.ok(selected >= 2);
+  } finally {
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: oldNavigator,
+    });
+    globalThis.document = oldDocument;
+  }
+});
+
 test("mic publishing can request getUserMedia without a headphone confirmation gate", async () => {
   const oldAudioContext = globalThis.AudioContext;
   const oldNavigator = globalThis.navigator;

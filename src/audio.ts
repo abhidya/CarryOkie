@@ -254,7 +254,7 @@ export class PhoneAudio {
       this.backingAudio = new Audio(url);
       this.backingAudio.loop = false;
       this.backingAudio.crossOrigin = "anonymous";
-      this.backingSource = this.ctx.createMediaElementSource(this.backingAudio);
+      this.backingSource = this.ctx!.createMediaElementSource(this.backingAudio);
       this.backingSource!.connect(this.backingGain!);
     } else if (this.backingAudio.src !== url) {
       this.backingAudio.src = url;

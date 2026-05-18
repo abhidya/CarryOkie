@@ -3,7 +3,7 @@ import { chromium } from "playwright";
 
 const baseUrl = process.env.E2E_BASE_URL || "http://localhost:4174/";
 const headed = process.env.HEADLESS !== "1";
-
+const keepBrowserOpen = process.env.KEEP_BROWSER_OPEN === "1";
 const browser = await chromium.launch({
   headless: !headed,
   slowMo: headed ? 150 : 0,
@@ -123,7 +123,7 @@ try {
   await player.click("#muteMic");
   await player.waitForSelector("text=Mic muted.", { timeout: 5000 });
 
-  console.log(`PASS headed real-browser E2E room ${roomCode}`);
+  console.log(`PASS real-browser E2E room ${roomCode}`);
   console.log(`PASS player-host DataChannel opened`);
   console.log(`PASS queue request accepted and started`);
   console.log(`PASS autotune preset, gain controls, mute/unmute exercised`);
@@ -135,7 +135,7 @@ try {
   console.error("Console logs:", JSON.stringify(logs, null, 2));
   throw error;
 } finally {
-  if (process.env.KEEP_BROWSER_OPEN === "1") {
+  if (keepBrowserOpen) {
     console.log("Browser left open. Close it manually when done.");
   } else {
     await browser.close();

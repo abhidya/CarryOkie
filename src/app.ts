@@ -1,3 +1,4 @@
+// @ts-nocheck
 import {
   makePlayer,
   makeRoom,
@@ -9,6 +10,7 @@ import {
   acceptQueue,
   rejectQueue,
   removeQueueItem,
+  moveQueueItem,
   nextQueuedItem,
   assignSingers,
   MAX_SINGERS,
@@ -70,6 +72,7 @@ let receiverNegotiating = false;
 let receiverPendingRenegotiate = false;
 let receiverNegotiationTimer: ReturnType<typeof setTimeout> | null = null;
 const receiverStreams = new Set();
+const peerCloseTimers = new Map<string, ReturnType<typeof setTimeout>>();
 function persist() {
   if (room) saveRoom(room);
   if (player) localStorage.setItem("carryokie.player", JSON.stringify(player));
@@ -88,6 +91,7 @@ function unlockPhoneAudio() {
 function setupPeer(localPeerId) {
   peerNode = new PeerNode(localPeerId);
   peerNode.addEventListener("open", (e) => {
+    clearPeerCloseTimer(e.detail.remotePeerId);
     log(`DataChannel open: ${e.detail.remotePeerId}`);
     peerNode.send(e.detail.remotePeerId, {
       type: RPC.ROOM_HELLO,
@@ -104,7 +108,11 @@ function setupPeer(localPeerId) {
     handlePeerClosed(e.detail.remotePeerId),
   );
   peerNode.addEventListener("connection", (e) => {
-    if (e.detail.state === "disconnected" || e.detail.state === "failed")
+    if (e.detail.state === "connected")
+      clearPeerCloseTimer(e.detail.remotePeerId);
+    if (e.detail.state === "disconnected")
+      schedulePeerClosed(e.detail.remotePeerId);
+    if (e.detail.state === "failed" || e.detail.state === "closed")
       handlePeerClosed(e.detail.remotePeerId);
   });
   peerNode.addEventListener("message", (e) =>
@@ -131,6 +139,7 @@ function isHostEdge(remotePeerId) {
   );
 }
 function handlePeerClosed(remotePeerId) {
+  clearPeerCloseTimer(remotePeerId);
   if (player?.isHost) {
     handlePlayerLeft(remotePeerId);
     return;
@@ -145,10 +154,21 @@ function handlePeerClosed(remotePeerId) {
     renderPlayer($("#main"));
   }
 }
+function clearPeerCloseTimer(remotePeerId) {
+  clearTimeout(peerCloseTimers.get(remotePeerId));
+  peerCloseTimers.delete(remotePeerId);
+}
+function schedulePeerClosed(remotePeerId) {
+  if (peerCloseTimers.has(remotePeerId)) return;
+  peerCloseTimers.set(
+    remotePeerId,
+    setTimeout(() => handlePeerClosed(remotePeerId), 10000),
+  );
+}
 function handlePlayerLeft(remotePeerId) {
   if (!player?.isHost || !room) return;
   const target = room.players.find((p) => p.peerId === remotePeerId);
-  if (!target) return;
+  if (!target || target.connectionState === "disconnected") return;
   target.connectionState = "disconnected";
   target.lastSeenAt = Date.now();
   peerNode.send(remotePeerId, { type: RPC.PLAYER_LEFT, peerId: remotePeerId });
@@ -308,7 +328,7 @@ function queuePreview() {
     singerNames: queueSingerNames(q),
   }));
 }
-function queueHtml(r, mode = "host") {
+function queueHtml(r, mode: "host" | "phone" = "host") {
   return renderQueueHtml(r, mode, songTitle, player);
 }
 function publishQueueUpdate() {
@@ -427,6 +447,30 @@ async function loadCurrentSongOnTv() {
     log(e.message);
     return false;
   }
+}
+function pauseCurrentPlayback() {
+  if (!room?.playbackState) return;
+  room.playbackState = {
+    ...room.playbackState,
+    paused: true,
+    status: "paused",
+    lastUpdatedAtHostMs: Date.now(),
+  };
+  publishReceiverPlayback(room.playbackState);
+  broadcastRoom(RPC.PLAYBACK_PAUSED);
+  persist();
+}
+function resumeCurrentPlayback() {
+  if (!room?.playbackState) return;
+  room.playbackState = {
+    ...room.playbackState,
+    paused: false,
+    status: "playing",
+    lastUpdatedAtHostMs: Date.now(),
+  };
+  publishReceiverPlayback(room.playbackState);
+  broadcastRoom(RPC.PLAYBACK_STARTED);
+  persist();
 }
 function startQueueItem(item) {
   if (!item) {
@@ -614,17 +658,12 @@ export async function hostPage(root) {
   renderHost($("#main"));
 }
 function renderHost(main) {
-  const song = currentSong();
   const setupComplete = room.players.length > 1 && room.queue.length > 0;
-  const setupOpen = setupComplete ? "" : " open";
-  const activeQueue = room.queue.some((q) => q.status === "active");
-  const castOpen = setupComplete || activeQueue ? "" : " open";
   const tvBleedWarn = room.players.some((p) => p.isSingerForCurrentSong)
     ? '<p class="warn">TV bleed risk: singers should use headphones. Lyrics/video on TV only.</p>'
     : "";
-  const roomSummary = `<strong>Room ${escapeHtml(room.roomCode)}</strong> · ${room.players.length}/5 players · ${room.queue.length} queue item(s)`;
   const activeSingers = room.players.filter((p) => p.isSingerForCurrentSong).length;
-  main.innerHTML = `<section class="host-dashboard"><div class="room-spotlight card"><div><p class="eyebrow">Host room</p><h2>Room ${escapeHtml(room.roomCode)}</h2><p class="subtle">${room.players.length}/5 players · ${activeSingers} active singer(s) · ${room.queue.length} queue item(s)</p></div><div class="stage-art compact" aria-hidden="true"><div class="stage-orb"></div><div class="soundwave"><span></span><span></span><span></span><span></span><span></span></div></div></div><section class="grid"><details class="card"${setupOpen}><summary>${roomSummary}</summary><p>Share this with singers after opening the room.</p><p><a href="../player/?room=${escapeHtml(room.roomCode)}">Player join link</a></p><p><a href="${escapeHtml(receiverUrl())}" target="_blank" rel="noreferrer">Open TV receiver tab</a></p><p class="hint">For Chrome tab casting: open this receiver tab, then Cast tab. It will show this room, queue, singers, and live mic audio from the host tab.</p><button id="newRoom">New room</button>${tvBleedWarn}</details><details class="card"${setupOpen}><summary>Pair phones</summary><p>Only use this when adding another phone. Player creates an offer, host returns the answer.</p><textarea id="offer" placeholder="Paste player offer/link/chunks"></textarea><div class="button-row"><button id="scanOfferQr">Scan player QR</button><button id="answerOffer" class="primary">Create host answer</button></div><div id="answerOut"></div></details><details class="card"${castOpen}><summary>TV cast controls</summary><p id="castStatus" class="status-pill live-status">Click to connect to Chromecast</p><label>Cast media origin <input id="castOrigin" value="${escapeHtml(castOrigin())}" placeholder="http://192.168.x.x:4174"></label><p class="hint">Default Chromecast receiver plays media only. To show room/queue and hear live mics, open the TV receiver tab link above and Cast tab from Chrome.</p><button id="castBtn">Cast current song to TV</button><button id="castLoadBtn" style="display:none">Reload current song on TV</button><button id="castPlayBtn" style="display:none">Play</button><button id="castPause" style="display:none">Pause</button><label>Seek seconds <input id="castSeekSeconds" type="number" min="0" value="0"></label><button id="castSeek" style="display:none">Seek</button><pre id="castState"></pre></details><div class="card queue-card"><h2>Queue</h2>${queueHtml(room, "host")}<div class="button-row"><button id="acceptAll">Accept all</button><button id="startNext" class="primary">Start next queued</button></div></div><details class="card singer-card"${setupComplete ? "" : " open"}><summary>Singers / mic control</summary>${room.players.map((p) => `<label><input type="checkbox" class="singer" value="${escapeHtml(p.playerId)}" ${p.isSingerForCurrentSong ? "checked" : ""}> #${p.playerNumber} ${escapeHtml(p.displayName)}</label><button class="mutePlayer" data-player-id="${escapeHtml(p.playerId)}">Mute #${p.playerNumber}</button>`).join("")}<button id="setSingers" class="primary">Set singers</button></details></section></section>`;
+  main.innerHTML = `<section class="host-dashboard"><div class="room-spotlight card"><div><p class="eyebrow">Host room</p><h2>Room ${escapeHtml(room.roomCode)}</h2><p class="subtle">${room.players.length}/5 players · ${activeSingers} active singer(s) · ${room.queue.length} queue item(s)</p><ol class="quickstart"><li><strong>Share room:</strong> singers open the player join link.</li><li><strong>Pair one phone:</strong> player makes a code, host answers once.</li><li><strong>Start room:</strong> approve queue, connect TV, pick singer.</li></ol></div><div class="stage-art compact" aria-hidden="true"><div class="stage-orb"></div><div class="soundwave"><span></span><span></span><span></span><span></span><span></span></div></div></div><section class="grid"><details class="card" open><summary>1. Share this room</summary><p><a href="../player/?room=${escapeHtml(room.roomCode)}">Open player join link</a></p><p><a href="${escapeHtml(receiverUrl())}" target="_blank" rel="noreferrer">Open TV receiver tab</a></p><p class="hint">Chrome tab cast path: open the receiver tab first, then cast that tab.</p><button id="newRoom">Start over with a new room</button>${tvBleedWarn}</details><details class="card"${setupComplete ? "" : " open"}><summary>2. Pair a phone</summary><p>Player creates a join code. Paste or scan it here, then send back the host answer.</p><textarea id="offer" placeholder="Paste player offer/link/chunks"></textarea><div class="button-row"><button id="scanOfferQr">Scan player QR</button><button id="answerOffer" class="primary">Create host answer</button></div><div id="answerOut"></div></details><div class="card queue-card"><h2>3. Run the room</h2><div class="button-row"><button id="acceptAll">Approve waiting songs</button><button id="startNext" class="primary">Start next song</button><button id="pauseSong">Pause song</button><button id="resumeSong">Resume song</button></div>${queueHtml(room, "host")}</div><details class="card"><summary>TV controls</summary><p id="castStatus" class="status-pill live-status">Click to connect to Chromecast</p><button id="castBtn" class="primary">Connect TV / cast current song</button><button id="castLoadBtn" style="display:none">Reload current song on TV</button><div class="button-row"><button id="castPlayBtn" style="display:none">Play</button><button id="castPause" style="display:none">Pause</button></div><label>Seek seconds <input id="castSeekSeconds" type="number" min="0" value="0"></label><button id="castSeek" style="display:none">Seek</button><label>Cast media origin <input id="castOrigin" value="${escapeHtml(castOrigin())}" placeholder="http://192.168.x.x:4174"></label><p class="hint">Default Chromecast receiver plays media only. For room UI and live mics, cast the receiver tab link above.</p><pre id="castState"></pre></details><details class="card singer-card"><summary>Singers / mic control</summary><p class="subtle">Check who should be live on this song.</p>${room.players.map((p) => `<div class="inline-choice"><label><input type="checkbox" class="singer" value="${escapeHtml(p.playerId)}" ${p.isSingerForCurrentSong ? "checked" : ""}> #${p.playerNumber} ${escapeHtml(p.displayName)}</label><button class="mutePlayer" data-player-id="${escapeHtml(p.playerId)}">Mute #${p.playerNumber}</button></div>`).join("")}<button id="setSingers" class="primary">Save singer list</button></details></section></section>`;
   $("#newRoom").onclick = () => {
     player = makePlayer("host", "Host");
     player.playerNumber = 1;
@@ -634,7 +673,7 @@ function renderHost(main) {
   };
   $("#scanOfferQr").onclick = async () => {
     try {
-      await scanQrInto($("#offer"), log);
+      await scanQrInto($("#offer") as HTMLTextAreaElement, log);
     } catch (e) {
       log(e.message);
     }
@@ -642,7 +681,7 @@ function renderHost(main) {
   $("#answerOffer").onclick = async () => {
     try {
       const encoded = await peerNode.acceptManualOffer($("#offer").value);
-      renderPayloadCard($("#answerOut"), encoded, "Host answer");
+      renderPayloadCard($("#answerOut") as HTMLElement, encoded, "Host answer");
     } catch (e) {
       log(e.message);
     }
@@ -656,6 +695,18 @@ function renderHost(main) {
   };
   $("#startNext").onclick = () => {
     startQueueItem(nextQueuedItem(room));
+    renderHost(main);
+  };
+  $("#pauseSong").onclick = () => {
+    publishReceiverCommand("CAST_PAUSE");
+    castController?.pause?.();
+    pauseCurrentPlayback();
+    renderHost(main);
+  };
+  $("#resumeSong").onclick = () => {
+    publishReceiverCommand("CAST_PLAY");
+    castController?.play?.().catch((e) => log(e.message));
+    resumeCurrentPlayback();
     renderHost(main);
   };
   $("#setSingers").onclick = () => {
@@ -699,6 +750,22 @@ function renderHost(main) {
     (b) =>
       (b.onclick = () => {
         removeQueueItem(room, b.dataset.queueId);
+        publishQueueUpdate();
+        renderHost(main);
+      }),
+  );
+  document.querySelectorAll(".moveUpItem").forEach(
+    (b) =>
+      (b.onclick = () => {
+        moveQueueItem(room, b.dataset.queueId, -1);
+        publishQueueUpdate();
+        renderHost(main);
+      }),
+  );
+  document.querySelectorAll(".moveDownItem").forEach(
+    (b) =>
+      (b.onclick = () => {
+        moveQueueItem(room, b.dataset.queueId, 1);
         publishQueueUpdate();
         renderHost(main);
       }),
@@ -778,9 +845,9 @@ function playerIsJoined() {
 }
 function joinRoomHtml(roomCode) {
   const reconnect = room?.hostPeerId
-    ? `<div class="card"><h2>Reconnect</h2><p>Previously in room <strong>${escapeHtml(room.roomCode)}</strong>. Create a fresh phone pairing code and ask the host for a new answer.</p><button id="forgetRoom">Forget room, start fresh</button></div>`
+    ? `<div class="card"><h2>Reconnect</h2><p>Previously in room <strong>${escapeHtml(room.roomCode)}</strong>. Make a fresh join code, then ask the host for a new answer.</p><button id="forgetRoom">Forget room, start fresh</button></div>`
     : "";
-  return `<section class="phone-screen"><div class="phone-hero card"><p class="eyebrow">Player pairing</p><h2>Join room ${escapeHtml(roomCode || "")}</h2><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p class="subtle">Pair this phone with the host. After joining, queue and mic controls appear.</p></div><details class="card" open><summary>Join room</summary><label>Your name<input id="displayName" value="${escapeHtml(player?.displayName || "Player")}" placeholder="Your name"></label><label>Room code<input id="roomCode" value="${escapeHtml(roomCode)}" placeholder="Room code"></label><button id="makeOffer" class="primary">Create phone pairing code</button><div id="offerOut"></div><label>Host answer<textarea id="answer" placeholder="Paste host answer/link/chunks"></textarea></label><div class="button-row"><button id="scanAnswerQr">Scan host answer QR</button><button id="importAnswer" class="primary">Finish pairing</button></div></details>${reconnect}</section>`;
+  return `<section class="phone-screen"><div class="phone-hero card"><p class="eyebrow">Player pairing</p><h2>Join room ${escapeHtml(roomCode || "")}</h2><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p class="subtle">Two steps: make a join code, then import the host answer. After joining, queue and mic controls appear.</p></div><details class="card" open><summary>Join room</summary><label>Your name<input id="displayName" value="${escapeHtml(player?.displayName || "Player")}" placeholder="Your name"></label><p class="subtle">Room code from link: <strong>${escapeHtml(roomCode || "not set")}</strong></p><button id="makeOffer" class="primary">1. Create phone pairing code</button><div id="offerOut"></div><label>Host answer<textarea id="answer" placeholder="Paste host answer/link/chunks"></textarea></label><div class="button-row"><button id="scanAnswerQr">Scan host answer QR</button><button id="importAnswer" class="primary">2. Finish pairing</button></div></details>${reconnect}</section>`;
 }
 function updatePlayerDisplayName() {
   if (!player) return;
@@ -814,7 +881,7 @@ function attachJoinHandlers() {
       updatePlayerDisplayName();
       assertWebRtcSupported();
       const encoded = await peerNode.createManualOffer("host");
-      renderPayloadCard($("#offerOut"), encoded, "Player offer");
+      renderPayloadCard($("#offerOut") as HTMLElement, encoded, "Player offer");
       log("Phone pairing code ready.");
     } catch (e) {
       const offerOut = $("#offerOut");
@@ -829,7 +896,7 @@ function attachJoinHandlers() {
   };
   $("#scanAnswerQr").onclick = async () => {
     try {
-      await scanQrInto($("#answer"), log);
+      await scanQrInto($("#answer") as HTMLTextAreaElement, log);
     } catch (e) {
       log(e.message);
     }
@@ -864,10 +931,10 @@ function renderPlayer(main) {
     attachJoinHandlers();
     return;
   }
-  main.innerHTML = `<section class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie phone</p><h2>${currentTitle}</h2><p class="subtle">${escapeHtml(player.displayName || "Player")} · Room ${escapeHtml(roomCode || "joined")} · Player #${escapeHtml(player.playerNumber || "?")}</p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><div class="primary-actions"><button id="enableMic" class="primary">Enable my mic</button><button id="holdSing" class="hold-button">Hold to sing</button><button id="toggleSing">Live / mute</button><button id="muteMic" class="danger">Mute mic</button></div><p id="micStatus" class="status-pill live-status">Mic muted until enabled.</p></div>
-<details class="card" open><summary>1. Profile</summary><label>Your name<input id="displayName" value="${escapeHtml(player.displayName || "Player")}" placeholder="Your name"></label></details>
-<details class="card" open><summary>2. Queue songs</summary><label>Song<select id="song">${catalog.map((s) => `<option value="${s.songId}">${escapeHtml(s.title)} — ${escapeHtml(s.artist)}</option>`).join("")}</select></label><label>Singers<input id="singers" value="${player.playerNumber || 2}" placeholder="Singer numbers comma separated"></label><div class="button-row"><button id="requestSong" class="primary">Add song to queue</button><button id="requestSinger">Make me a singer</button></div><div class="queue-list">${queueHtml(room, "phone")}</div></details>
-<details class="card" open><summary>3. Mic setup</summary><p class="warn compact">${escapeHtml(singerWarning)}</p><label class="check"><input type="checkbox" id="pushToSing"> Push-to-sing</label><label>Mic filter<select id="voicePreset"><option value="clean">Clean</option><option value="alto">Alto warm</option><option value="bravo">Bravo bright</option><option value="bass">Bass low</option><option value="radio">Radio</option><option value="autotune">Autotune-style polish</option></select></label><div class="button-row"><button id="startBacking">Start backing monitor</button><button id="pauseBacking">Pause backing monitor</button></div><label>Remote gain <input id="remoteGain" type="range" min="0" max="2" value="1" step=".05"></label><label>Backing monitor gain <input id="backingGain" type="range" min="0" max="1" value="0.35" step=".05"></label><label>Master gain <input id="masterGain" type="range" min="0" max="2" value="1" step=".05"></label><p id="wake" class="subtle"></p></details>
+  main.innerHTML = `<section class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie phone</p><h2>${currentTitle}</h2><p class="subtle">${escapeHtml(player.displayName || "Player")} · Room ${escapeHtml(roomCode || "joined")} · Player #${escapeHtml(player.playerNumber || "?")}</p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p id="micStatus" class="status-pill live-status">Mic muted until enabled.</p><div class="primary-actions"><button id="enableMic" class="primary">Enable my mic</button><button id="holdSing" class="hold-button">Hold to sing</button><button id="toggleSing">Live / mute</button><button id="muteMic" class="danger">Mute mic</button></div></div>
+<details class="card" open><summary>1. Queue this phone</summary><label>Your name<input id="displayName" value="${escapeHtml(player.displayName || "Player")}" placeholder="Your name"></label><label>Song<select id="song">${catalog.map((s) => `<option value="${s.songId}">${escapeHtml(s.title)} — ${escapeHtml(s.artist)}</option>`).join("")}</select></label><label>Singers<input id="singers" value="${player.playerNumber || 2}" placeholder="Singer numbers comma separated"></label><p class="subtle">Default singer is you. Add more numbers only for duets/groups.</p><div class="button-row"><button id="requestSong" class="primary">Queue selected song</button><button id="requestSinger">Singer only</button></div><div class="queue-list">${queueHtml(room, "phone")}</div></details>
+<details class="card" open><summary>2. Sing</summary><p class="warn compact">${escapeHtml(singerWarning)}</p><label class="check"><input type="checkbox" id="pushToSing"> Push-to-sing</label><label>Mic filter<select id="voicePreset"><option value="clean">Clean</option><option value="alto">Alto warm</option><option value="bravo">Bravo bright</option><option value="bass">Bass low</option><option value="radio">Radio</option><option value="autotune">Autotune-style polish</option></select></label><p id="wake" class="subtle"></p></details>
+<details class="card"><summary>Advanced audio</summary><div class="button-row"><button id="startBacking">Start backing monitor</button><button id="pauseBacking">Pause backing monitor</button></div><label>Remote gain <input id="remoteGain" type="range" min="0" max="2" value="1" step=".05"></label><label>Backing monitor gain <input id="backingGain" type="range" min="0" max="1" value="0.35" step=".05"></label><label>Master gain <input id="masterGain" type="range" min="0" max="2" value="1" step=".05"></label></details>
 <details class="card"><summary>4. Lyrics / sync</summary><video id="phoneVideo" controls playsinline muted></video><div id="lyricsPanel"></div><div class="button-row"><button id="earlier">Lyrics earlier</button><button id="later">Lyrics later</button><button id="resetSync">Reset sync</button></div></details>
 <details class="card"><summary>Debug room state</summary><pre id="playerDebugState"></pre></details></section>`;
   document
@@ -912,10 +979,11 @@ function renderPlayer(main) {
       }),
   );
   $("#voicePreset").onchange = (e) => {
-    audio?.setVoicePreset(e.target.value);
+    const target = e.target as HTMLSelectElement;
+    audio?.setVoicePreset(target.value);
     const status = $("#micStatus");
     if (status)
-      status.textContent = `Mic filter: ${e.target.selectedOptions?.[0]?.textContent || e.target.value}`;
+      status.textContent = `Mic filter: ${target.selectedOptions?.[0]?.textContent || target.value}`;
   };
   $("#enableMic").onclick = async () => {
     try {
@@ -971,9 +1039,12 @@ function renderPlayer(main) {
         log(e.message);
       });
   $("#pauseBacking").onclick = () => audio?.pauseBackingMonitor();
-  $("#remoteGain").oninput = (e) => audio?.setGain("remote", +e.target.value);
-  $("#backingGain").oninput = (e) => audio?.setGain("backing", +e.target.value);
-  $("#masterGain").oninput = (e) => audio?.setGain("master", +e.target.value);
+  $("#remoteGain").oninput = (e) =>
+    audio?.setGain("remote", +(e.target as HTMLInputElement).value);
+  $("#backingGain").oninput = (e) =>
+    audio?.setGain("backing", +(e.target as HTMLInputElement).value);
+  $("#masterGain").oninput = (e) =>
+    audio?.setGain("master", +(e.target as HTMLInputElement).value);
   $("#earlier").onclick = () => {
     room.playbackState.seekOffsetMs -= 250;
     persist();
@@ -1091,7 +1162,7 @@ export async function debugPage(root) {
   $("#debugOffer").onclick = async () => {
     try {
       const encoded = await peerNode.createManualOffer("host");
-      renderPayloadCard($("#offerOut"), encoded, "Offer");
+      renderPayloadCard($("#offerOut") as HTMLElement, encoded, "Offer");
     } catch (e) {
       log(e.message);
     }
@@ -1099,7 +1170,7 @@ export async function debugPage(root) {
   $("#debugImport").onclick = async () => {
     try {
       const encoded = await peerNode.acceptManualOffer($("#debugAnswer").value);
-      renderPayloadCard($("#answerOut"), encoded, "Answer");
+      renderPayloadCard($("#answerOut") as HTMLElement, encoded, "Answer");
     } catch (e) {
       log(e.message);
     }

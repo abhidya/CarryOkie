@@ -1,5 +1,6 @@
 import { qrSvg } from "./qr.ts";
 import {
+  type ProtectedSong,
   resolvePlayableMediaUrl,
   resolveDefaultCastMediaUrl,
   resolveDefaultCastMediaType,
@@ -36,6 +37,18 @@ declare namespace chrome.cast {
       constructor(mediaInfo: MediaInfo);
       media: MediaInfo;
       autoplay: boolean;
+    }
+  }
+  namespace framework {
+    class RemotePlayer {
+      currentTime: number;
+      isPaused: boolean;
+    }
+    class RemotePlayerController {
+      constructor(player: RemotePlayer);
+      addEventListener(type: string, fn: () => void): void;
+      playOrPause(): void;
+      seek(): void;
     }
   }
 }
@@ -84,7 +97,7 @@ interface Song {
   artist: string;
   castMediaUrl?: string | null;
   phoneBackingAudioUrl?: string | null;
-  encryptedMedia?: unknown;
+  encryptedMedia?: ProtectedSong["encryptedMedia"];
   defaultCastMediaUrl?: string | null;
   defaultCastMediaMimeType?: string;
   lyricsJsonUrl?: string | null;
@@ -109,6 +122,14 @@ interface CastState {
   currentMediaLoaded: boolean;
   defaultMediaReceiver: boolean;
   error: string | null;
+}
+
+type CastGlobal = typeof globalThis & {
+  cast?: typeof cast;
+};
+
+function castGlobal(): CastGlobal {
+  return globalThis as CastGlobal;
 }
 
 export const CAST_NAMESPACE = "urn:x-cast:com.carryokie.room";
@@ -147,6 +168,43 @@ function rewriteCastUrlForReceiver(url: string): string {
   }
 }
 
+function shouldLoadCastReceiverFramework(): boolean {
+  try {
+    const params = new URLSearchParams(location.search);
+    if (params.get("castReceiver") === "1") return true;
+    if (params.has("room")) return false;
+    return /\bCrKey\b|Chromecast/i.test(navigator.userAgent);
+  } catch {
+    return false;
+  }
+}
+
+function loadCastReceiverFramework(): Promise<void> {
+  if (castGlobal().cast?.framework?.CastReceiverContext)
+    return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(
+      "script[src*=caf_receiver]",
+    );
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener(
+        "error",
+        () => reject(new Error("Cast Receiver SDK failed to load.")),
+        { once: true },
+      );
+      return;
+    }
+    const script = document.createElement("script");
+    script.src =
+      "https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js";
+    script.onload = () => resolve();
+    script.onerror = () =>
+      reject(new Error("Cast Receiver SDK failed to load."));
+    document.head.appendChild(script);
+  });
+}
+
 export class CastController extends EventTarget {
   appId: string;
   available = false;
@@ -164,7 +222,7 @@ export class CastController extends EventTarget {
     return this.appId === DEFAULT_MEDIA_RECEIVER_APP_ID;
   }
   async init(): Promise<void> {
-    if (globalThis.cast?.framework) {
+    if (castGlobal().cast?.framework) {
       if (!this.available) this.configure();
       return;
     }
@@ -210,7 +268,7 @@ export class CastController extends EventTarget {
     this.emit("state", this.state());
   }
   async requestSession(): Promise<CastSession> {
-    if (!globalThis.cast?.framework)
+    if (!castGlobal().cast?.framework)
       throw new Error(
         "Cast SDK not ready. Use Chrome on macOS/Android, click Init Cast, then wait a moment. Safari/Firefox will not work.",
       );
@@ -223,7 +281,7 @@ export class CastController extends EventTarget {
   }
   async ensureSession(): Promise<CastSession> {
     if (this.session) return this.session;
-    if (globalThis.cast?.framework) {
+    if (castGlobal().cast?.framework) {
       const current =
         cast.framework.CastContext.getInstance().getCurrentSession?.();
       if (current) {
@@ -238,15 +296,16 @@ export class CastController extends EventTarget {
   send(
     type: string,
     payload: Record<string, unknown> = {},
-  ): Promise<boolean> | undefined {
+  ): Promise<boolean> {
     if (!CAST_TYPES.includes(type))
       throw new Error(`Unknown Cast message ${type}`);
     if (this.usesDefaultMediaReceiver) return Promise.resolve(false);
-    return this.session?.sendMessage(CAST_NAMESPACE, {
+    if (!this.session) return Promise.resolve(false);
+    return Promise.resolve(this.session.sendMessage(CAST_NAMESPACE, {
       type,
       payload,
       sentAt: Date.now(),
-    });
+    })).then(() => true);
   }
   sendSafe(
     type: string,
@@ -285,7 +344,7 @@ export class CastController extends EventTarget {
     };
     const request = new chrome.cast.media.LoadRequest(mediaInfo);
     request.autoplay = true;
-    await this.session.loadMedia(request);
+    await this.session!.loadMedia(request);
     this.currentMediaLoaded = true;
     this.emit("state", this.state());
     this.sendSafe("CAST_LOAD_SONG", { song, roomCode: room.roomCode });
@@ -364,9 +423,10 @@ export function receiverApp(root: HTMLElement): void {
     lines: [],
     status: "Waiting for host tab…",
   };
-  root.innerHTML = `<main class="tv"><section class="tv-info"><p class="eyebrow">CarryOkie receiver</p><h1>CarryOkie</h1><div class="stage-art receiver-stage" aria-hidden="true"><div class="stage-orb"></div><div class="stage-mic"></div><div class="soundwave"><span></span><span></span><span></span><span></span><span></span></div></div><div class="room" id="room">${escapeHtml(initialRoomCode)}</div><div id="joinQr"></div><p>Scan/open /player. Tab-cast receiver mirrors host room, queue, singers, backing track, and live singer mics.</p><section id="singers"></section><section id="receiverStatus"></section><section id="liveMics"><h2>Live mics</h2><p>Waiting for host tab audio…</p></section></section><section class="tv-stage"><video id="media" class="castMediaElement" controls playsinline></video><section id="lyrics" class="lyrics big"></section><section id="queue"></section></section></main>`;
+  root.innerHTML = `<main class="tv"><section class="tv-info"><p class="eyebrow">CarryOkie receiver</p><h1>CarryOkie</h1><div class="stage-art receiver-stage" aria-hidden="true"><div class="stage-orb"></div><div class="stage-mic"></div><div class="soundwave"><span></span><span></span><span></span><span></span><span></span></div></div><div class="room" id="room">${escapeHtml(initialRoomCode)}</div><div id="joinQr"></div><p>Scan/open /player. Tab-cast receiver mirrors host room, queue, singers, backing track, and live singer mics.</p><section id="singers"></section><section id="receiverStatus"></section><section id="liveMics"><h2>Live mics</h2><p>Waiting for host tab audio…</p><button id="retryLiveMics">Start / retry live mics</button></section></section><section class="tv-stage"><video id="media" class="castMediaElement" controls playsinline></video><section id="lyrics" class="lyrics big"></section><section id="queue"></section></section></main>`;
   const media = root.querySelector<HTMLVideoElement>("#media")!;
   const liveMics = root.querySelector<HTMLElement>("#liveMics")!;
+  const retryLiveMicsButton = root.querySelector<HTMLButtonElement>("#retryLiveMics")!;
   const receiverId = crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
   let loadedSongId = "";
   let mediaReady = false;
@@ -552,13 +612,29 @@ export function receiverApp(root: HTMLElement): void {
   function ensureLiveMicAudio(): HTMLAudioElement {
     if (liveMicAudio) return liveMicAudio;
     liveMics.innerHTML =
-      '<h2>Live mics</h2><p class="subtle">Playing all forwarded singer mics.</p>';
+      '<h2>Live mics</h2><p class="subtle">Playing all forwarded singer mics.</p><button id="retryLiveMics">Start / retry live mics</button>';
+    liveMics.querySelector("#retryLiveMics")?.addEventListener("click", () => {
+      void tryPlayLiveMics();
+    });
     liveMicAudio = document.createElement("audio");
     liveMicAudio.autoplay = true;
     liveMicAudio.controls = true;
+    liveMicAudio.playsInline = true;
+    liveMicAudio.muted = false;
+    liveMicAudio.volume = 1;
     liveMicAudio.srcObject = liveMicStream;
     liveMics.appendChild(liveMicAudio);
     return liveMicAudio;
+  }
+  async function tryPlayLiveMics(): Promise<void> {
+    const audio = ensureLiveMicAudio();
+    try {
+      await audio.play();
+      state.status = `Playing ${liveMicTrackIds.size} live mic${liveMicTrackIds.size === 1 ? "" : "s"}.`;
+    } catch {
+      state.status = "Tap receiver once or press Start / retry live mics.";
+    }
+    render();
   }
   function addLiveMic(stream: MediaStream): void {
     const audioTracks = stream.getAudioTracks?.() ||
@@ -569,17 +645,7 @@ export function receiverApp(root: HTMLElement): void {
       liveMicStream.addTrack(track);
     }
     if (!audioTracks.length) return;
-    const audio = ensureLiveMicAudio();
-    audio
-      .play()
-      .then(() => {
-        state.status = `Playing ${liveMicTrackIds.size} live mic${liveMicTrackIds.size === 1 ? "" : "s"}.`;
-        render();
-      })
-      .catch(() => {
-        state.status = "Tap receiver once to start all live mic audio.";
-        render();
-      });
+    void tryPlayLiveMics();
   }
   function removeStaleLiveMicTracks(): void {
     const currentIds = new Set<string>();
@@ -650,12 +716,27 @@ export function receiverApp(root: HTMLElement): void {
       3000,
     );
   }
+  retryLiveMicsButton.addEventListener("click", () => {
+    void tryPlayLiveMics();
+  });
+  root.addEventListener("pointerdown", () => {
+    if (liveMicTrackIds.size) void tryPlayLiveMics();
+  });
   window.addEventListener("message", (ev) => handle(ev.data));
   media.addEventListener("timeupdate", () => {
     state.mediaTimeMs = Math.round(media.currentTime * 1000);
     render();
   });
-  if (globalThis.cast?.framework?.CastReceiverContext) {
+  async function startCastReceiverFramework(): Promise<void> {
+    if (!shouldLoadCastReceiverFramework()) return;
+    try {
+      await loadCastReceiverFramework();
+    } catch (error) {
+      state.status = (error as Error).message;
+      render();
+      return;
+    }
+    if (!castGlobal().cast?.framework?.CastReceiverContext) return;
     const context = cast.framework.CastReceiverContext.getInstance();
     context.addCustomMessageListener(
       CAST_NAMESPACE,
@@ -663,5 +744,6 @@ export function receiverApp(root: HTMLElement): void {
     );
     context.start();
   }
+  void startCastReceiverFramework();
   render();
 }
