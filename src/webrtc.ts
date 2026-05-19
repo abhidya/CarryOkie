@@ -39,6 +39,7 @@ interface PeerEdge {
   pc: RTCPeerConnection;
   dc: RTCDataChannel | null;
   streams: MediaStream[];
+  sentTrackKeys: Set<string>;
   manual: boolean;
   initiator: boolean;
   negotiating?: boolean;
@@ -49,6 +50,29 @@ interface PeerEdge {
 interface RelayedStream {
   sourcePeerId: string;
   stream: MediaStream;
+  trackKeys: string[];
+}
+
+const fallbackTrackIds = new WeakMap<MediaStreamTrack, string>();
+let fallbackTrackId = 0;
+
+export function mediaTrackKey(track: MediaStreamTrack): string {
+  if (track.id) return `${track.kind}:${track.id}`;
+  let id = fallbackTrackIds.get(track);
+  if (!id) {
+    fallbackTrackId += 1;
+    id = `anon-${fallbackTrackId}`;
+    fallbackTrackIds.set(track, id);
+  }
+  return `${track.kind}:${id}`;
+}
+
+function streamTracks(stream: MediaStream): MediaStreamTrack[] {
+  return typeof stream.getTracks === "function" ? stream.getTracks() : [];
+}
+
+function streamTrackKeys(stream: MediaStream): string[] {
+  return streamTracks(stream).map(mediaTrackKey);
 }
 
 export function assertWebRtcSupported(): void {
@@ -94,6 +118,7 @@ export class PeerNode extends EventTarget {
       pc,
       dc: null,
       streams: [],
+      sentTrackKeys: new Set(),
       manual,
       initiator,
     };
@@ -109,14 +134,14 @@ export class PeerNode extends EventTarget {
         });
     };
     pc.ontrack = (ev) => {
-      const stream = ev.streams[0] || (ev.track ? new MediaStream([ev.track]) : undefined);
+      const stream =
+        ev.streams[0] || (ev.track ? new MediaStream([ev.track]) : undefined);
       this.emit("track", {
         remotePeerId,
         stream,
         track: ev.track,
       });
-      if (stream)
-        this.emit("duet", { remotePeerId, stream });
+      if (stream) this.emit("duet", { remotePeerId, stream });
     };
     pc.ondatachannel = (ev) => this.attachChannel(edge, ev.channel);
     pc.onnegotiationneeded = () => {
@@ -125,7 +150,10 @@ export class PeerNode extends EventTarget {
         return;
       }
       this.negotiate(edge).catch((e) =>
-        this.emit("error", { message: `Renegotiation failed: ${(e as Error).message}`, remotePeerId: edge.remotePeerId }),
+        this.emit("error", {
+          message: `Renegotiation failed: ${(e as Error).message}`,
+          remotePeerId: edge.remotePeerId,
+        }),
       );
     };
     if (initiator)
@@ -140,10 +168,17 @@ export class PeerNode extends EventTarget {
     this.peers.set(remotePeerId, edge);
     return edge;
   }
-  addStreamToEdge(edge: PeerEdge, stream: MediaStream): void {
-    if (edge.streams.includes(stream)) return;
-    edge.streams.push(stream);
-    stream.getTracks().forEach((t) => edge.pc.addTrack(t, stream));
+  addStreamToEdge(edge: PeerEdge, stream: MediaStream): boolean {
+    const newTracks = streamTracks(stream).filter(
+      (track) => !edge.sentTrackKeys.has(mediaTrackKey(track)),
+    );
+    if (!newTracks.length) return false;
+    if (!edge.streams.includes(stream)) edge.streams.push(stream);
+    newTracks.forEach((track) => {
+      edge.sentTrackKeys.add(mediaTrackKey(track));
+      edge.pc.addTrack(track, stream);
+    });
+    return true;
   }
   attachChannel(edge: PeerEdge, dc: RTCDataChannel): void {
     edge.dc = dc;
@@ -262,7 +297,10 @@ export class PeerNode extends EventTarget {
       return;
     }
     this.negotiate(edge).catch((e) =>
-      this.emit("error", { message: `Renegotiation failed: ${(e as Error).message}`, remotePeerId: edge.remotePeerId }),
+      this.emit("error", {
+        message: `Renegotiation failed: ${(e as Error).message}`,
+        remotePeerId: edge.remotePeerId,
+      }),
     );
   }
   async negotiate(edge: PeerEdge): Promise<void> {
@@ -294,7 +332,9 @@ export class PeerNode extends EventTarget {
           try {
             if (edge.pc.signalingState === "have-local-offer")
               await edge.pc.setLocalDescription({ type: "rollback" });
-          } catch { /* best-effort rollback */ }
+          } catch {
+            /* best-effort rollback */
+          }
           if (edge.needsNegotiation) this.requestNegotiation(edge);
         }
       }, 15000);
@@ -394,23 +434,33 @@ export class PeerNode extends EventTarget {
     return payload;
   }
   addLocalStream(stream: MediaStream): void {
-    if (!this.localStreams.includes(stream)) this.localStreams.push(stream);
+    const keys = streamTrackKeys(stream);
+    const newKeys = keys.filter(
+      (key) =>
+        !this.localStreams.some((localStream) =>
+          streamTrackKeys(localStream).includes(key),
+        ),
+    );
+    if (newKeys.length) this.localStreams.push(stream);
     for (const edge of this.peers.values()) {
-      this.addStreamToEdge(edge, stream);
-      this.requestNegotiation(edge);
+      if (this.addStreamToEdge(edge, stream)) this.requestNegotiation(edge);
     }
   }
   relayRemoteStream(sourcePeerId: string, stream: MediaStream): void {
-    if (
-      !this.relayedStreams.some(
-        (s) => s.sourcePeerId === sourcePeerId && s.stream === stream,
-      )
-    )
-      this.relayedStreams.push({ sourcePeerId, stream });
+    const keys = streamTrackKeys(stream);
+    const newKeys = keys.filter(
+      (key) =>
+        !this.relayedStreams.some(
+          (stream) =>
+            stream.sourcePeerId === sourcePeerId &&
+            stream.trackKeys.includes(key),
+        ),
+    );
+    if (newKeys.length)
+      this.relayedStreams.push({ sourcePeerId, stream, trackKeys: newKeys });
     for (const edge of this.peers.values()) {
       if (edge.remotePeerId === sourcePeerId) continue;
-      this.addStreamToEdge(edge, stream);
-      this.requestNegotiation(edge);
+      if (this.addStreamToEdge(edge, stream)) this.requestNegotiation(edge);
     }
   }
   emit(type: string, detail: object): void {

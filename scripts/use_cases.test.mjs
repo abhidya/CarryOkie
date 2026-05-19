@@ -240,17 +240,15 @@ test("moveQueueItem reorders queue without dropping items", () => {
   const c = queueRequest("song_c", [1], host.playerId, 2);
   room.queue.push(a, b, c);
   moveQueueItem(room, c.queueItemId, -1);
-  assert.deepEqual(room.queue.map((item) => item.songId), [
-    "song_a",
-    "song_c",
-    "song_b",
-  ]);
+  assert.deepEqual(
+    room.queue.map((item) => item.songId),
+    ["song_a", "song_c", "song_b"],
+  );
   moveQueueItem(room, a.queueItemId, 1);
-  assert.deepEqual(room.queue.map((item) => item.songId), [
-    "song_c",
-    "song_a",
-    "song_b",
-  ]);
+  assert.deepEqual(
+    room.queue.map((item) => item.songId),
+    ["song_c", "song_a", "song_b"],
+  );
 });
 
 test("host loss locks room authority", () => {
@@ -420,6 +418,8 @@ test("tab-cast receiver accepts host-forwarded live audio without requesting mic
   const host = fs.readFileSync("src/app.ts", "utf8");
   assert.match(host, /receiverPendingRenegotiate/);
   assert.match(host, /publishReceiverCommand/);
+  assert.match(host, /receiverTrackKeys/);
+  assert.match(host, /mediaTrackKey/);
 });
 
 test("protected catalog includes songs with encrypted media", () => {

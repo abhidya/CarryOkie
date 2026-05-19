@@ -294,19 +294,18 @@ export class CastController extends EventTarget {
     }
     return this.requestSession();
   }
-  send(
-    type: string,
-    payload: Record<string, unknown> = {},
-  ): Promise<boolean> {
+  send(type: string, payload: Record<string, unknown> = {}): Promise<boolean> {
     if (!CAST_TYPES.includes(type))
       throw new Error(`Unknown Cast message ${type}`);
     if (this.usesDefaultMediaReceiver) return Promise.resolve(false);
     if (!this.session) return Promise.resolve(false);
-    return Promise.resolve(this.session.sendMessage(CAST_NAMESPACE, {
-      type,
-      payload,
-      sentAt: Date.now(),
-    })).then(() => true);
+    return Promise.resolve(
+      this.session.sendMessage(CAST_NAMESPACE, {
+        type,
+        payload,
+        sentAt: Date.now(),
+      }),
+    ).then(() => true);
   }
   sendSafe(
     type: string,
@@ -429,7 +428,8 @@ export function receiverApp(root: HTMLElement): void {
   root.innerHTML = `<main class="tv"><section class="tv-info"><p class="eyebrow">CarryOkie receiver</p><h1>CarryOkie</h1><div class="stage-art receiver-stage" aria-hidden="true"><div class="stage-orb"></div><div class="stage-mic"></div><div class="soundwave"><span></span><span></span><span></span><span></span><span></span></div></div><div class="room" id="room">${escapeHtml(initialRoomCode)}</div><div id="joinQr"></div><p>Scan/open /player. Tab-cast receiver mirrors host room, queue, singers, backing track, and live singer mics.</p><section id="singers"></section><section id="receiverStatus"></section><section id="liveMics"><h2>Live mics</h2><p>Waiting for host tab audio…</p><button id="retryLiveMics">Start / retry live mics</button></section></section><section class="tv-stage"><video id="media" class="castMediaElement" controls playsinline></video><section id="lyrics" class="lyrics big"></section><section id="queue"></section></section></main>`;
   const media = root.querySelector<HTMLVideoElement>("#media")!;
   const liveMics = root.querySelector<HTMLElement>("#liveMics")!;
-  const retryLiveMicsButton = root.querySelector<HTMLButtonElement>("#retryLiveMics")!;
+  const retryLiveMicsButton =
+    root.querySelector<HTMLButtonElement>("#retryLiveMics")!;
   const receiverId = crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
   let loadedSongId = "";
   let mediaReady = false;
@@ -452,13 +452,14 @@ export function receiverApp(root: HTMLElement): void {
       state.roomCode === "------"
         ? ""
         : qrSvg(playerUrl, { scale: 3, title: "Join CarryOkie room" });
-    const queueSingerLabel = (queueItem: (typeof state.queue)[number]): string =>
-      (
-        queueItem.singerNames?.length
-          ? queueItem.singerNames
-          : (queueItem.singerNumbers || []).map(
-              (singerNumber) => `#${singerNumber}`,
-            )
+    const queueSingerLabel = (
+      queueItem: (typeof state.queue)[number],
+    ): string =>
+      (queueItem.singerNames?.length
+        ? queueItem.singerNames
+        : (queueItem.singerNumbers || []).map(
+            (singerNumber) => `#${singerNumber}`,
+          )
       ).join(", ");
     root.querySelector("#queue")!.innerHTML =
       "<h2>Queue</h2><ol>" +
@@ -610,7 +611,9 @@ export function receiverApp(root: HTMLElement): void {
       if (payload.playbackState) {
         state.playbackState = payload.playbackState as Record<string, unknown>;
         const derived = deriveTvMediaPositionMs(
-          payload.playbackState as Parameters<typeof deriveTvMediaPositionMs>[0],
+          payload.playbackState as Parameters<
+            typeof deriveTvMediaPositionMs
+          >[0],
         );
         state.mediaTimeMs = derived.positionMs;
       }
@@ -649,7 +652,8 @@ export function receiverApp(root: HTMLElement): void {
     render();
   }
   function addLiveMic(stream: MediaStream): void {
-    const audioTracks = stream.getAudioTracks?.() ||
+    const audioTracks =
+      stream.getAudioTracks?.() ||
       stream.getTracks().filter((track) => track.kind === "audio");
     for (const track of audioTracks) {
       if (liveMicTrackIds.has(track.id)) continue;
@@ -751,11 +755,11 @@ export function receiverApp(root: HTMLElement): void {
       Math.abs((media.currentTime || 0) - seconds) > 0.75
     )
       media.currentTime = seconds;
-  const paused =
-    !!state.playbackState.paused ||
-    ["paused", "idle", "ended", "host_lost", "error"].includes(
-      (state.playbackState.status as string) || "",
-    );
+    const paused =
+      !!state.playbackState.paused ||
+      ["paused", "idle", "ended", "host_lost", "error"].includes(
+        (state.playbackState.status as string) || "",
+      );
     if (!paused) media.play().catch(() => {});
     else media.pause();
   }

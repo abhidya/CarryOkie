@@ -1,37 +1,44 @@
 # Design
 
 ## Source of truth
+
 - Status: Active
 - Last refreshed: 2026-05-17
 - Primary product surfaces: `/host`, `/player`, `/receiver`, `/debug`, protected local media import/export, real-browser local E2E.
 - Evidence reviewed: `README.md`, `DESIGN.md`, `design-coverage.json`, `package.json`, `host/index.html`, `player/index.html`, `receiver/index.html`, `debug/index.html`, `src/app.ts`, `src/cast.ts`, `src/audio.ts`, `src/webrtc.ts`, `src/signaling.ts`, `src/state.ts`, `src/styles.css`, `scripts/*.test.mjs`, `public/protected/catalog.json`.
 
 ## Brand
+
 - Personality: living-room karaoke utility; confident, practical, low-friction, safety-aware.
 - Trust signals: clear local-only/static architecture, explicit licensed-media copy, visible room code/QR, honest mic/Cast/network status.
 - Avoid: implying DRM, implying server-backed room discovery, hiding STUN/no-TURN limits, flashy AI-demo visual excess.
 
 ## Product goals
+
 - Goals: let one host run a karaoke room from static files; TV/receiver shows and plays backing media; phones join, request songs, carry controls, and publish/listen to singer mic streams.
 - Non-goals: backend signaling, TURN reliability, Spotify/unlicensed streams, production DRM, Chromecast live mic mixing.
 - Success signals: `npm test`, `npm run build`, and `npm run test:e2e` pass locally; host/player/receiver can complete manual pairing, queue start, mic publish, and receiver live-mic bridge.
 
 ## Personas and jobs
+
 - Primary personas: karaoke host with laptop/Chrome; participant singer with phone; local developer validating room flow.
 - User jobs: start room, pair phone, request/accept/start song, assign singer, publish mic safely, show TV/receiver state.
 - Key contexts of use: same-room LAN, localhost or HTTPS, Chrome/Chromium for host/Cast, mobile browser for phones, no guaranteed TURN path.
 
 ## Information architecture
+
 - Primary navigation: page-specific URLs instead of global app nav.
 - Core routes/screens: `/host` authoritative room controller; `/player` participant phone; `/receiver` TV/tab receiver; `/debug` diagnostics.
 - Content hierarchy: room identity and pairing first; then queue/song; then singer/mic controls; diagnostics stay visible but secondary.
 
 ## Design principles
+
 - Principle 1: execution truth beats spec text. Current passing app paths and tests define behavior; older design docs explain intent.
 - Principle 2: make failure actionable. Cast, mic, crypto, and WebRTC failures must name likely cause and next step.
 - Tradeoffs: static/no-server simplicity beats seamless join; phones own live mics to avoid Chromecast mixer fantasy.
 
 ## Visual language
+
 - Color: dark stage-like base with high-contrast action colors; semantic status colors only where they clarify state.
 - Typography: readable system UI; body text at accessible sizes for phone use.
 - Spacing/layout rhythm: card sections with clear scan/copy/manual steps; no dense control pileups on phone.
@@ -40,12 +47,14 @@
 - Imagery/iconography: code-native QR/stage/sound visuals; no raster dependency required.
 
 ## Components
+
 - Existing components to reuse: `$()`/DOM helpers, `commonChrome`, queue view/service, lyric view, QR payload card, Cast controller, PhoneAudio controls.
 - New/changed components: local E2E runner; root `DESIGN.md` contract; invalid-media import guard.
 - Variants and states: loading, pairing, paired, queued, active, mic live/muted, Cast unavailable, receiver ready, host lost.
 - Token/component ownership: `src/styles.css` owns visual system; app modules own behavior boundaries.
 
 ## Accessibility
+
 - Target standard: practical WCAG AA for contrast, touch target size, readable text.
 - Keyboard/focus behavior: buttons/inputs must remain native and reachable; QR/manual paths must not be mouse-only.
 - Contrast/readability: room code, pairing steps, and mic safety warnings must be high contrast.
@@ -53,11 +62,13 @@
 - Reduced motion and sensory considerations: avoid motion reliance; mic feedback warnings stay explicit.
 
 ## Responsive behavior
+
 - Supported breakpoints/devices: desktop Chrome host, phone portrait player, TV/large receiver, debug desktop.
 - Layout adaptations: phone controls stack; host surfaces queue and Cast controls; receiver prioritizes room/song/singers.
 - Touch/hover differences: all player actions must work by tap; hover is enhancement only.
 
 ## Interaction states
+
 - Loading: show catalog/Cast/pairing progress text.
 - Empty: no queue/no singers states explain next action.
 - Error: show network-incompatible, Cast unavailable, crypto/media, or mic permission cause.
@@ -66,11 +77,13 @@
 - Offline/slow network, if applicable: STUN/no-TURN failure must not look like wrong room code.
 
 ## Content voice
+
 - Tone: short, direct, operational.
 - Terminology: room, host, player, receiver, pairing code, singer, queue, Cast, mic.
 - Microcopy rules: state what happened and next action; do not promise hardware behavior tests cannot prove.
 
 ## Implementation constraints
+
 - Framework/styling system: Vite + TypeScript modules + plain CSS; no frontend framework.
 - Design-token constraints: existing CSS variables/classes first; no new design-system dependency.
 - Performance constraints: static deploy; avoid importing corrupt/huge non-MP4 downloads into protected catalog.
@@ -78,6 +91,7 @@
 - Test/screenshot expectations: use source tests as truth; local E2E is `npm run test:e2e`; headed manual debug is `KEEP_BROWSER_OPEN=1 npm run test:e2e:headed`.
 
 ## Open questions
+
 - [ ] Real Chromecast hardware pass / owner: user / impact: confirms Cast discovery and TV playback outside mocked tests.
 - [ ] Physical phone feedback/latency pass / owner: user / impact: confirms mic usability in actual room audio.
 

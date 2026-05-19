@@ -180,7 +180,10 @@ export class PeerJsRoomTransport {
   private attachConnection(conn: DataConnection): void {
     conn.on("open", () => {
       this.connections.set(conn.peer, conn);
-      this.handlers.onPeerConnected(conn.peer, conn.metadata as Record<string, unknown>);
+      this.handlers.onPeerConnected(
+        conn.peer,
+        conn.metadata as Record<string, unknown>,
+      );
       if (!this._isHost && this._state !== "connected") {
         this.setState("connected");
       }
@@ -188,7 +191,9 @@ export class PeerJsRoomTransport {
 
     conn.on("data", (data: unknown) => {
       try {
-        const msg = (typeof data === "string" ? JSON.parse(data) : data) as RoomMessage;
+        const msg = (
+          typeof data === "string" ? JSON.parse(data) : data
+        ) as RoomMessage;
         if (msg?.type) this.handlers.onMessage(conn.peer, msg);
       } catch {
         // ignore malformed

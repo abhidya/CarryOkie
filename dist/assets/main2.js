@@ -1,11 +1,3963 @@
-(function(){let e=document.createElement(`link`).relList;if(e&&e.supports&&e.supports(`modulepreload`))return;for(let e of document.querySelectorAll(`link[rel="modulepreload"]`))n(e);new MutationObserver(e=>{for(let t of e)if(t.type===`childList`)for(let e of t.addedNodes)e.tagName===`LINK`&&e.rel===`modulepreload`&&n(e)}).observe(document,{childList:!0,subtree:!0});function t(e){let t={};return e.integrity&&(t.integrity=e.integrity),e.referrerPolicy&&(t.referrerPolicy=e.referrerPolicy),e.crossOrigin===`use-credentials`?t.credentials=`include`:e.crossOrigin===`anonymous`?t.credentials=`omit`:t.credentials=`same-origin`,t}function n(e){if(e.ep)return;e.ep=!0;let n=t(e);fetch(e.href,n)}})();function e(){return globalThis.crypto?.randomUUID?globalThis.crypto.randomUUID():URL.createObjectURL(new Blob).split(`/`).pop()}function t(){return Date.now()}function n(){let e=[`BLUE`,`CAT`,`STAR`,`MOON`,`BIRD`,`MINT`,`GOLD`,`ECHO`,`KITE`,`WAVE`];return e[Math.floor(Math.random()*e.length)]+e[Math.floor(Math.random()*e.length)]}function r(e,t=`Guest`){return typeof e==`string`&&e.trim().replace(/\s+/g,` `).slice(0,32)||t}function i(n=`participant`,i=`Guest`){return{peerId:e(),playerId:e(),playerNumber:null,displayName:r(i,`Guest`),role:n,isHost:n===`host`,isSingerForCurrentSong:!1,micState:{permissionState:`prompt`,enabled:!1,muted:!0,publishing:!1,receivingPeerIds:[],remoteGain:1,localMonitorGain:0,backingGain:0,masterGain:1},monitorState:{headphonesConfirmed:!1,phoneSpeakerOutputAck:!1,keepAwake:`unknown`},connectionState:`new`,lastSeenAt:t()}}function a(r){return{roomId:e(),roomCode:n(),hostPeerId:r.peerId,hostPlayerId:r.playerId,createdAt:t(),playerCount:1,maxPlayers:5,currentSongId:`song_002`,currentQueueItemId:null,playbackState:{songId:`song_002`,status:`idle`,startedAtHostMs:null,pausedAtSongMs:0,seekOffsetMs:0,playbackRate:1,lastUpdatedAtHostMs:t(),tvMediaTimeMs:0,tvMediaTimeSampledAtHostMs:null,syncDegraded:!0},players:[r],queue:[],castState:{available:!1,connected:!1,receiverReady:!1,currentMediaLoaded:!1,lastCommandAt:null,lastReceiverAckAt:null,error:null},meshState:{edges:{},failures:[]},limits:{maxPlayers:5,maxSingers:5}}}function o(e,t){if(e.players.length>=5)throw Error(`Room full: MVP cap is 5 players.`);let n=new Set(e.players.map(e=>e.playerNumber).filter(Boolean));return t.playerNumber=[1,2,3,4,5].find(e=>!n.has(e))??null,e.players.push(t),e.playerCount=e.players.length,e}function s(e,t){if(t.length>5)throw Error(`Maximum 5 active singers.`);let n=new Set(t);return e.players.forEach(e=>{e.isSingerForCurrentSong=n.has(e.playerId),e.role=e.isHost?`host`:e.isSingerForCurrentSong?`singer`:`listener`}),e}function c(n,r,i,a=0){if(r.length>5)throw Error(`Queue item max 5 singers.`);let o=[...new Set(r.filter(e=>Number.isInteger(e)&&e>=1&&e<=5))];if(!n)throw Error(`Queue item needs a song.`);if(!i)throw Error(`Queue item needs a requesting player.`);if(o.length===0)throw Error(`Queue item needs at least one singer number.`);if(a>=20)throw Error(`Queue full: MVP cap is 20 items.`);return{queueItemId:e(),songId:n,singerNumbers:o,requestedByPlayerId:i,status:`requested`,createdAt:t(),acceptedAt:null}}function l(e,n){let r=e.queue.find(e=>e.queueItemId===n);return!r||r.status===`active`||r.status===`ended`?e:(r.status=`queued`,r.acceptedAt=t(),e)}function u(e,t){let n=e.queue.find(e=>e.queueItemId===t);return!n||n.status===`active`||n.status===`ended`||(n.status=`rejected`),e}function ee(e,t){return e.queue=e.queue.filter(e=>e.queueItemId!==t),e.currentQueueItemId===t&&(e.currentQueueItemId=null),e}function d(e,t,n){let r=e.queue.findIndex(e=>e.queueItemId===t);if(r<0)return e;let i=r+n;if(i<0||i>=e.queue.length)return e;let[a]=e.queue.splice(r,1);return e.queue.splice(i,0,a),e}function te(e){return typeof e==`string`&&/^[a-zA-Z0-9_-]{8,80}$/.test(e)}function ne(e,t){if(e.queue.some(e=>e.queueItemId===t.queueItemId))return e;let n=e.queue.filter(e=>![`ended`,`rejected`].includes(e.status)).length,r=c(t.songId,t.singerNumbers,t.requestedByPlayerId,n);return r.queueItemId=te(t.queueItemId)?t.queueItemId:r.queueItemId,r.createdAt=t.createdAt||r.createdAt,e.queue.push(r),e}function f(e){return e.queue.find(e=>e.status===`queued`)}function p(e,t,n){let r=e.queue.find(e=>e.queueItemId===t);if(!r||r.status===`active`||r.status===`ended`||!Number.isInteger(n)||n<1||n>5)return e;if(!r.singerNumbers.includes(n)){if(r.singerNumbers.length>=5)throw Error(`Queue item max 5 singers.`);r.singerNumbers.push(n)}return r.status===`rejected`&&(r.status=`requested`),e}function m(e,t,n){let r=e.queue.find(e=>e.queueItemId===t);if(!r||r.status===`active`||r.status===`ended`)return e;let i=r.singerNumbers.filter(e=>e!==n);if(i.length===0)throw Error(`Queue item needs at least one singer number.`);return r.singerNumbers=i,e}function re(e){return e.playbackState.status=`host_lost`,e.hostLostMessage=`Host disconnected. Audio between already-connected phones may continue, but TV and queue controls are locked. Create a new room to continue.`,e}function h(e){localStorage.setItem(`carryokie.room`,JSON.stringify(e))}function ie(){try{return JSON.parse(localStorage.getItem(`carryokie.room`)||`null`)}catch{return null}}var g=10,_=17+g*4,ae=274,oe=18,se=[68,68,69,69],ce=[6,28,50];function v(e,t,n){for(let r=n-1;r>=0;r--)e.push(t>>>r&1)}function le(e){let t=[];for(let n=0;n<e.length;n+=8)t.push(e.slice(n,n+8).reduce((e,t)=>e<<1|t,0));return t}function ue(e,t){let n=0;for(let r=7;r>=0;r--)n=(n<<1^(n>>>7)*285)&255,t>>>r&1&&(n^=e);return n}function de(e){let t=[1],n=1;for(let r=0;r<e;r++){let e=Array(t.length+1).fill(0);for(let r=0;r<t.length;r++)e[r]^=ue(t[r],n),e[r+1]^=t[r];t=e,n=ue(n,2)}return t}function fe(e,t){let n=de(t),r=Array(t).fill(0);for(let i of e){let e=i^r.shift();r.push(0);for(let i=0;i<t;i++)r[i]^=ue(n[i],e)}return r}function pe(e){let t=[...new TextEncoder().encode(e)];if(t.length>260)throw Error(`QR chunk too large (${t.length} bytes). Use smaller chunks.`);let n=[];for(v(n,4,4),v(n,t.length,16),t.forEach(e=>v(n,e,8)),v(n,0,Math.min(4,ae*8-n.length));n.length%8;)n.push(0);let r=le(n);for(let e=236;r.length<ae;e^=253)r.push(e);return r}function me(e){let t=pe(e),n=[],r=0;for(let e of se){let i=t.slice(r,r+e);r+=e,n.push({data:i,ec:fe(i,oe)})}let i=[];for(let e=0;e<Math.max(...se);e++)for(let t of n)e<t.data.length&&i.push(t.data[e]);for(let e=0;e<oe;e++)for(let t of n)i.push(t.ec[e]);return i}function he(){return Array.from({length:_},()=>Array(_).fill(null))}function y(e,t,n,r){t>=0&&t<_&&n>=0&&n<_&&(e[t][n]=!!r)}function ge(e,t,n,r=!1){y(e,t,n,r)}function _e(e,t,n){for(let r=-1;r<=7;r++)for(let i=-1;i<=7;i++){let a=t+r,o=n+i;a<0||a>=_||o<0||o>=_||y(e,a,o,r>=0&&r<=6&&i>=0&&i<=6&&(r===0||r===6||i===0||i===6||r>=2&&r<=4&&i>=2&&i<=4))}}function ve(e,t,n){if(e[t][n]===null)for(let r=-2;r<=2;r++)for(let i=-2;i<=2;i++)y(e,t+r,n+i,Math.max(Math.abs(r),Math.abs(i))!==1)}function ye(e,t,n){let r=e<<n;1<<Math.floor(Math.log2(t));for(let e=Math.floor(Math.log2(r));e>=n;e--)r>>>e&1&&(r^=t<<e-Math.floor(Math.log2(t)));return e<<n|r}function be(e){_e(e,0,0),_e(e,0,_-7),_e(e,_-7,0);for(let t=8;t<_-8;t++)y(e,6,t,t%2==0),y(e,t,6,t%2==0);for(let t of ce)for(let n of ce)ve(e,t,n);y(e,4*g+9,8,!0);for(let t=0;t<9;t++)ge(e,8,t),ge(e,t,8);for(let t=0;t<8;t++)ge(e,8,_-1-t),ge(e,_-1-t,8);let t=ye(g,7973,12);for(let n=0;n<18;n++){let r=(t>>>n&1)==1;y(e,Math.floor(n/3),_-11+n%3,r),y(e,_-11+n%3,Math.floor(n/3),r)}}function xe(e,t){let n=[];t.forEach(e=>v(n,e,8));let r=0,i=!0;for(let t=_-1;t>=1;t-=2){t===6&&t--;for(let a=0;a<_;a++){let o=i?_-1-a:a;for(let i=t;i>=t-1;i--)if(e[o][i]===null){let t=((n[r++]||0)^+((o+i)%2==0))==1;y(e,o,i,t)}}i=!i}}function Se(e){let t=ye(8,1335,10)^21522,n=e=>(t>>>e&1)==1;[[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],[7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]].forEach(([t,r],i)=>y(e,t,r,n(i))),[[_-1,8],[_-2,8],[_-3,8],[_-4,8],[_-5,8],[_-6,8],[_-7,8],[8,_-8],[8,_-7],[8,_-6],[8,_-5],[8,_-4],[8,_-3],[8,_-2],[8,_-1]].forEach(([t,r],i)=>y(e,t,r,n(i)))}function Ce(e){let t=he();return be(t),xe(t,me(e)),Se(t),t.map(e=>e.map(e=>!!e))}function we(e,{scale:t=4,quiet:n=4,title:r=`CarryOkie QR`}={}){let i=Ce(e),a=i.length+n*2,o=[];return i.forEach((e,t)=>e.forEach((e,r)=>{e&&o.push(`<rect x="${r+n}" y="${t+n}" width="1" height="1"/>`)})),`<svg class="qr" data-qr="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${a} ${a}" width="${a*t}" height="${a*t}" role="img" aria-label="${r}"><rect width="100%" height="100%" fill="#fff"/><g fill="#000">${o.join(``)}</g></svg>`}var Te=new TextEncoder,Ee=new TextDecoder;function De(e){let t=``;return e.forEach(e=>t+=String.fromCharCode(e)),btoa(t).replace(/\+/g,`-`).replace(/\//g,`_`).replace(/=+$/,``)}function Oe(e){for(e=e.replace(/-/g,`+`).replace(/_/g,`/`);e.length%4;)e+=`=`;let t=atob(e);return Uint8Array.from(t,e=>e.charCodeAt(0))}async function ke(e){if(!(`CompressionStream`in globalThis))return{alg:`plain`,bytes:e};let t=new Blob([e]).stream().pipeThrough(new CompressionStream(`deflate`));return{alg:`deflate`,bytes:new Uint8Array(await new Response(t).arrayBuffer())}}async function Ae(e,t){if(e===`plain`)return t;if(!(`DecompressionStream`in globalThis))throw Error(`Deflate payload unsupported in this runtime. Use a modern browser.`);let n=new Blob([t]).stream().pipeThrough(new DecompressionStream(`deflate`));return new Uint8Array(await new Response(n).arrayBuffer())}function je(e){let t=e.replace(/\r?\n/g,`\r
-`).trim().split(`\r
-`).filter(Boolean),n=[],r=[],i=null;for(let e of t)e.startsWith(`m=`)?(i=[e],r.push(i)):i?i.push(e):n.push(e);let a=r.map(Pe).filter(e=>e.length>0),o=a.map(e=>e.find(e=>e.startsWith(`a=mid:`))?.slice(6)).filter(Boolean);return[...n.map(e=>e.startsWith(`a=group:BUNDLE`)&&o.length?`a=group:BUNDLE ${o.join(` `)}`:e).filter(e=>Me(e)),...a.flat()].join(`\r
-`)+`\r
-`}function Me(e){return/^(v=|o=|s=|t=|a=group:BUNDLE|a=msid-semantic:|a=ice-ufrag:|a=ice-pwd:|a=ice-options:|a=fingerprint:|a=setup:)/.test(e)}function Ne(e){let t=e.split(/\s+/);return t.filter((e,n)=>![`generation`,`network-id`,`network-cost`].includes(e)&&![`generation`,`network-id`,`network-cost`].includes(t[n-1])).join(` `)}function Pe(e){let t=e[0],n=t.split(/\s+/)[0].slice(2);if(![`audio`,`application`].includes(n))return[];let r=e.find(e=>e.startsWith(`a=mid:`));if(n===`application`)return e.filter(e=>e.startsWith(`m=`)||e===r||/^(c=|a=ice-ufrag:|a=ice-pwd:|a=fingerprint:|a=setup:|a=sctp-port:|a=max-message-size:|a=candidate:|a=end-of-candidates)/.test(e)).map(e=>e.startsWith(`a=candidate:`)?Ne(e):e);let i=e.map(e=>e.match(/^a=rtpmap:(\d+) opus\/48000\/2/i)?.[1]).find(Boolean),a=i?t.split(/\s+/).slice(0,3).concat(i).join(` `):t;return e.map(e=>e===t?a:e).filter(e=>e.startsWith(`a=rtpmap:`)||e.startsWith(`a=fmtp:`)||e.startsWith(`a=rtcp-fb:`)?!i||e.startsWith(`a=rtpmap:${i} `)||e.startsWith(`a=fmtp:${i} `):e.startsWith(`m=`)||e===r||/^(c=|a=ice-ufrag:|a=ice-pwd:|a=fingerprint:|a=setup:|a=rtcp-mux|a=sendrecv|a=recvonly|a=sendonly|a=inactive|a=msid:|a=ssrc:|a=candidate:|a=end-of-candidates)/.test(e)).map(e=>e.startsWith(`a=candidate:`)?Ne(e):e)}async function Fe(e){let t={v:1,app:`carryokie`,createdAt:Date.now(),...e};if(typeof t.description==`object`&&t.description!==null&&`sdp`in t.description){let e=t.description;t.description={type:e.type,sdp:je(e.sdp||``)}}let n=await ke(Te.encode(JSON.stringify(t))),r=`ck1.${n.alg}.${De(n.bytes)}`,i=globalThis.location||{origin:`http://localhost`,pathname:`/player/`};return{token:r,url:`${i.origin}${i.pathname}#signal=${r}`,chunks:Re(r)}}async function Ie(e){let t=Le(e).split(`.`);if(t.length!==3||t[0]!==`ck1`)throw Error(`Signal import failed: unsupported CarryOkie payload.`);let n=await Ae(t[1],Oe(t[2])),r=JSON.parse(Ee.decode(n));if(r.app!==`carryokie`)throw Error(`Signal import failed: not a CarryOkie payload.`);return r}function Le(e){if(e=(e||``).trim(),e.startsWith(`chunk:`))throw Error(`Paste all chunks into the multi-chunk field before import.`);try{let t=new URL(e),n=new URLSearchParams(t.hash.slice(1));if(n.get(`signal`))return n.get(`signal`)}catch{}let t=e.match(/ck1\.[a-z]+\.[A-Za-z0-9_-]+/);if(!t)throw Error(`Signal import failed: no payload found.`);return t[0]}function Re(e,t=240){let n=Math.ceil(e.length/t),r=`chunk:${n}/${n}:`.length;return t+r>260&&(t=Math.max(1,260-r)),n=Math.ceil(e.length/t),Array.from({length:n},(r,i)=>`chunk:${i+1}/${n}:${e.slice(i*t,(i+1)*t)}`)}function ze(e){let t=e.split(/\n+/).map(e=>e.trim()).filter(Boolean).map(e=>{let t=e.match(/^chunk:(\d+)\/(\d+):(.+)$/);return t?{i:+t[1],n:+t[2],data:t[3]}:null});if(t.some(e=>!e))return e;let n=t[0].n;if(t.length!==n)throw Error(`Need ${n} chunks, got ${t.length}.`);return t.sort((e,t)=>e.i-t.i).map(e=>e.data).join(``)}function Be(e,t,n=`Signal payload`){let r=()=>e.querySelector(`textarea`),i=(t,n)=>{let r=e.querySelector(t);if(!r)return;let i=r.textContent;r.textContent=n,setTimeout(()=>r.textContent=i,1500)},a=()=>{let e=r();return e?(e.focus(),e.select(),e.setSelectionRange?.(0,e.value.length),!0):!1},o=()=>{if(!a())return!1;try{return!!document.execCommand?.(`copy`)}catch{return!1}},s=0,c=()=>{let n=e.querySelector(`[data-single-qr]`),r=e.querySelector(`[data-qr-count]`);n&&(n.innerHTML=we(t.chunks[s])),r&&(r.textContent=`QR ${s+1}/${t.chunks.length}`)};e.innerHTML=`<div class="payload"><h3>${n}</h3><p>One QR code is shown at a time. Scan it, then use Next only if this payload needs another local chunk. Link/share/copy remains available.</p><figure><figcaption data-qr-count></figcaption><div data-single-qr></div></figure><div class="actions"><button data-prev>Prev QR</button><button data-next>Next QR</button><button data-copy>Copy link</button><button data-share>Share</button></div><textarea readonly>${t.url}</textarea><details><summary>Text fallback (${t.chunks.length} local chunk${t.chunks.length===1?``:`s`})</summary><textarea readonly>${t.chunks.join(`
-`)}</textarea></details></div>`,c();let l=()=>{e.querySelector(`[data-prev]`).disabled=s===0,e.querySelector(`[data-next]`).disabled=s===t.chunks.length-1};l(),e.querySelector(`[data-prev]`).onclick=()=>{s=Math.max(0,s-1),c(),l()},e.querySelector(`[data-next]`).onclick=()=>{s=Math.min(t.chunks.length-1,s+1),c(),l()},e.querySelector(`[data-copy]`).onclick=async()=>{try{await navigator.clipboard.writeText(t.url),i(`[data-copy]`,`Copied!`)}catch(e){if(console.error(`Copy failed:`,e),o()){i(`[data-copy]`,`Copied!`);return}a(),i(`[data-copy]`,`Press ⌘/Ctrl+C`)}},e.querySelector(`[data-share]`).onclick=async()=>{try{navigator.share?(await navigator.share({title:`CarryOkie signal`,text:t.url}),i(`[data-share]`,`Shared!`)):(await navigator.clipboard.writeText(t.url),i(`[data-share]`,`Copied!`))}catch(e){if(console.error(`Share failed:`,e),o()){i(`[data-share]`,`Copied!`);return}a(),i(`[data-share]`,`Press ⌘/Ctrl+C`)}}}async function Ve(e,t=()=>{}){let n=globalThis.BarcodeDetector;if(!n)throw Error(`Camera QR import needs Chrome/Android BarcodeDetector support. Use copy/paste fallback on this browser.`);if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw Error(`Camera QR import needs camera permission and HTTPS.`);let r=await navigator.mediaDevices.getUserMedia({video:{facingMode:`environment`},audio:!1}),i=document.createElement(`video`);i.playsInline=!0,i.muted=!0,i.autoplay=!0,i.srcObject=r,i.style.cssText=`width:100%;max-height:280px;background:#000;border-radius:12px;margin:.5rem 0`,e.insertAdjacentElement(`beforebegin`,i),await i.play();let a=new n({formats:[`qr_code`]});return t(`Scanning QR with camera…`),new Promise((n,o)=>{let s=()=>{r.getTracks().forEach(e=>e.stop()),i.remove()},c=window.setTimeout(()=>{s(),o(Error(`No QR found. Try brighter light or paste the link/chunks.`))},3e4),l=async()=>{try{let r=(await a.detect(i))[0]?.rawValue?.trim();if(r){window.clearTimeout(c),s(),e.value=r.startsWith(`chunk:`)&&e.value.trim()?`${e.value.trim()}\n${r}`:r,e.dispatchEvent(new Event(`input`,{bubbles:!0})),t(`QR imported.`),n(r);return}requestAnimationFrame(l)}catch(e){window.clearTimeout(c),s(),o(e)}};l()})}var He={iceServers:[{urls:`stun:stun.l.google.com:19302`}]},b={ROOM_HELLO:`ROOM_HELLO`,ROOM_STATE_SNAPSHOT:`ROOM_STATE_SNAPSHOT`,PLAYER_JOINED:`PLAYER_JOINED`,PLAYER_LEFT:`PLAYER_LEFT`,QUEUE_ADD_REQUEST:`QUEUE_ADD_REQUEST`,QUEUE_UPDATE_REQUEST:`QUEUE_UPDATE_REQUEST`,QUEUE_ACCEPTED:`QUEUE_ACCEPTED`,QUEUE_REJECTED:`QUEUE_REJECTED`,QUEUE_UPDATED:`QUEUE_UPDATED`,SINGER_JOIN_REQUEST:`SINGER_JOIN_REQUEST`,SINGER_ASSIGNED:`SINGER_ASSIGNED`,SINGER_REMOVED:`SINGER_REMOVED`,MIC_ENABLED:`MIC_ENABLED`,MIC_MUTED:`MIC_MUTED`,MIC_UNMUTED:`MIC_UNMUTED`,PLAYBACK_STARTED:`PLAYBACK_STARTED`,PLAYBACK_PAUSED:`PLAYBACK_PAUSED`,PLAYBACK_SEEKED:`PLAYBACK_SEEKED`,PLAYBACK_SYNC:`PLAYBACK_SYNC`,LATENCY_PING:`LATENCY_PING`,LATENCY_PONG:`LATENCY_PONG`,SIGNAL_RELAY_OFFER:`SIGNAL_RELAY_OFFER`,SIGNAL_RELAY_ANSWER:`SIGNAL_RELAY_ANSWER`,SIGNAL_RELAY_ICE:`SIGNAL_RELAY_ICE`,ERROR_NOTICE:`ERROR_NOTICE`};function Ue(){if(typeof RTCPeerConnection>`u`)throw Error(`WebRTC is unavailable in this browser/context. On phones, open the GitHub Pages HTTPS URL or serve local testing over HTTPS; local HTTP hostnames may block offer creation.`)}var We=class extends EventTarget{localPeerId;peers;clockOffsetMs;localStreams;relayedStreams;constructor(e){super(),this.localPeerId=e,this.peers=new Map,this.clockOffsetMs=0,this.localStreams=[],this.relayedStreams=[]}makeConnection(e,{manual:t=!0,initiator:n=!1,replace:r=!1}={}){Ue();let i=this.peers.get(e);if(i&&!r)return i;i&&r&&(i.pc.close?.(),this.peers.delete(e));let a=new RTCPeerConnection(He),o={remotePeerId:e,pc:a,dc:null,streams:[],manual:t,initiator:n};return a.oniceconnectionstatechange=()=>this.emit(`ice`,{remotePeerId:e,state:a.iceConnectionState}),a.onconnectionstatechange=()=>{this.emit(`connection`,{remotePeerId:e,state:a.connectionState}),a.connectionState===`failed`&&this.emit(`error`,{message:`WebRTC failed. Strict mode has STUN but no TURN; try same Wi-Fi or a less restrictive network.`,remotePeerId:e})},a.ontrack=t=>{let n=t.streams[0]||(t.track?new MediaStream([t.track]):void 0);this.emit(`track`,{remotePeerId:e,stream:n,track:t.track}),n&&this.emit(`duet`,{remotePeerId:e,stream:n})},a.ondatachannel=e=>this.attachChannel(o,e.channel),a.onnegotiationneeded=()=>{if(o.negotiating){o.needsNegotiation=!0;return}this.negotiate(o).catch(e=>this.emit(`error`,{message:`Renegotiation failed: ${e.message}`,remotePeerId:o.remotePeerId}))},n&&this.attachChannel(o,a.createDataChannel(`room-rpc`,{ordered:!0})),this.localStreams.forEach(e=>this.addStreamToEdge(o,e)),this.relayedStreams.filter(t=>t.sourcePeerId!==e).forEach(({stream:e})=>this.addStreamToEdge(o,e)),this.peers.set(e,o),o}addStreamToEdge(e,t){e.streams.includes(t)||(e.streams.push(t),t.getTracks().forEach(n=>e.pc.addTrack(n,t)))}attachChannel(e,t){e.dc=t,t.onopen=()=>{this.emit(`open`,{remotePeerId:e.remotePeerId}),e.streams.length&&this.requestNegotiation(e)},t.onclose=()=>this.emit(`close`,{remotePeerId:e.remotePeerId}),t.onmessage=t=>{try{this.handleMessage(e.remotePeerId,JSON.parse(t.data))}catch(e){this.emit(`error`,{message:e.message})}}}handleMessage(e,t){if(t.type===b.LATENCY_PING&&this.send(e,{type:b.LATENCY_PONG,t0:t.t0,h1:Date.now()}),t.type===b.LATENCY_PONG){let e=Date.now();this.clockOffsetMs=t.h1+(e-t.t0)/2-e,this.emit(`clock`,{offsetMs:this.clockOffsetMs})}if([b.SIGNAL_RELAY_OFFER,b.SIGNAL_RELAY_ANSWER,b.SIGNAL_RELAY_ICE].includes(t.type)&&t.toPeerId&&t.toPeerId!==this.localPeerId){this.send(t.toPeerId,{...t,relayedByPeerId:this.localPeerId}),this.emit(`relay`,{fromPeerId:e,toPeerId:t.toPeerId,msg:t});return}if(t.type===b.SIGNAL_RELAY_OFFER&&t.toPeerId===this.localPeerId){this.acceptRenegotiationOffer(e,t).catch(t=>this.emit(`error`,{message:t.message,remotePeerId:e}));return}if(t.type===b.SIGNAL_RELAY_ANSWER&&t.toPeerId===this.localPeerId){this.acceptRenegotiationAnswer(e,t).catch(t=>this.emit(`error`,{message:t.message,remotePeerId:e}));return}this.emit(`message`,{remotePeerId:e,msg:t})}signalDescription(e){let t=e.signal;return t?.description||t}async acceptRenegotiationOffer(e,t){let n=this.peers.get(e)||this.makeConnection(e,{manual:!1,initiator:!1});n.pc.signalingState===`have-local-offer`&&await n.pc.setLocalDescription({type:`rollback`}),await n.pc.setRemoteDescription(this.signalDescription(t));let r=await n.pc.createAnswer();await n.pc.setLocalDescription(r),await x(n.pc),this.send(e,{type:b.SIGNAL_RELAY_ANSWER,fromPeerId:this.localPeerId,toPeerId:e,signal:n.pc.localDescription})}async acceptRenegotiationAnswer(e,t){let n=this.peers.get(e);if(!n)throw Error(`No peer connection for renegotiation answer.`);await n.pc.setRemoteDescription(this.signalDescription(t)),clearTimeout(n.negotiationTimer),n.negotiating=!1,n.needsNegotiation&&this.requestNegotiation(n)}requestNegotiation(e){if(!e.dc||e.dc.readyState!==`open`||e.negotiating||e.pc.signalingState!==`stable`){e.needsNegotiation=!0;return}this.negotiate(e).catch(t=>this.emit(`error`,{message:`Renegotiation failed: ${t.message}`,remotePeerId:e.remotePeerId}))}async negotiate(e){if(!e.dc||e.dc.readyState!==`open`||e.negotiating||e.pc.signalingState!==`stable`){e.needsNegotiation=!0;return}e.negotiating=!0,e.needsNegotiation=!1;try{let t=await e.pc.createOffer({offerToReceiveAudio:!0});await e.pc.setLocalDescription(t),await x(e.pc),this.send(e.remotePeerId,{type:b.SIGNAL_RELAY_OFFER,fromPeerId:this.localPeerId,toPeerId:e.remotePeerId,signal:e.pc.localDescription}),clearTimeout(e.negotiationTimer),e.negotiationTimer=setTimeout(async()=>{if(e.negotiating){e.negotiating=!1;try{e.pc.signalingState===`have-local-offer`&&await e.pc.setLocalDescription({type:`rollback`})}catch{}e.needsNegotiation&&this.requestNegotiation(e)}},15e3)}catch(t){throw e.negotiating=!1,t}}send(e,t){let n=this.peers.get(e);n?.dc?.readyState===`open`&&n.dc.send(JSON.stringify(t))}broadcast(e){for(let t of this.peers.keys())this.send(t,e)}pingAll(){this.broadcast({type:b.LATENCY_PING,t0:Date.now()})}relaySignal(e,t,n,r){if(![b.SIGNAL_RELAY_OFFER,b.SIGNAL_RELAY_ANSWER,b.SIGNAL_RELAY_ICE].includes(e))throw Error(`Unsupported relay type ${e}`);this.send(n,{type:e,fromPeerId:t,toPeerId:n,signal:r,sentAt:Date.now()})}async createManualOffer(e){let t=this.makeConnection(e,{manual:!0,initiator:!0,replace:!0}),n=await t.pc.createOffer({offerToReceiveAudio:!0});return await t.pc.setLocalDescription(n),await x(t.pc),Fe({kind:`offer`,fromPeerId:this.localPeerId,toPeerId:e,description:t.pc.localDescription})}async acceptManualOffer(e){let t=await Ie(ze(e));if(t.kind!==`offer`)throw Error(`Expected offer payload.`);let n=this.makeConnection(t.fromPeerId,{manual:!0,initiator:!1,replace:!0});await n.pc.setRemoteDescription(t.description);let r=await n.pc.createAnswer();return await n.pc.setLocalDescription(r),await x(n.pc),Fe({kind:`answer`,fromPeerId:this.localPeerId,toPeerId:t.fromPeerId,description:n.pc.localDescription})}async acceptManualAnswer(e){let t=await Ie(ze(e));if(t.kind!==`answer`)throw Error(`Expected answer payload.`);let n=(t.fromPeerId?this.peers.get(t.fromPeerId):void 0)||(t.toPeerId?this.peers.get(t.toPeerId):void 0)||[...this.peers.values()].find(e=>e.initiator&&e.pc.signalingState!==`stable`);if(!n)throw Error(`No pending offer for this answer.`);return t.fromPeerId&&n.remotePeerId!==t.fromPeerId&&(this.peers.delete(n.remotePeerId),n.remotePeerId=t.fromPeerId,this.peers.set(n.remotePeerId,n)),await n.pc.setRemoteDescription(t.description),n.streams.length&&this.requestNegotiation(n),t}addLocalStream(e){this.localStreams.includes(e)||this.localStreams.push(e);for(let t of this.peers.values())this.addStreamToEdge(t,e),this.requestNegotiation(t)}relayRemoteStream(e,t){this.relayedStreams.some(n=>n.sourcePeerId===e&&n.stream===t)||this.relayedStreams.push({sourcePeerId:e,stream:t});for(let n of this.peers.values())n.remotePeerId!==e&&(this.addStreamToEdge(n,t),this.requestNegotiation(n))}emit(e,t){this.dispatchEvent(new CustomEvent(e,{detail:t}))}};function x(e,t=4e3,n=1e3){return e.iceGatheringState===`complete`?Promise.resolve():new Promise(r=>{let i=null,a=()=>{e.removeEventListener(`icegatheringstatechange`,o),e.removeEventListener(`icecandidate`,s),clearTimeout(c),clearTimeout(i??void 0),r()},o=()=>{e.iceGatheringState===`complete`&&a()},s=e=>{e.candidate&&(clearTimeout(i??void 0),i=setTimeout(a,n))},c=setTimeout(a,t);e.addEventListener(`icegatheringstatechange`,o),e.addEventListener(`icecandidate`,s)})}var Ge=class{log;ctx;master;remoteGain;backingGain;localStream;publishedStream;micSource;micDestination;micFilters;voicePreset;localMonitorGain;backingAudio;backingSource;pushToSing;gateThreshold;gateEnabled;gateProcessor;wakeLock=null;remoteSources;remoteStreams;constructor(e=()=>{}){this.log=e,this.ctx=null,this.master=null,this.remoteGain=null,this.backingGain=null,this.localStream=null,this.publishedStream=null,this.micSource=null,this.micDestination=null,this.micFilters={},this.voicePreset=`clean`,this.localMonitorGain=0,this.backingAudio=null,this.backingSource=null,this.pushToSing=!1,this.gateThreshold=.03,this.gateEnabled=!1,this.gateProcessor=null,this.remoteSources=[],this.remoteStreams=new Set}async init(){this.ctx=this.ctx||new AudioContext,(!this.master||!this.remoteGain||!this.backingGain)&&(this.master=this.ctx.createGain(),this.remoteGain=this.ctx.createGain(),this.backingGain=this.ctx.createGain(),this.master.gain.value=1,this.remoteGain.gain.value=1,this.backingGain.gain.value=0,this.localMonitorGain=0,this.remoteGain.connect(this.master),this.backingGain.connect(this.master),this.master.connect(this.ctx.destination)),this.ctx.state===`suspended`&&await this.ctx.resume?.().catch(()=>{})}async requestMic({pushToSing:e=!1}={}){if(!navigator.mediaDevices)throw Error(`Mic requires HTTPS. Connect via GitHub Pages or localhost.`);if(!navigator.mediaDevices.getUserMedia)throw Error(`Browser doesn't support getUserMedia API.`);return await this.init(),this.pushToSing=e,this.localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:!0,noiseSuppression:!0,autoGainControl:!0},video:!1}),e&&this.setMicMuted(!0),this.applyGate(),this.publishedStream=this.buildMicFilterStream(this.localStream),this.publishedStream}setMicMuted(e){this.localStream?.getAudioTracks().forEach(t=>{t.enabled=!e}),this.publishedStream?.getAudioTracks().forEach(t=>{t.enabled=!e})}buildMicFilterStream(e){if(!this.ctx?.createMediaStreamDestination||!this.ctx.createBiquadFilter||!this.ctx.createDynamicsCompressor)return e;try{this.micSource?.disconnect(),this.micSource=this.ctx.createMediaStreamSource(e),this.micDestination=this.ctx.createMediaStreamDestination();let t=this.ctx.createBiquadFilter(),n=this.ctx.createBiquadFilter(),r=this.ctx.createBiquadFilter(),i=this.ctx.createDynamicsCompressor(),a=this.ctx.createGain();return t.type=`highpass`,n.type=`lowshelf`,r.type=`peaking`,this.micSource.connect(t),t.connect(n),n.connect(r),r.connect(i),i.connect(a),a.connect(this.micDestination),this.micFilters={highpass:t,tone:n,presence:r,compressor:i,output:a},this.applyVoicePreset(),this.micDestination.stream}catch(t){return this.log(`Mic filters unavailable: ${t.message}. Using clean mic.`),e}}setVoicePreset(e){this.voicePreset=[`clean`,`alto`,`bravo`,`bass`,`radio`,`autotune`].includes(e)?e:`clean`,this.applyVoicePreset()}applyVoicePreset(){let{highpass:e,tone:t,presence:n,compressor:r,output:i}=this.micFilters;if(!e||!t||!n||!r||!i)return;let a={clean:{hp:70,lowGain:0,presenceFreq:3200,presenceGain:0,ratio:2,threshold:-24,out:1},alto:{hp:95,lowGain:2,presenceFreq:2400,presenceGain:1.5,ratio:3,threshold:-26,out:1.05},bravo:{hp:120,lowGain:-1,presenceFreq:4200,presenceGain:4,ratio:3.5,threshold:-28,out:1.08},bass:{hp:55,lowGain:4,presenceFreq:1800,presenceGain:-1,ratio:3,threshold:-25,out:1},radio:{hp:180,lowGain:-6,presenceFreq:2800,presenceGain:5,ratio:6,threshold:-32,out:1.1},autotune:{hp:100,lowGain:-1,presenceFreq:3600,presenceGain:3,ratio:8,threshold:-34,out:1.12}},o=a[this.voicePreset]||a.clean;e.frequency.value=o.hp,t.gain.value=o.lowGain,n.frequency.value=o.presenceFreq,n.Q.value=1,n.gain.value=o.presenceGain,r.threshold.value=o.threshold,r.knee.value=12,r.ratio.value=o.ratio,r.attack.value=.003,r.release.value=.18,i.gain.value=o.out}addRemoteStream(e,t=`remote singer`){this.remoteStreams.has(e)||(this.remoteStreams.add(e),this.init().then(()=>{if(!this.ctx||!this.remoteGain)return;let n=this.ctx.createMediaStreamSource(e);this.remoteSources.push(n),n.connect(this.remoteGain),this.log(`Receiving ${t}`)}))}async startBackingMonitor(e){return await this.init(),!this.backingAudio||!this.backingSource||!this.ctx||!this.backingGain?(this.backingAudio=new Audio(e),this.backingAudio.loop=!1,this.backingAudio.crossOrigin=`anonymous`,this.backingSource=this.ctx.createMediaElementSource(this.backingAudio),this.backingSource.connect(this.backingGain)):this.backingAudio.src!==e&&(this.backingAudio.src=e),this.backingGain.gain.value=this.backingGain.gain.value||.35,await this.backingAudio.play(),this.backingAudio}pauseBackingMonitor(){this.backingAudio?.pause()}setGain(e,t){e===`remote`&&this.remoteGain&&(this.remoteGain.gain.value=t),e===`backing`&&this.backingGain&&(this.backingGain.gain.value=t),e===`master`&&this.master&&(this.master.gain.value=t)}wakeLockVideo=null;async tryWakeLock(){try{return`wakeLock`in navigator?(this.wakeLock=await navigator.wakeLock.request(`screen`),`active`):(this.wakeLockVideo||(this.wakeLockVideo=document.createElement(`video`),this.wakeLockVideo.loop=!0,this.wakeLockVideo.muted=!0,this.wakeLockVideo.style.cssText=`position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;`,document.body.appendChild(this.wakeLockVideo)),this.wakeLockVideo.src=new URL(``+new URL(`../silent_loop.mp4`,import.meta.url).href,``+import.meta.url).toString(),await this.wakeLockVideo.play().catch(()=>{}),`video-fallback`)}catch{return`failed`}}stopWakeLock(){this.wakeLock&&=(this.wakeLock.release(),null),this.wakeLockVideo&&=(this.wakeLockVideo.pause(),this.wakeLockVideo.remove(),null)}applyGate(){if(!(!this.localStream||!this.ctx||!this.gateEnabled))try{let e=this.ctx.createMediaStreamSource(this.localStream),t=this.ctx.createScriptProcessor(4096,1,1);t.onaudioprocess=e=>{let t=e.inputBuffer.getChannelData(0),n=e.outputBuffer.getChannelData(0),r=0;for(let e=0;e<t.length;e++)r+=t[e]*t[e];if(r=Math.sqrt(r/t.length),r<this.gateThreshold)for(let e=0;e<n.length;e++)n[e]=0;else for(let e=0;e<n.length;e++)n[e]=t[e]},e.connect(t),t.connect(this.ctx.destination),this.gateProcessor=t,this.log(`Noise gate enabled (threshold: ${this.gateThreshold}).`)}catch(e){this.log(`Noise gate failed: ${e.message}. Continuing without gate.`)}}setGateEnabled(e,t){this.gateEnabled=e,t!==void 0&&(this.gateThreshold=t),e&&this.localStream&&this.applyGate()}duetMonitorGains=new Map;enableDuetMonitoring(e,t){if(this.ctx)if(t&&!this.duetMonitorGains.has(e)){let t=this.ctx.createGain();t.gain.value=.5,t.connect(this.master),this.duetMonitorGains.set(e,t),this.log(`Duet monitoring enabled for ${e}`)}else !t&&this.duetMonitorGains.has(e)&&(this.duetMonitorGains.get(e)?.disconnect(),this.duetMonitorGains.delete(e),this.log(`Duet monitoring disabled for ${e}`))}connectDuetStream(e,t){!this.ctx||!this.duetMonitorGains.has(t)||this.ctx.createMediaStreamSource(e).connect(this.duetMonitorGains.get(t))}},Ke=`TV backing track bleed risk: your phone mic can hear the TV backing track. Use headphones or push-to-sing to avoid sending backing track to everyone.`,qe=`NvV8BCkbvZNWft8N71lX+8pYS3/cqwjNcCz3N1zF5IE=`,Je=new Map,Ye;function Xe(){return!!globalThis.crypto?.subtle?.importKey&&!!globalThis.crypto?.subtle?.decrypt}function Ze(e){let t=atob(e),n=new Uint8Array(t.length);for(let e=0;e<t.length;e++)n[e]=t.charCodeAt(e);return n}function S(e){if(!e)return null;if(/^[a-z][a-z0-9+.-]*:/i.test(e))return e;let t=e.startsWith(`/public/`)?e.slice(7):e;return t.startsWith(`/`)?new URL(`..`+t,import.meta.url).toString():new URL(t,import.meta.url).toString()}function Qe(e){return e?{...e,url:S(e.url)}:void 0}function $e(e){let t={...e,encryptedMedia:Qe(e.encryptedMedia),encryptedAudio:Qe(e.encryptedAudio),castMediaUrl:S(e.castMediaUrl),phoneBackingAudioUrl:S(e.phoneBackingAudioUrl),lyricsJsonUrl:S(e.lyricsJsonUrl),lyricsVttUrl:S(e.lyricsVttUrl),thumbnailUrl:S(e.thumbnailUrl),defaultCastMediaUrl:S(e.defaultCastMediaUrl)};return t.encryptedMedia?{...t,castMediaUrl:null,phoneBackingAudioUrl:null,lyricsJsonUrl:null,lyricsVttUrl:null,thumbnailUrl:null,needsClientDecrypt:!0}:t}async function et(){if(!Xe())throw Error(`Protected media decrypt needs Web Crypto. Use HTTPS/GitHub Pages, localhost, or the clear Cast export fallback for local phone testing.`);return Ye||=globalThis.crypto.subtle.importKey(`raw`,Ze(qe),{name:`AES-GCM`},!1,[`decrypt`]),Ye}async function tt(e=S(`/protected/catalog.json`)){try{let t=await fetch(e);return t.ok?((await t.json()).songs||[]).map($e):[]}catch{return[]}}async function nt(e){if(!e?.encryptedMedia)return null;let t=e.encryptedMedia;if(Je.has(e.songId))return Je.get(e.songId);let n=await fetch(S(t.url));if(!n.ok)throw Error(`Protected media fetch failed: ${n.status}`);let r=new Uint8Array(await n.arrayBuffer()),i=await et(),a=await globalThis.crypto.subtle.decrypt({name:`AES-GCM`,iv:Ze(t.iv),tagLength:(t.tagBytesAppended||16)*8},i,r),o=URL.createObjectURL(new Blob([a],{type:t.mimeType||`video/mp4`}));return Je.set(e.songId,o),o}async function rt(e){return e?.encryptedMedia?!Xe()&&e.defaultCastMediaUrl?e.defaultCastMediaUrl:nt(e):e?.castMediaUrl||e?.phoneBackingAudioUrl||null}function it(e){return e?.defaultCastMediaUrl||(e?.encryptedMedia?null:e?.castMediaUrl)||null}function at(e){return e?.defaultCastMediaMimeType||e?.encryptedMedia?.mimeType||`video/mp4`}function ot(e){return!!e?.encryptedMedia}function C(e,t=Date.now(),n=0){if(!e||e.syncDegraded||e.tvMediaTimeSampledAtHostMs==null)return{positionMs:e?.tvMediaTimeMs||0,syncDegraded:!0};let r=t+n,i=Math.max(0,r-e.tvMediaTimeSampledAtHostMs),a=e.paused?`paused`:e.status||`playing`,o=!e.paused&&![`paused`,`idle`,`ended`,`host_lost`,`error`].includes(a),s=e.playbackRate??1,c=e.tvMediaTimeMs||0,l=e.seekOffsetMs||0;return{positionMs:Math.max(0,c+l+(o?i*s:0)),syncDegraded:!1}}function w(e){return String(e??``).replace(/[&<>"']/g,e=>({"&":`&amp;`,"<":`&lt;`,">":`&gt;`,'"':`&quot;`,"'":`&#39;`})[e])}function T(){return globalThis}var st=`urn:x-cast:com.carryokie.room`,ct=`CC1AD845`,lt=[`CAST_LOAD_SONG`,`CAST_PLAY`,`CAST_PAUSE`,`CAST_SEEK`,`CAST_STOP`,`CAST_SET_SINGERS`,`CAST_UPDATE_QUEUE_PREVIEW`,`CAST_SHOW_JOIN_QR`,`CAST_SYNC_PLAYBACK_STATE`,`CAST_SHOW_ERROR`];function ut(){try{return new URLSearchParams(location.search).get(`castOrigin`)||localStorage.getItem(`carryokie.castOrigin`)}catch{return null}}function dt(e){let t=ut();if(!t)return e;try{let n=new URL(e,location.href);return new URL(n.pathname+n.search+n.hash,t).toString()}catch{return e}}function ft(){try{let e=new URLSearchParams(location.search);return e.get(`castReceiver`)===`1`?!0:e.has(`room`)?!1:/\bCrKey\b|Chromecast/i.test(navigator.userAgent)}catch{return!1}}function pt(){return T().cast?.framework?.CastReceiverContext?Promise.resolve():new Promise((e,t)=>{let n=document.querySelector(`script[src*=caf_receiver]`);if(n){n.addEventListener(`load`,()=>e(),{once:!0}),n.addEventListener(`error`,()=>t(Error(`Cast Receiver SDK failed to load.`)),{once:!0});return}let r=document.createElement(`script`);r.src=`https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js`,r.onload=()=>e(),r.onerror=()=>t(Error(`Cast Receiver SDK failed to load.`)),document.head.appendChild(r)})}var mt=class extends EventTarget{appId;available=!1;connected=!1;remotePlayer=null;controller=null;session=null;currentMediaLoaded=!1;constructor(e=ct){super(),this.appId=e}get usesDefaultMediaReceiver(){return this.appId===ct}async init(){if(T().cast?.framework){this.available||this.configure();return}return new Promise((e,t)=>{let n=window;if(n.__onGCastApiAvailable=n=>{if(n)this.configure(),e();else{let e=Error(`Cast Sender unavailable in this browser.`);this.emit(`error`,{message:e.message}),t(e)}},!document.querySelector(`script[src*=cast_sender]`)){let e=document.createElement(`script`);e.src=`https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1`,document.head.appendChild(e)}})}configure(){cast.framework.CastContext.getInstance().setOptions({receiverApplicationId:this.appId,autoJoinPolicy:chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED}),this.remotePlayer=new cast.framework.RemotePlayer,this.controller=new cast.framework.RemotePlayerController(this.remotePlayer),this.controller.addEventListener(cast.framework.RemotePlayerEventType.CURRENT_TIME_CHANGED,()=>this.sampleMediaStatus()),this.controller.addEventListener(cast.framework.RemotePlayerEventType.IS_PAUSED_CHANGED,()=>this.sampleMediaStatus()),this.available=!0,this.emit(`state`,this.state())}async requestSession(){if(!T().cast?.framework)throw Error(`Cast SDK not ready. Use Chrome on macOS/Android, click Init Cast, then wait a moment. Safari/Firefox will not work.`);let e=cast.framework.CastContext.getInstance();return this.session=e.getCurrentSession?.()||await e.requestSession(),this.connected=!!this.session,this.emit(`state`,this.state()),this.session}async ensureSession(){if(this.session)return this.session;if(T().cast?.framework){let e=cast.framework.CastContext.getInstance().getCurrentSession?.();if(e)return this.session=e,this.connected=!0,this.emit(`state`,this.state()),e}return this.requestSession()}send(e,t={}){if(!lt.includes(e))throw Error(`Unknown Cast message ${e}`);return this.usesDefaultMediaReceiver||!this.session?Promise.resolve(!1):Promise.resolve(this.session.sendMessage(st,{type:e,payload:t,sentAt:Date.now()})).then(()=>!0)}sendSafe(e,t={}){return Promise.resolve(this.send(e,t)).catch(t=>(this.emit(`error`,{message:`Cast message ${e} failed: ${t?.message||t}`}),!1))}async loadSong(e,t){await this.ensureSession();let n=this.usesDefaultMediaReceiver?it(e):await rt(e);if(!n)throw Error(this.usesDefaultMediaReceiver?`Default Chromecast needs a clear cast export. Run npm run exportCastMedia.`:`No playable media URL for song.`);let r=this.usesDefaultMediaReceiver?dt(n):n,i=new chrome.cast.media.MediaInfo(r,at(e));i.metadata=new chrome.cast.media.GenericMediaMetadata,i.metadata.title=`${e.title} — ${e.artist}`,i.customData={roomCode:t.roomCode,note:`TV plays backing/lyrics only; no live mic.`};let a=new chrome.cast.media.LoadRequest(i);a.autoplay=!0,await this.session.loadMedia(a),this.currentMediaLoaded=!0,this.emit(`state`,this.state()),this.sendSafe(`CAST_LOAD_SONG`,{song:e,roomCode:t.roomCode}),await this.play(),this.sampleMediaStatus()}async play(){await this.ensureSession(),(!this.remotePlayer||this.remotePlayer.isPaused)&&this.controller?.playOrPause(),this.sendSafe(`CAST_PLAY`)}pause(){(!this.remotePlayer||!this.remotePlayer.isPaused)&&this.controller?.playOrPause(),this.sendSafe(`CAST_PAUSE`)}seek(e){this.remotePlayer&&(this.remotePlayer.currentTime=e,this.controller?.seek()),this.send(`CAST_SEEK`,{seconds:e})}sampleMediaStatus(){if(!this.remotePlayer)return;let e=!!this.remotePlayer.isPaused,t={tvMediaTimeMs:Math.round((this.remotePlayer.currentTime||0)*1e3),tvMediaTimeSampledAtHostMs:Date.now(),paused:e,status:e?`paused`:`playing`,playbackRate:1,source:`RemotePlayerController.currentTime`};this.emit(`playbackSample`,t),this.sendSafe(`CAST_SYNC_PLAYBACK_STATE`,t)}state(){return{available:this.available,connected:this.connected,receiverReady:this.connected,currentMediaLoaded:this.currentMediaLoaded,defaultMediaReceiver:this.usesDefaultMediaReceiver,error:null}}emit(e,t){this.dispatchEvent(new CustomEvent(e,{detail:t}))}};function ht(e){let t=new URLSearchParams(location.search).get(`room`)||`------`,n={roomCode:t,song:null,singers:[],queue:[],mediaTimeMs:0,lines:[],status:`Waiting for host tab…`,playbackState:null};e.innerHTML=`<main class="tv"><section class="tv-info"><p class="eyebrow">CarryOkie receiver</p><h1>CarryOkie</h1><div class="stage-art receiver-stage" aria-hidden="true"><div class="stage-orb"></div><div class="stage-mic"></div><div class="soundwave"><span></span><span></span><span></span><span></span><span></span></div></div><div class="room" id="room">${w(t)}</div><div id="joinQr"></div><p>Scan/open /player. Tab-cast receiver mirrors host room, queue, singers, backing track, and live singer mics.</p><section id="singers"></section><section id="receiverStatus"></section><section id="liveMics"><h2>Live mics</h2><p>Waiting for host tab audio…</p><button id="retryLiveMics">Start / retry live mics</button></section></section><section class="tv-stage"><video id="media" class="castMediaElement" controls playsinline></video><section id="lyrics" class="lyrics big"></section><section id="queue"></section></section></main>`;let r=e.querySelector(`#media`),i=e.querySelector(`#liveMics`),a=e.querySelector(`#retryLiveMics`),o=crypto?.randomUUID?.()||`${Date.now()}-${Math.random()}`,s=``,c=!1;function l(){let e=n.mediaTimeMs;return n.lines.findLast?.(t=>e>=t.startMs)||n.lines.filter(t=>e>=t.startMs).pop()||n.lines[0]}function u(){e.querySelector(`#room`).textContent=n.roomCode;let t=new URL(`../player/?room=${encodeURIComponent(n.roomCode)}`,location.href).toString();e.querySelector(`#joinQr`).innerHTML=n.roomCode===`------`?``:we(t,{scale:3,title:`Join CarryOkie room`});let r=e=>(e.singerNames?.length?e.singerNames:(e.singerNumbers||[]).map(e=>`#${e}`)).join(`, `);e.querySelector(`#queue`).innerHTML=`<h2>Queue</h2><ol>`+n.queue.map(e=>`<li>${w(e.title||e.songId)} singers ${w(r(e))}</li>`).join(``)+`</ol>`,e.querySelector(`#singers`).innerHTML=`<h2>Singers</h2>`+((n.singers||[]).map(e=>`<p>#${w(e.playerNumber)} ${w(e.displayName)}</p>`).join(``)||`<p>No active singers</p>`),e.querySelector(`#receiverStatus`).innerHTML=`<p class="status-pill">${w(n.status)}</p>`;let i=l();e.querySelector(`#lyrics`).innerHTML=n.lines.length?n.lines.map(e=>`<p class="${e===i?`active`:``}">${w(e.text)}</p>`).join(``):`<p>Waiting for lyrics…</p>`}async function ee(e){if(ot(e)){n.lines=[],u();return}if(e?.lyricsJsonUrl){try{n.lines=(await fetch(e.lyricsJsonUrl).then(e=>e.json())).lines||[]}catch{n.lines=[],n.status=`Lyrics unavailable; backing track still loaded.`}u()}}function d(e,t){if(e){if(n.song=e,n.roomCode=t||n.roomCode,e.songId===s){u();return}s=e.songId,n.status=`Loading backing track…`,rt(e).then(e=>{if(!e){n.status=`No playable media for receiver tab.`,u();return}r.src=e;let t=()=>{c&&(c=!1,r.play().catch(()=>{n.status=`Tap receiver once to start backing track/audio.`,u()}))};r.play().then(()=>{n.status=`Backing track playing.`,t(),u()}).catch(()=>{t(),n.status=`Tap receiver once to start backing track/audio.`,u()})}).catch(e=>{n.status=e?.message||`Failed to load backing track.`,u()}),ee(e)}}function te(e){try{return typeof e==`string`?JSON.parse(e):e}catch{return null}}function ne(e){let t=te(e);if(!t?.type)return;let i=t.payload;t.type===`CAST_LOAD_SONG`&&i&&d(i.song,i.roomCode),t.type===`CAST_PLAY`&&(!r.src&&n.song&&d(n.song,n.roomCode),r.src?r.play().catch(()=>{}):c=!0),t.type===`CAST_PAUSE`&&r.src&&r.pause(),t.type===`CAST_SEEK`&&i&&(r.currentTime=i.seconds),t.type===`CAST_SET_SINGERS`&&i&&(n.singers=i.players||i.singers),(t.type===`CAST_SYNC_PLAYBACK_STATE`||t.type===`RECEIVER_PLAYBACK_SYNC`)&&i&&(n.playbackState=i,n.mediaTimeMs=C(i).positionMs),t.type===`CAST_SHOW_JOIN_QR`&&i&&(n.roomCode=i.roomCode),t.type===`CAST_UPDATE_QUEUE_PREVIEW`&&i&&(n.queue=i.queue||[]),t.type===`RECEIVER_STATE`&&i&&(n.roomCode=i.roomCode||n.roomCode,n.queue=i.queue||n.queue,n.singers=i.singers||n.singers,i.playbackState&&(n.playbackState=i.playbackState,n.mediaTimeMs=C(i.playbackState).positionMs),d(i.song,i.roomCode)),u()}let f=new MediaStream,p=new Set,m=null;function re(){return m||(i.innerHTML=`<h2>Live mics</h2><p class="subtle">Playing all forwarded singer mics.</p><button id="retryLiveMics">Start / retry live mics</button>`,i.querySelector(`#retryLiveMics`)?.addEventListener(`click`,()=>{h()}),m=document.createElement(`audio`),m.autoplay=!0,m.controls=!0,m.playsInline=!0,m.muted=!1,m.volume=1,m.srcObject=f,i.appendChild(m),m)}async function h(){let e=re();try{await e.play(),n.status=`Playing ${p.size} live mic${p.size===1?``:`s`}.`}catch{n.status=`Tap receiver once or press Start / retry live mics.`}u()}function ie(e){let t=e.getAudioTracks?.()||e.getTracks().filter(e=>e.kind===`audio`);for(let e of t)p.has(e.id)||(p.add(e.id),f.addTrack(e));t.length&&h()}function g(){let e=new Set;for(let t of f.getTracks())t.readyState===`ended`?(f.removeTrack(t),p.delete(t.id)):e.add(t.id)}function _(e){return e?{type:e.type,sdp:e.sdp}:null}if(typeof BroadcastChannel<`u`){let e=new BroadcastChannel(`carryokie.receiver`),t=null;e.onmessage=async r=>{let i=r.data||{};if(i.type===`RECEIVER_STATE`&&ne(i),i.type===`RECEIVER_OFFER`&&(!i.receiverId||i.receiverId===o))try{(!t||t.signalingState===`closed`)&&(t?.close?.(),t=new RTCPeerConnection(He),t.ontrack=e=>{let t=e.streams[0];t?ie(t):e.track&&ie(new MediaStream([e.track]))}),t.signalingState===`have-local-offer`&&await t.setLocalDescription({type:`rollback`}),g(),await t.setRemoteDescription(i.description);let n=await t.createAnswer();await t.setLocalDescription(n),await x(t),e.postMessage({type:`RECEIVER_ANSWER`,receiverId:o,description:_(t.localDescription)})}catch(e){n.status=`Receiver audio error: ${e.message}`,u(),t?.close?.(),t=null}},e.postMessage({type:`RECEIVER_READY`,receiverId:o,roomCode:n.roomCode}),setInterval(()=>e.postMessage({type:`RECEIVER_READY`,receiverId:o,roomCode:n.roomCode}),3e3)}a.addEventListener(`click`,()=>{h()}),e.addEventListener(`pointerdown`,()=>{p.size&&h()}),window.addEventListener(`message`,e=>ne(e.data));function ae(){if(!n.playbackState||!r.src||r.readyState<1)return;let e=C(n.playbackState),t=Math.max(0,e.positionMs/1e3);Number.isFinite(t)&&Math.abs((r.currentTime||0)-t)>.75&&(r.currentTime=t),n.playbackState.paused||[`paused`,`idle`,`ended`,`host_lost`,`error`].includes(n.playbackState.status||``)?r.pause():r.play().catch(()=>{})}setInterval(ae,500),r.addEventListener(`timeupdate`,()=>{n.playbackState||(n.mediaTimeMs=Math.round(r.currentTime*1e3)),u()});async function oe(){if(!ft())return;try{await pt()}catch(e){n.status=e.message,u();return}if(!T().cast?.framework?.CastReceiverContext)return;let e=cast.framework.CastReceiverContext.getInstance();e.addCustomMessageListener(st,e=>ne(e.data)),e.start()}oe(),u()}function E(e,t=document){return t.querySelector(e)}function D(e){return String(e??``).replace(/[&<>"']/g,e=>({"&":`&amp;`,"<":`&lt;`,">":`&gt;`,'"':`&quot;`,"'":`&#39;`})[e])}function gt(e=location){let t=e.hostname;return e.protocol===`http:`&&t!==`localhost`&&t!==`127.0.0.1`?`<p class="warn">Phone browser is on local HTTP. If offer creation, camera QR, or protected video fails, use the GitHub Pages HTTPS URL for the full flow.</p>`:``}function _t(e,t){e.innerHTML=`<main class="shell"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>${t}</h1>${gt()}</div><div class="mini-stage" aria-hidden="true"><span></span><span></span><span></span></div></header><section id="main"></section><section class="activity-card"><h2>Log</h2><div id="log" class="log"></div></section></main>`}function vt(e){let t=E(`#log`);t&&t.prepend(Object.assign(document.createElement(`div`),{textContent:`${new Date().toLocaleTimeString()} ${String(e)}`}))}function O(e,t=import.meta.url){if(!e)return null;let n=e.startsWith(`/public/`)?e.slice(7):e;return n.startsWith(`/`)?new URL(`..`+n,t).toString():new URL(n,t).toString()}function yt(e,t=import.meta.url){return{...e,lyricsJsonUrl:O(e.lyricsJsonUrl,t),lyricsVttUrl:O(e.lyricsVttUrl,t),castMediaUrl:O(e.castMediaUrl,t),phoneBackingAudioUrl:O(e.phoneBackingAudioUrl,t),thumbnailUrl:O(e.thumbnailUrl,t)}}async function bt(e=import.meta.url){let t=await tt(),n=[];try{let t=O(`/songs/catalog.json`,e),r=t?await fetch(t):null;r?.ok&&(n=((await r.json()).songs||[]).map(t=>yt(t,e)))}catch{n=[]}return[...t,...n]}function xt(e,t){return e?`${e.title||e.songId}${e.artist?` — `+e.artist:``}`:t}function St(e=[],t){let n=e.findLast?.(e=>t>=e.startMs)||e.filter(e=>t>=e.startMs).pop()||e[0];return`<div>${e.map(e=>`<p class="${e===n?`active`:``}">${D(e.text)}</p>`).join(``)}</div>`}function Ct(e,t,n){return e?.players?.find(e=>e.playerId===n&&e.peerId===t)}function wt(e,t){let n=new Set(e?.players?.map(e=>e.playerNumber).filter(Boolean)||[]);return[...new Set((Array.isArray(t)?t:[]).filter(e=>Number.isInteger(e)&&n.has(e)))]}function Tt(e,t,n,r){let i=r.item||{},a=Ct(e,n,i.requestedByPlayerId);if(!a?.playerNumber)throw Error(`Queue request needs a paired requester.`);if(!t.some(e=>e.songId===i.songId))throw Error(`Queue request song is not in this room catalog.`);let o=wt(e,i.singerNumbers);ne(e,{...i,requestedByPlayerId:a.playerId,singerNumbers:o.length?o:[a.playerNumber]})}function Et(e,t,n){let r=Ct(e,t,n.playerId);if(!r?.playerNumber)throw Error(`Queue update needs a paired player number.`);let i=e.queue.find(e=>e.queueItemId===n.queueItemId);if(!i)throw Error(`Queue item not found.`);if(n.action===`join`)p(e,i.queueItemId,r.playerNumber);else if(n.action===`leave`)m(e,i.queueItemId,r.playerNumber);else if(n.action===`remove`&&i.requestedByPlayerId===r.playerId&&![`active`,`ended`].includes(i.status))ee(e,i.queueItemId);else throw Error(`Queue update not allowed.`)}function Dt(e,t){return t.map(t=>e.players.find(e=>e.playerNumber===t)?.displayName||`#${t}`).join(`, `)}function Ot(e,t=`host`,n,r){return e?.queue?.length?`<ul class="queue-items">${e.queue.map(i=>{let a=D(i.queueItemId),o=D(i.status),s=e.players.find(e=>e.playerId===i.requestedByPlayerId)?.displayName||`Guest`,c=`${[`requested`,`rejected`].includes(i.status)?`<button class="acceptItem" data-queue-id="${a}" title="Accept/requeue">Approve</button>`:``} ${i.status===`queued`?`<button class="startItem" data-queue-id="${a}" title="Start on TV">Start now</button>`:``} ${i.status===`requested`?`<button class="rejectItem" data-queue-id="${a}" title="Reject">Not now</button>`:``} <button class="moveUpItem" data-queue-id="${a}" title="Move earlier">↑</button> <button class="moveDownItem" data-queue-id="${a}" title="Move later">↓</button> <button class="removeItem" data-queue-id="${a}" title="Remove">Remove</button>`,l=[`active`,`ended`].includes(i.status)?``:`<button class="queueSelf" data-action="join" data-queue-id="${a}">Add me</button> <button class="queueSelf" data-action="leave" data-queue-id="${a}">Leave</button> ${i.requestedByPlayerId===r?.playerId?`<button class="queueSelf" data-action="remove" data-queue-id="${a}">Cancel request</button>`:``}`;return`<li class="queue-item"><div class="queue-top"><strong>${D(n(i.songId))}</strong><span class="queue-status queue-status-${o}">${o}</span></div><p class="subtle">Singers: ${D(Dt(e,i.singerNumbers))} · requested by ${D(s)}</p><div class="button-row queue-actions">${t===`host`?c:l}</div></li>`}).join(``)}</ul>`:`<p class="subtle">No songs queued yet.</p>`}var k=ie(),A=JSON.parse(localStorage.getItem(`carryokie.player`)||`null`),j,M,N=[],P,kt=!1,At=null,F,I,jt=null,L=!1,R=!1,z=!1,B=null,Mt=new Set,Nt=new Map;function V(){k&&h(k),A&&localStorage.setItem(`carryokie.player`,JSON.stringify(A))}function H(e){vt(e)}async function Pt(){N=await bt(import.meta.url)}function Ft(){M?.init().catch(e=>{H(e?.message||`Phone audio unlock was ignored by the browser.`)})}function It(e){return j=new We(e),j.addEventListener(`open`,t=>{zt(t.detail.remotePeerId),H(`DataChannel open: ${t.detail.remotePeerId}`),j.send(t.detail.remotePeerId,{type:b.ROOM_HELLO,peerId:e,player:A}),A?.isHost&&j.send(t.detail.remotePeerId,{type:b.ROOM_STATE_SNAPSHOT,room:k})}),j.addEventListener(`close`,e=>Rt(e.detail.remotePeerId)),j.addEventListener(`connection`,e=>{e.detail.state===`connected`&&zt(e.detail.remotePeerId),e.detail.state===`disconnected`&&Bt(e.detail.remotePeerId),(e.detail.state===`failed`||e.detail.state===`closed`)&&Rt(e.detail.remotePeerId)}),j.addEventListener(`message`,e=>fn(e.detail.remotePeerId,e.detail.msg)),j.addEventListener(`error`,e=>H(e.detail.message)),j.addEventListener(`track`,e=>{let t=e.detail.stream||(e.detail.track?new MediaStream([e.detail.track]):null);t&&(M?.addRemoteStream(t,e.detail.remotePeerId),A?.isHost&&(j.relayRemoteStream(e.detail.remotePeerId,t),L=!0,Kt().catch(e=>H(e.message))))}),setInterval(()=>j?.pingAll(),5e3),setInterval(()=>{if(A?.isHost&&k?.playbackState&&!k.playbackState.paused&&F){let e=Date.now(),t=C(k.playbackState,e,0);k.playbackState={...k.playbackState,tvMediaTimeMs:t.positionMs,tvMediaTimeSampledAtHostMs:e,lastUpdatedAtHostMs:e},G(k.playbackState)}},2e3),j}function Lt(e){return e===`host`||!!k?.hostPeerId&&e===k.hostPeerId}function Rt(e){if(zt(e),A?.isHost){Vt(e);return}k&&Lt(e)&&(re(k),V(),H(k.hostLostMessage||`Host disconnected. TV and queue controls are locked. Create a new room to continue.`),Z(E(`#main`)))}function zt(e){clearTimeout(Nt.get(e)),Nt.delete(e)}function Bt(e){Nt.has(e)||Nt.set(e,setTimeout(()=>Rt(e),1e4))}function Vt(e){if(!A?.isHost||!k)return;let t=k.players.find(t=>t.peerId===e);!t||t.connectionState===`disconnected`||(t.connectionState=`disconnected`,t.lastSeenAt=Date.now(),j.send(e,{type:b.PLAYER_LEFT,peerId:e}),j.broadcast({type:b.PLAYER_LEFT,peerId:e,room:k}),H(`Player #${t.playerNumber} ${t.displayName} disconnected.`),V(),X(E(`#main`)))}function U(e=b.ROOM_STATE_SNAPSHOT){j?.broadcast({type:e,room:k})}function Ht(){return new URL(`../receiver/?room=${encodeURIComponent(k?.roomCode||``)}`,location.href).toString()}function Ut(){return{roomCode:k?.roomCode,queue:Xt(),singers:k?.players?.filter(e=>e.isSingerForCurrentSong)||[],song:en(),playbackState:k?.playbackState}}function W(){F?.postMessage?.({type:`RECEIVER_STATE`,payload:Ut()})}function G(e=k?.playbackState){F?.postMessage?.({type:`RECEIVER_PLAYBACK_SYNC`,payload:e})}function K(e,t={}){F?.postMessage?.({type:e,payload:t})}function q(e,t={}){P?.sendSafe?.(e,t),W()}function Wt(e){return e?{type:e.type,sdp:e.sdp}:null}function Gt(e){I?.close?.(),I=null,Mt.clear(),jt=e,L=!0,z=!1,clearTimeout(B??void 0),B=null}async function Kt(){if(!A?.isHost||!I||!j||!L)return;if(R||I.signalingState!==`stable`){z=!0;return}R=!0,z=!1,L=!1;let e=!1;try{for(let{stream:e}of j.relayedStreams||[])Mt.has(e)||(Mt.add(e),e.getTracks().forEach(t=>I.addTrack(t,e)));if(!Mt.size)return;let t=await I.createOffer({offerToReceiveAudio:!0});await I.setLocalDescription(t),await x(I),F?.postMessage({type:`RECEIVER_OFFER`,receiverId:jt,description:Wt(I.localDescription)}),e=!0,clearTimeout(B??void 0),B=setTimeout(async()=>{if(R){R=!1;try{I?.signalingState===`have-local-offer`&&await I.setLocalDescription({type:`rollback`})}catch{}(z||L)&&Kt().catch(e=>H(e.message))}},15e3)}finally{e||(R=!1)}}function qt(){F||typeof BroadcastChannel>`u`||(F=new BroadcastChannel(`carryokie.receiver`),F.onmessage=async e=>{let t=e.data||{};if(t.type===`RECEIVER_READY`){let e=t.receiverId||`receiver`;W(),jt!==e&&Gt(e),I||(I=new RTCPeerConnection(He),I.oniceconnectionstatechange=()=>H(`Receiver tab audio ${I.iceConnectionState}`)),Kt().catch(e=>H(e.message))}t.type===`RECEIVER_ANSWER`&&I&&(!t.receiverId||t.receiverId===jt)&&(await I.setRemoteDescription(t.description).catch(async e=>{H(e.message);try{I?.signalingState===`have-local-offer`&&await I.setLocalDescription({type:`rollback`})}catch{}R=!1}),clearTimeout(B??void 0),R=!1,(z||L)&&Kt().catch(e=>H(e.message)))})}function Jt(e){return xt(N.find(t=>t.songId===e),e)}function Yt(e){return e.singerNumbers.map(e=>k?.players?.find(t=>t.playerNumber===e)?.displayName||`#${e}`)}function Xt(){return k.queue.map(e=>({...e,title:Jt(e.songId),singerNames:Yt(e)}))}function Zt(e,t=`host`){return Ot(e,t,Jt,A)}function J(){U(b.QUEUE_UPDATED),q(`CAST_UPDATE_QUEUE_PREVIEW`,{queue:Xt()}),V()}function Qt(e){kt||(kt=!0,e.addEventListener(`state`,e=>{let t=e.detail,n=E(`#castStatus`);n&&(n.textContent=t.connected?`Connected to TV`:t.available?`Available, click to connect`:`Chromecast not available`)}),e.addEventListener(`error`,e=>H(e.detail.message)),e.addEventListener(`playbackSample`,e=>{k.playbackState={...k.playbackState,...e.detail,syncDegraded:!1,lastUpdatedAtHostMs:Date.now()},j?.broadcast({type:b.PLAYBACK_SYNC,sample:k.playbackState}),G(k.playbackState),V()}))}function Y(e){M?.setMicMuted(e),A?.micState&&(A.micState={...A.micState,muted:e},V());let t=E(`#micStatus`);t&&(t.textContent=e?`Mic muted.`:`Mic live.`),j?.broadcast({type:e?b.MIC_MUTED:b.MIC_UNMUTED,playerId:A?.playerId})}function $t(e,t){if(!A?.isHost||!t||!k)return!1;let n=k.players.find(e=>e.peerId===t.peerId||e.playerId===t.playerId);if(n){let i=r(t.displayName,n.displayName||`Guest`),a=n.displayName!==i||n.connectionState!==`connected`||n.peerId!==(t.peerId||e);return n.displayName=i,n.peerId=t.peerId||e,n.connectionState=`connected`,n.lastSeenAt=Date.now(),a}return o(k,{...t,peerId:t.peerId||e,displayName:r(t.displayName,`Guest`),role:`participant`,isHost:!1,connectionState:`connected`,lastSeenAt:Date.now()}),!0}function en(){return N.find(e=>e.songId===k?.currentSongId)||N[0]}function tn(){return localStorage.getItem(`carryokie.castOrigin`)||location.origin}function nn(){let e=E(`#castOrigin`);e?.value&&localStorage.setItem(`carryokie.castOrigin`,e.value.replace(/\/$/,``))}function rn(){[`castLoadBtn`,`castPlayBtn`,`castPause`,`castSeek`].forEach(e=>{let t=E(`#`+e);t&&(t.style.display=`inline`)})}async function an(){let e=en();if(!P||!e)return!1;try{return await P.loadSong(e,k),P.sendSafe(`CAST_SHOW_JOIN_QR`,{roomCode:k.roomCode}),W(),rn(),E(`#castStatus`)&&(E(`#castStatus`).textContent=`Loaded ${e.title||e.songId} on TV`),H(`TV media loaded: ${e.title||e.songId}`),!0}catch(e){return H(e.message),!1}}function on(){if(!k?.playbackState)return;let e=C(k.playbackState,Date.now(),0);k.playbackState={...k.playbackState,paused:!0,status:`paused`,pausedAtSongMs:e.positionMs,tvMediaTimeMs:e.positionMs,lastUpdatedAtHostMs:Date.now()},G(k.playbackState),U(b.PLAYBACK_PAUSED),V()}function sn(){if(!k?.playbackState)return;let e=Date.now(),t=k.playbackState.pausedAtSongMs||0;k.playbackState={...k.playbackState,paused:!1,status:`playing`,startedAtHostMs:e,tvMediaTimeMs:t,tvMediaTimeSampledAtHostMs:e,pausedAtSongMs:0,syncDegraded:!1,lastUpdatedAtHostMs:e},G(k.playbackState),U(b.PLAYBACK_STARTED),V()}function cn(e){if(!e){H(`Queue is empty. Add or accept a song first.`);return}if(e.status!==`queued`){H(`Accept the queue item before starting it.`);return}k.currentSongId=e.songId,k.currentQueueItemId=e.queueItemId,k.queue.forEach(t=>{t.status===`active`&&t.queueItemId!==e.queueItemId&&(t.status=`ended`)}),e.status=`active`,e.acceptedAt||=Date.now();let t=e.singerNumbers.map(e=>k.players.find(t=>t.playerNumber===e)?.playerId).filter(Boolean);s(k,t),k.playbackState={...k.playbackState,songId:e.songId,status:`loading`,startedAtHostMs:null,pausedAtSongMs:0,seekOffsetMs:0,tvMediaTimeMs:0,tvMediaTimeSampledAtHostMs:null,paused:!0,syncDegraded:!0,lastUpdatedAtHostMs:Date.now()},U(b.ROOM_STATE_SNAPSHOT),q(`CAST_UPDATE_QUEUE_PREVIEW`,{queue:Xt()}),q(`CAST_SET_SINGERS`,{players:k.players.filter(e=>e.isSingerForCurrentSong)}),V(),W(),P?.state?.().connected&&an(),sn()}function ln(e,t){return Ct(k,e,t)}function un(e,t){Tt(k,N,e,t)}function dn(e,t){Et(k,e,t)}function fn(e,t){if(H(`${t.type} from ${e}`),t.type===b.ROOM_HELLO&&A?.isHost){let n=$t(e,t.player);j.send(e,{type:b.ROOM_STATE_SNAPSHOT,room:k}),n&&(U(),V(),X(E(`#main`)))}if(t.type===b.ROOM_STATE_SNAPSHOT&&!A?.isHost){k=t.room;let e=k.players.find(e=>e.peerId===A.peerId||e.playerId===A.playerId);e&&(A={...A,...e}),V(),Z(E(`#main`))}if(t.type===b.QUEUE_ADD_REQUEST&&A?.isHost)try{un(e,t),J(),X(E(`#main`))}catch(t){j.send(e,{type:b.ERROR_NOTICE,message:t.message}),H(t.message)}if(t.type===b.QUEUE_UPDATE_REQUEST&&A?.isHost)try{dn(e,t),J(),X(E(`#main`))}catch(t){j.send(e,{type:b.ERROR_NOTICE,message:t.message}),H(t.message)}if(t.type===b.QUEUE_UPDATED&&!A?.isHost&&(k=t.room,V(),Z(E(`#main`))),t.type===b.PLAYBACK_SYNC&&(k.playbackState={...k.playbackState,...t.sample,syncDegraded:!1},V(),Q(),bn()),t.type===b.SINGER_JOIN_REQUEST&&A?.isHost){let n=ln(e,t.playerId);if(n){let e=[...new Set([...k.players.filter(e=>e.isSingerForCurrentSong).map(e=>e.playerId),n.playerId])].slice(0,5);s(k,e),U(b.SINGER_ASSIGNED),q(`CAST_SET_SINGERS`,{players:k.players.filter(e=>e.isSingerForCurrentSong)}),V(),X(E(`#main`))}else j.send(e,{type:b.ERROR_NOTICE,message:`Singer request needs a paired player.`})}if(t.type===b.SINGER_ASSIGNED&&!A?.isHost){k=t.room;let e=k.players.find(e=>e.peerId===A.peerId||e.playerId===A.playerId);e&&(A={...A,...e}),V(),Z(E(`#main`))}if(t.type===b.PLAYER_LEFT&&!A?.isHost&&(k=t.room,k?.playbackState?.status===`host_lost`?H(`Host disconnected. TV and queue controls are locked. Create a new room to continue.`):H(`Player ${t.peerId} left the room.`),V(),Z(E(`#main`))),t.type===b.MIC_MUTED&&t.playerId===A?.playerId&&(Y(!0),H(`Host muted your mic.`)),t.type===b.MIC_ENABLED&&A?.isHost){let e=k.players.find(e=>e.playerId===t.playerId);e&&(e.micState={...e.micState,enabled:!0,publishing:!0},V(),X(E(`#main`)),H(`#${e.playerNumber} ${e.displayName} enabled mic.`))}}async function pn(e){await Pt(),A?.isHost||(A=i(`host`,`Host`),A.playerNumber=1,k=a(A),V()),It(A.peerId),qt(),_t(e,`Host Controller`),X(E(`#main`))}function X(e){let t=k.players.length>1&&k.queue.length>0,n=k.players.some(e=>e.isSingerForCurrentSong)?`<p class="warn">TV bleed risk: singers should use headphones. Lyrics/video on TV only.</p>`:``,r=k.players.filter(e=>e.isSingerForCurrentSong).length;e.innerHTML=`<section class="host-dashboard"><div class="room-spotlight card"><div><p class="eyebrow">Host room</p><h2>Room ${D(k.roomCode)}</h2><p class="subtle">${k.players.length}/5 players · ${r} active singer(s) · ${k.queue.length} queue item(s)</p><ol class="quickstart"><li><strong>Share room:</strong> singers open the player join link.</li><li><strong>Pair one phone:</strong> player makes a code, host answers once.</li><li><strong>Start room:</strong> approve queue, connect TV, pick singer.</li></ol></div><div class="stage-art compact" aria-hidden="true"><div class="stage-orb"></div><div class="soundwave"><span></span><span></span><span></span><span></span><span></span></div></div></div><section class="grid"><details class="card" open><summary>1. Share this room</summary><p><a href="../player/?room=${D(k.roomCode)}">Open player join link</a></p><p><a href="${D(Ht())}" target="_blank" rel="noreferrer">Open TV receiver tab</a></p><p class="hint">Chrome tab cast path: open the receiver tab first, then cast that tab.</p><button id="newRoom">Start over with a new room</button>${n}</details><details class="card"${t?``:` open`}><summary>2. Pair a phone</summary><p>Player creates a join code. Paste or scan it here, then send back the host answer.</p><textarea id="offer" placeholder="Paste player offer/link/chunks"></textarea><div class="button-row"><button id="scanOfferQr">Scan player QR</button><button id="answerOffer" class="primary">Create host answer</button></div><div id="answerOut"></div></details><div class="card queue-card"><h2>3. Run the room</h2><div class="button-row"><button id="acceptAll">Approve waiting songs</button><button id="startNext" class="primary">Start next song</button><button id="pauseSong">Pause song</button><button id="resumeSong">Resume song</button></div>${Zt(k,`host`)}</div><details class="card"><summary>TV controls</summary><p id="castStatus" class="status-pill live-status">Click to connect to Chromecast</p><button id="castBtn" class="primary">Connect TV / cast current song</button><button id="castLoadBtn" style="display:none">Reload current song on TV</button><div class="button-row"><button id="castPlayBtn" style="display:none">Play</button><button id="castPause" style="display:none">Pause</button></div><label>Seek seconds <input id="castSeekSeconds" type="number" min="0" value="0"></label><button id="castSeek" style="display:none">Seek</button><label>Cast media origin <input id="castOrigin" value="${D(tn())}" placeholder="http://192.168.x.x:4174"></label><p class="hint">Default Chromecast receiver plays media only. For room UI and live mics, cast the receiver tab link above.</p><pre id="castState"></pre></details><details class="card singer-card"><summary>Singers / mic control</summary><p class="subtle">Check who should be live on this song.</p>${k.players.map(e=>`<div class="inline-choice"><label><input type="checkbox" class="singer" value="${D(e.playerId)}" ${e.isSingerForCurrentSong?`checked`:``}> #${e.playerNumber} ${D(e.displayName)}</label><button class="mutePlayer" data-player-id="${D(e.playerId)}">Mute #${e.playerNumber}</button></div>`).join(``)}<button id="setSingers" class="primary">Save singer list</button></details></section></section>`,E(`#newRoom`).onclick=()=>{A=i(`host`,`Host`),A.playerNumber=1,k=a(A),V(),location.reload()},E(`#scanOfferQr`).onclick=async()=>{try{await Ve(E(`#offer`),H)}catch(e){H(e.message)}},E(`#answerOffer`).onclick=async()=>{try{let e=await j.acceptManualOffer(E(`#offer`).value);Be(E(`#answerOut`),e,`Host answer`)}catch(e){H(e.message)}},E(`#acceptAll`).onclick=()=>{k.queue.filter(e=>e.status===`requested`).forEach(e=>l(k,e.queueItemId)),J(),X(e)},E(`#startNext`).onclick=()=>{cn(f(k)),X(e)},E(`#pauseSong`).onclick=()=>{K(`CAST_PAUSE`),P?.pause?.(),on(),X(e)},E(`#resumeSong`).onclick=()=>{K(`CAST_PLAY`),P?.play?.().catch(e=>H(e.message)),sn(),X(e)},E(`#setSingers`).onclick=()=>{s(k,[...document.querySelectorAll(`.singer:checked`)].map(e=>e.value)),U(b.SINGER_ASSIGNED),q(`CAST_SET_SINGERS`,{players:k.players.filter(e=>e.isSingerForCurrentSong)}),V(),X(e)},document.querySelectorAll(`.acceptItem`).forEach(t=>t.onclick=()=>{l(k,t.dataset.queueId),J(),X(e)}),document.querySelectorAll(`.startItem`).forEach(t=>t.onclick=()=>{cn(k.queue.find(e=>e.queueItemId===t.dataset.queueId)),X(e)}),document.querySelectorAll(`.rejectItem`).forEach(t=>t.onclick=()=>{u(k,t.dataset.queueId),J(),X(e)}),document.querySelectorAll(`.removeItem`).forEach(t=>t.onclick=()=>{ee(k,t.dataset.queueId),J(),X(e)}),document.querySelectorAll(`.moveUpItem`).forEach(t=>t.onclick=()=>{d(k,t.dataset.queueId,-1),J(),X(e)}),document.querySelectorAll(`.moveDownItem`).forEach(t=>t.onclick=()=>{d(k,t.dataset.queueId,1),J(),X(e)}),document.querySelectorAll(`.mutePlayer`).forEach(e=>e.onclick=()=>{let t=e.dataset.playerId,n=k.players.find(e=>e.playerId===t);n&&j.send(n.peerId,{type:b.MIC_MUTED,playerId:t}),H(`Mute sent to #${n?.playerNumber||`?`}`)}),E(`#castStatus`).textContent=`Click to connect to Chromecast`;let o=P||=new mt(`CC1AD845`);E(`#castStatus`).textContent=`Click to connect to Chromecast`,Qt(o),E(`#castBtn`).onclick=async()=>{try{nn(),E(`#castBtn`).disabled=!0,E(`#castStatus`).textContent=`Connecting to Chromecast…`,await o.init(),await o.requestSession(),E(`#castBtn`).style.display=`none`,rn(),E(`#castStatus`).textContent=`Connected to TV`,W(),H(`Cast connected`),await an()}catch(e){E(`#castBtn`).disabled=!1,H(e.message)}},E(`#castLoadBtn`).onclick=()=>{nn(),an()},E(`#castPlayBtn`).onclick=()=>{K(`CAST_PLAY`),o.play().catch(e=>H(e.message))},E(`#castPause`).onclick=()=>{K(`CAST_PAUSE`),o.pause()},E(`#castSeek`).onclick=()=>{let e=+E(`#castSeekSeconds`).value||0;if(K(`CAST_SEEK`,{seconds:e}),o.seek(e),k?.playbackState){let t=Date.now();k.playbackState={...k.playbackState,tvMediaTimeMs:e*1e3,tvMediaTimeSampledAtHostMs:t,seekOffsetMs:0,lastUpdatedAtHostMs:t},G(k.playbackState),V()}}}async function mn(e){await Pt(),(!A?.playerId||A.isHost)&&(A=i(`participant`,`Player`),V()),A.displayName=r(A.displayName,`Player`),V(),It(A.peerId),M=new Ge(H),_t(e,`Player Phone`),Z(E(`#main`))}function hn(){return!!(k?.hostPeerId&&A?.playerNumber&&k.players?.some(e=>e.playerId===A.playerId||e.peerId===A.peerId))}function gn(e){let t=k?.hostPeerId?`<div class="card"><h2>Reconnect</h2><p>Previously in room <strong>${D(k.roomCode)}</strong>. Make a fresh join code, then ask the host for a new answer.</p><button id="forgetRoom">Forget room, start fresh</button></div>`:``;return`<section class="phone-screen"><div class="phone-hero card"><p class="eyebrow">Player pairing</p><h2>Join room ${D(e||``)}</h2><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p class="subtle">Two steps: make a join code, then import the host answer. After joining, queue and mic controls appear.</p></div><details class="card" open><summary>Join room</summary><label>Your name<input id="displayName" value="${D(A?.displayName||`Player`)}" placeholder="Your name"></label><p class="subtle">Room code from link: <strong>${D(e||`not set`)}</strong></p><button id="makeOffer" class="primary">1. Create phone pairing code</button><div id="offerOut"></div><label>Host answer<textarea id="answer" placeholder="Paste host answer/link/chunks"></textarea></label><div class="button-row"><button id="scanAnswerQr">Scan host answer QR</button><button id="importAnswer" class="primary">2. Finish pairing</button></div></details>${t}</section>`}function _n(){if(!A)return;let e=E(`#displayName`),t=r(e?.value,`Player`);e&&(e.value=t);let n=A.displayName!==t;A={...A,displayName:t},V(),n&&hn()&&k?.hostPeerId&&j?.send(k.hostPeerId,{type:b.ROOM_HELLO,peerId:A.peerId,player:A})}function vn(){document.querySelectorAll(`button`).forEach(e=>e.addEventListener(`click`,Ft)),E(`#makeOffer`).onclick=async()=>{let e=E(`#makeOffer`);try{e&&(e.disabled=!0,e.textContent=`Creating code...`);let t=E(`#offerOut`);t&&(t.textContent=`Creating phone pairing code...`),H(`Creating phone pairing code...`),_n(),Ue();let n=await j.createManualOffer(`host`);Be(E(`#offerOut`),n,`Player offer`),H(`Phone pairing code ready.`)}catch(e){let t=E(`#offerOut`);t&&(t.textContent=e.message),H(e.message)}finally{e&&(e.disabled=!1,e.textContent=`Create phone pairing code`)}},E(`#scanAnswerQr`).onclick=async()=>{try{await Ve(E(`#answer`),H)}catch(e){H(e.message)}},E(`#importAnswer`).onclick=async()=>{try{_n(),await j.acceptManualAnswer(E(`#answer`).value),H(`Answer imported. Waiting for DataChannel open.`)}catch(e){H(e.message)}},E(`#forgetRoom`)?.addEventListener(`click`,()=>{localStorage.removeItem(`carryokie.room`),localStorage.removeItem(`carryokie.player`),location.reload()}),E(`#displayName`)?.addEventListener(`change`,_n)}function Z(e){let t=N.find(e=>e.songId===(k?.currentSongId||`song_002`))||N[0],n=new URLSearchParams(location.search).get(`room`)||k?.roomCode||``,r=t?`${D(t.title||t.songId)}${t.artist?` — `+D(t.artist):``}`:`Pick a song`;if(!hn()){e.innerHTML=gn(n),vn();return}e.innerHTML=`<section class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie phone</p><h2>${r}</h2><p class="subtle">${D(A.displayName||`Player`)} · Room ${D(n||`joined`)} · Player #${D(A.playerNumber||`?`)}</p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p id="micStatus" class="status-pill live-status">Mic muted until enabled.</p><div class="primary-actions"><button id="enableMic" class="primary">Enable my mic</button><button id="holdSing" class="hold-button">Hold to sing</button><button id="toggleSing">Live / mute</button><button id="muteMic" class="danger">Mute mic</button></div></div>
-<details class="card" open><summary>1. Queue this phone</summary><label>Your name<input id="displayName" value="${D(A.displayName||`Player`)}" placeholder="Your name"></label><label>Song<select id="song">${N.map(e=>`<option value="${e.songId}">${D(e.title)} — ${D(e.artist)}</option>`).join(``)}</select></label><label>Singers<input id="singers" value="${A.playerNumber||2}" placeholder="Singer numbers comma separated"></label><p class="subtle">Default singer is you. Add more numbers only for duets/groups.</p><div class="button-row"><button id="requestSong" class="primary">Queue selected song</button><button id="requestSinger">Singer only</button></div><div class="queue-list">${Zt(k,`phone`)}</div></details>
-<details class="card" open><summary>2. Sing</summary><p class="warn compact">${D(Ke)}</p><label class="check"><input type="checkbox" id="pushToSing"> Push-to-sing</label><label>Mic filter<select id="voicePreset"><option value="clean">Clean</option><option value="alto">Alto warm</option><option value="bravo">Bravo bright</option><option value="bass">Bass low</option><option value="radio">Radio</option><option value="autotune">Autotune-style polish</option></select></label><p id="wake" class="subtle"></p></details>
+//#region \0vite/modulepreload-polyfill.js
+(function polyfill() {
+  const relList = document.createElement("link").relList;
+  if (relList && relList.supports && relList.supports("modulepreload")) return;
+  for (const link of document.querySelectorAll('link[rel="modulepreload"]'))
+    processPreload(link);
+  new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type !== "childList") continue;
+      for (const node of mutation.addedNodes)
+        if (node.tagName === "LINK" && node.rel === "modulepreload")
+          processPreload(node);
+    }
+  }).observe(document, {
+    childList: true,
+    subtree: true,
+  });
+  function getFetchOpts(link) {
+    const fetchOpts = {};
+    if (link.integrity) fetchOpts.integrity = link.integrity;
+    if (link.referrerPolicy) fetchOpts.referrerPolicy = link.referrerPolicy;
+    if (link.crossOrigin === "use-credentials")
+      fetchOpts.credentials = "include";
+    else if (link.crossOrigin === "anonymous") fetchOpts.credentials = "omit";
+    else fetchOpts.credentials = "same-origin";
+    return fetchOpts;
+  }
+  function processPreload(link) {
+    if (link.ep) return;
+    link.ep = true;
+    const fetchOpts = getFetchOpts(link);
+    fetch(link.href, fetchOpts);
+  }
+})();
+function uuid() {
+  return globalThis.crypto?.randomUUID
+    ? globalThis.crypto.randomUUID()
+    : URL.createObjectURL(new Blob()).split("/").pop();
+}
+function nowMs() {
+  return Date.now();
+}
+function makeRoomCode() {
+  const words = [
+    "BLUE",
+    "CAT",
+    "STAR",
+    "MOON",
+    "BIRD",
+    "MINT",
+    "GOLD",
+    "ECHO",
+    "KITE",
+    "WAVE",
+  ];
+  return (
+    words[Math.floor(Math.random() * words.length)] +
+    words[Math.floor(Math.random() * words.length)]
+  );
+}
+function normalizeDisplayName(displayName, fallback = "Guest") {
+  if (typeof displayName !== "string") return fallback;
+  return displayName.trim().replace(/\s+/g, " ").slice(0, 32) || fallback;
+}
+function makePlayer(role = "participant", displayName = "Guest") {
+  return {
+    peerId: uuid(),
+    playerId: uuid(),
+    playerNumber: null,
+    displayName: normalizeDisplayName(displayName, "Guest"),
+    role,
+    isHost: role === "host",
+    isSingerForCurrentSong: false,
+    micState: {
+      permissionState: "prompt",
+      enabled: false,
+      muted: true,
+      publishing: false,
+      receivingPeerIds: [],
+      remoteGain: 1,
+      localMonitorGain: 0,
+      backingGain: 0,
+      masterGain: 1,
+    },
+    monitorState: {
+      headphonesConfirmed: false,
+      phoneSpeakerOutputAck: false,
+      keepAwake: "unknown",
+    },
+    connectionState: "new",
+    lastSeenAt: nowMs(),
+  };
+}
+function makeRoom(hostPlayer) {
+  return {
+    roomId: uuid(),
+    roomCode: makeRoomCode(),
+    hostPeerId: hostPlayer.peerId,
+    hostPlayerId: hostPlayer.playerId,
+    createdAt: nowMs(),
+    playerCount: 1,
+    maxPlayers: 5,
+    currentSongId: "song_002",
+    currentQueueItemId: null,
+    playbackState: {
+      songId: "song_002",
+      status: "idle",
+      startedAtHostMs: null,
+      pausedAtSongMs: 0,
+      seekOffsetMs: 0,
+      playbackRate: 1,
+      lastUpdatedAtHostMs: nowMs(),
+      tvMediaTimeMs: 0,
+      tvMediaTimeSampledAtHostMs: null,
+      syncDegraded: true,
+    },
+    players: [hostPlayer],
+    queue: [],
+    castState: {
+      available: false,
+      connected: false,
+      receiverReady: false,
+      currentMediaLoaded: false,
+      lastCommandAt: null,
+      lastReceiverAckAt: null,
+      error: null,
+    },
+    meshState: {
+      edges: {},
+      failures: [],
+    },
+    limits: {
+      maxPlayers: 5,
+      maxSingers: 5,
+    },
+  };
+}
+function addPlayer(room, player) {
+  if (room.players.length >= 5)
+    throw new Error("Room full: MVP cap is 5 players.");
+  const taken = new Set(
+    room.players.map((p) => p.playerNumber).filter(Boolean),
+  );
+  player.playerNumber = [1, 2, 3, 4, 5].find((n) => !taken.has(n)) ?? null;
+  room.players.push(player);
+  room.playerCount = room.players.length;
+  return room;
+}
+function assignSingers(room, playerIds) {
+  if (playerIds.length > 5) throw new Error(`Maximum 5 active singers.`);
+  const chosen = new Set(playerIds);
+  room.players.forEach((p) => {
+    p.isSingerForCurrentSong = chosen.has(p.playerId);
+    p.role = p.isHost
+      ? "host"
+      : p.isSingerForCurrentSong
+        ? "singer"
+        : "listener";
+  });
+  return room;
+}
+function queueRequest(
+  songId,
+  singerNumbers,
+  requestedByPlayerId,
+  currentQueueLength = 0,
+) {
+  if (singerNumbers.length > 5) throw new Error(`Queue item max 5 singers.`);
+  const singers = [
+    ...new Set(
+      singerNumbers.filter((n) => Number.isInteger(n) && n >= 1 && n <= 5),
+    ),
+  ];
+  if (!songId) throw new Error("Queue item needs a song.");
+  if (!requestedByPlayerId)
+    throw new Error("Queue item needs a requesting player.");
+  if (singers.length === 0)
+    throw new Error("Queue item needs at least one singer number.");
+  if (currentQueueLength >= 20)
+    throw new Error(`Queue full: MVP cap is 20 items.`);
+  return {
+    queueItemId: uuid(),
+    songId,
+    singerNumbers: singers,
+    requestedByPlayerId,
+    status: "requested",
+    createdAt: nowMs(),
+    acceptedAt: null,
+  };
+}
+function acceptQueue(room, queueItemId) {
+  const item = room.queue.find((q) => q.queueItemId === queueItemId);
+  if (!item || item.status === "active" || item.status === "ended") return room;
+  item.status = "queued";
+  item.acceptedAt = nowMs();
+  return room;
+}
+function rejectQueue(room, queueItemId) {
+  const item = room.queue.find((q) => q.queueItemId === queueItemId);
+  if (!item || item.status === "active" || item.status === "ended") return room;
+  item.status = "rejected";
+  return room;
+}
+function removeQueueItem(room, queueItemId) {
+  room.queue = room.queue.filter((q) => q.queueItemId !== queueItemId);
+  if (room.currentQueueItemId === queueItemId) room.currentQueueItemId = null;
+  return room;
+}
+function moveQueueItem(room, queueItemId, direction) {
+  const index = room.queue.findIndex((q) => q.queueItemId === queueItemId);
+  if (index < 0) return room;
+  const nextIndex = index + direction;
+  if (nextIndex < 0 || nextIndex >= room.queue.length) return room;
+  const [item] = room.queue.splice(index, 1);
+  room.queue.splice(nextIndex, 0, item);
+  return room;
+}
+function safeClientQueueId(id) {
+  return typeof id === "string" && /^[a-zA-Z0-9_-]{8,80}$/.test(id);
+}
+function enqueueRequest(room, item) {
+  if (room.queue.some((q) => q.queueItemId === item.queueItemId)) return room;
+  const openLength = room.queue.filter(
+    (q) => !["ended", "rejected"].includes(q.status),
+  ).length;
+  const normalized = queueRequest(
+    item.songId,
+    item.singerNumbers,
+    item.requestedByPlayerId,
+    openLength,
+  );
+  normalized.queueItemId = safeClientQueueId(item.queueItemId)
+    ? item.queueItemId
+    : normalized.queueItemId;
+  normalized.createdAt = item.createdAt || normalized.createdAt;
+  room.queue.push(normalized);
+  return room;
+}
+function nextQueuedItem(room) {
+  return room.queue.find((q) => q.status === "queued");
+}
+function addSingerToQueueItem(room, queueItemId, singerNumber) {
+  const item = room.queue.find((q) => q.queueItemId === queueItemId);
+  if (!item || item.status === "active" || item.status === "ended") return room;
+  if (!Number.isInteger(singerNumber) || singerNumber < 1 || singerNumber > 5)
+    return room;
+  if (!item.singerNumbers.includes(singerNumber)) {
+    if (item.singerNumbers.length >= 5)
+      throw new Error(`Queue item max 5 singers.`);
+    item.singerNumbers.push(singerNumber);
+  }
+  if (item.status === "rejected") item.status = "requested";
+  return room;
+}
+function removeSingerFromQueueItem(room, queueItemId, singerNumber) {
+  const item = room.queue.find((q) => q.queueItemId === queueItemId);
+  if (!item || item.status === "active" || item.status === "ended") return room;
+  const next = item.singerNumbers.filter((n) => n !== singerNumber);
+  if (next.length === 0)
+    throw new Error("Queue item needs at least one singer number.");
+  item.singerNumbers = next;
+  return room;
+}
+function lockHostLost(room) {
+  room.playbackState.status = "host_lost";
+  room.hostLostMessage =
+    "Host disconnected. Audio between already-connected phones may continue, but TV and queue controls are locked. Create a new room to continue.";
+  return room;
+}
+function saveRoom(room) {
+  localStorage.setItem("carryokie.room", JSON.stringify(room));
+}
+function loadRoom() {
+  try {
+    return JSON.parse(localStorage.getItem("carryokie.room") || "null");
+  } catch {
+    return null;
+  }
+}
+//#endregion
+//#region src/qr.ts
+var VERSION = 10;
+var SIZE = 17 + VERSION * 4;
+var DATA_CODEWORDS = 274;
+var EC_CODEWORDS_PER_BLOCK = 18;
+var BLOCK_SIZES = [68, 68, 69, 69];
+var ALIGN = [6, 28, 50];
+function pushBits(bits, value, length) {
+  for (let i = length - 1; i >= 0; i--) bits.push((value >>> i) & 1);
+}
+function bitsToBytes(bits) {
+  const out = [];
+  for (let i = 0; i < bits.length; i += 8)
+    out.push(bits.slice(i, i + 8).reduce((a, b) => (a << 1) | b, 0));
+  return out;
+}
+function gfMul(x, y) {
+  let z = 0;
+  for (let i = 7; i >= 0; i--) {
+    z = ((z << 1) ^ ((z >>> 7) * 285)) & 255;
+    if ((y >>> i) & 1) z ^= x;
+  }
+  return z;
+}
+function rsGenerator(degree) {
+  let poly = [1];
+  let root = 1;
+  for (let i = 0; i < degree; i++) {
+    const next = Array(poly.length + 1).fill(0);
+    for (let j = 0; j < poly.length; j++) {
+      next[j] ^= gfMul(poly[j], root);
+      next[j + 1] ^= poly[j];
+    }
+    poly = next;
+    root = gfMul(root, 2);
+  }
+  return poly;
+}
+function rsRemainder(data, degree) {
+  const gen = rsGenerator(degree);
+  const rem = Array(degree).fill(0);
+  for (const b of data) {
+    const factor = b ^ rem.shift();
+    rem.push(0);
+    for (let i = 0; i < degree; i++) rem[i] ^= gfMul(gen[i], factor);
+  }
+  return rem;
+}
+function encodeData(text) {
+  const bytes = [...new TextEncoder().encode(text)];
+  if (bytes.length > 260)
+    throw new Error(
+      `QR chunk too large (${bytes.length} bytes). Use smaller chunks.`,
+    );
+  const bits = [];
+  pushBits(bits, 4, 4);
+  pushBits(bits, bytes.length, 16);
+  bytes.forEach((b) => pushBits(bits, b, 8));
+  pushBits(bits, 0, Math.min(4, DATA_CODEWORDS * 8 - bits.length));
+  while (bits.length % 8) bits.push(0);
+  const data = bitsToBytes(bits);
+  for (let pad = 236; data.length < DATA_CODEWORDS; pad ^= 253) data.push(pad);
+  return data;
+}
+function makeCodewords(text) {
+  const data = encodeData(text);
+  const blocks = [];
+  let off = 0;
+  for (const size of BLOCK_SIZES) {
+    const dat = data.slice(off, off + size);
+    off += size;
+    blocks.push({
+      data: dat,
+      ec: rsRemainder(dat, EC_CODEWORDS_PER_BLOCK),
+    });
+  }
+  const out = [];
+  for (let i = 0; i < Math.max(...BLOCK_SIZES); i++)
+    for (const b of blocks) if (i < b.data.length) out.push(b.data[i]);
+  for (let i = 0; i < EC_CODEWORDS_PER_BLOCK; i++)
+    for (const b of blocks) out.push(b.ec[i]);
+  return out;
+}
+function blankMatrix() {
+  return Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
+}
+function set(m, r, c, v) {
+  if (r >= 0 && r < SIZE && c >= 0 && c < SIZE) m[r][c] = !!v;
+}
+function reserve(m, r, c, v = false) {
+  set(m, r, c, v);
+}
+function addFinder(m, row, col) {
+  for (let r = -1; r <= 7; r++)
+    for (let c = -1; c <= 7; c++) {
+      const rr = row + r,
+        cc = col + c;
+      if (rr < 0 || rr >= SIZE || cc < 0 || cc >= SIZE) continue;
+      set(
+        m,
+        rr,
+        cc,
+        r >= 0 &&
+          r <= 6 &&
+          c >= 0 &&
+          c <= 6 &&
+          (r === 0 ||
+            r === 6 ||
+            c === 0 ||
+            c === 6 ||
+            (r >= 2 && r <= 4 && c >= 2 && c <= 4)),
+      );
+    }
+}
+function addAlignment(m, row, col) {
+  if (m[row][col] !== null) return;
+  for (let r = -2; r <= 2; r++)
+    for (let c = -2; c <= 2; c++)
+      set(m, row + r, col + c, Math.max(Math.abs(r), Math.abs(c)) !== 1);
+}
+function bch(value, poly, shift) {
+  let v = value << shift;
+  1 << Math.floor(Math.log2(poly));
+  for (let i = Math.floor(Math.log2(v)); i >= shift; i--)
+    if ((v >>> i) & 1) v ^= poly << (i - Math.floor(Math.log2(poly)));
+  return (value << shift) | v;
+}
+function addFunctionPatterns(m) {
+  addFinder(m, 0, 0);
+  addFinder(m, 0, SIZE - 7);
+  addFinder(m, SIZE - 7, 0);
+  for (let i = 8; i < SIZE - 8; i++) {
+    set(m, 6, i, i % 2 === 0);
+    set(m, i, 6, i % 2 === 0);
+  }
+  for (const r of ALIGN) for (const c of ALIGN) addAlignment(m, r, c);
+  set(m, 4 * VERSION + 9, 8, true);
+  for (let i = 0; i < 9; i++) {
+    reserve(m, 8, i);
+    reserve(m, i, 8);
+  }
+  for (let i = 0; i < 8; i++) {
+    reserve(m, 8, SIZE - 1 - i);
+    reserve(m, SIZE - 1 - i, 8);
+  }
+  const versionBits = bch(VERSION, 7973, 12);
+  for (let i = 0; i < 18; i++) {
+    const bit = ((versionBits >>> i) & 1) === 1;
+    set(m, Math.floor(i / 3), SIZE - 11 + (i % 3), bit);
+    set(m, SIZE - 11 + (i % 3), Math.floor(i / 3), bit);
+  }
+}
+function placeData(m, codewords) {
+  const bits = [];
+  codewords.forEach((b) => pushBits(bits, b, 8));
+  let idx = 0,
+    upward = true;
+  for (let col = SIZE - 1; col >= 1; col -= 2) {
+    if (col === 6) col--;
+    for (let i = 0; i < SIZE; i++) {
+      const row = upward ? SIZE - 1 - i : i;
+      for (let c = col; c >= col - 1; c--)
+        if (m[row][c] === null) {
+          const masked =
+            ((bits[idx++] || 0) ^ ((row + c) % 2 === 0 ? 1 : 0)) === 1;
+          set(m, row, c, masked);
+        }
+    }
+    upward = !upward;
+  }
+}
+function addFormat(m) {
+  const format = bch(8, 1335, 10) ^ 21522;
+  const bit = (i) => ((format >>> i) & 1) === 1;
+  [
+    [8, 0],
+    [8, 1],
+    [8, 2],
+    [8, 3],
+    [8, 4],
+    [8, 5],
+    [8, 7],
+    [8, 8],
+    [7, 8],
+    [5, 8],
+    [4, 8],
+    [3, 8],
+    [2, 8],
+    [1, 8],
+    [0, 8],
+  ].forEach(([r, c], i) => set(m, r, c, bit(i)));
+  [
+    [SIZE - 1, 8],
+    [SIZE - 2, 8],
+    [SIZE - 3, 8],
+    [SIZE - 4, 8],
+    [SIZE - 5, 8],
+    [SIZE - 6, 8],
+    [SIZE - 7, 8],
+    [8, SIZE - 8],
+    [8, SIZE - 7],
+    [8, SIZE - 6],
+    [8, SIZE - 5],
+    [8, SIZE - 4],
+    [8, SIZE - 3],
+    [8, SIZE - 2],
+    [8, SIZE - 1],
+  ].forEach(([r, c], i) => set(m, r, c, bit(i)));
+}
+function qrMatrix(text) {
+  const m = blankMatrix();
+  addFunctionPatterns(m);
+  placeData(m, makeCodewords(text));
+  addFormat(m);
+  return m.map((row) => row.map((v) => !!v));
+}
+function qrSvg(text, { scale = 4, quiet = 4, title = "CarryOkie QR" } = {}) {
+  const m = qrMatrix(text);
+  const n = m.length + quiet * 2;
+  const rects = [];
+  m.forEach((row, r) =>
+    row.forEach((v, c) => {
+      if (v)
+        rects.push(
+          `<rect x="${c + quiet}" y="${r + quiet}" width="1" height="1"/>`,
+        );
+    }),
+  );
+  return `<svg class="qr" data-qr="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" width="${n * scale}" height="${n * scale}" role="img" aria-label="${title}"><rect width="100%" height="100%" fill="#fff"/><g fill="#000">${rects.join("")}</g></svg>`;
+}
+//#endregion
+//#region src/signaling.ts
+var enc = new TextEncoder();
+var dec = new TextDecoder();
+function b64url(bytes) {
+  let s = "";
+  bytes.forEach((b) => (s += String.fromCharCode(b)));
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function unb64url(s) {
+  s = s.replace(/-/g, "+").replace(/_/g, "/");
+  while (s.length % 4) s += "=";
+  const bin = atob(s);
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+}
+async function compress(bytes) {
+  if (!("CompressionStream" in globalThis))
+    return {
+      alg: "plain",
+      bytes,
+    };
+  const stream = new Blob([bytes])
+    .stream()
+    .pipeThrough(new CompressionStream("deflate"));
+  return {
+    alg: "deflate",
+    bytes: new Uint8Array(await new Response(stream).arrayBuffer()),
+  };
+}
+async function decompress(alg, bytes) {
+  if (alg === "plain") return bytes;
+  if (!("DecompressionStream" in globalThis))
+    throw new Error(
+      "Deflate payload unsupported in this runtime. Use a modern browser.",
+    );
+  const stream = new Blob([bytes])
+    .stream()
+    .pipeThrough(new DecompressionStream("deflate"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+function stripSdpForManual(sdp) {
+  const rawLines = sdp
+    .replace(/\r?\n/g, "\r\n")
+    .trim()
+    .split("\r\n")
+    .filter(Boolean);
+  const sessionLines = [];
+  const sections = [];
+  let current = null;
+  for (const line of rawLines)
+    if (line.startsWith("m=")) {
+      current = [line];
+      sections.push(current);
+    } else if (current) current.push(line);
+    else sessionLines.push(line);
+  const keptSections = sections
+    .map(minifyMediaSection)
+    .filter((section) => section.length > 0);
+  const keptMids = keptSections
+    .map((section) =>
+      section.find((line) => line.startsWith("a=mid:"))?.slice(6),
+    )
+    .filter(Boolean);
+  return (
+    [
+      ...sessionLines
+        .map((line) =>
+          line.startsWith("a=group:BUNDLE") && keptMids.length
+            ? `a=group:BUNDLE ${keptMids.join(" ")}`
+            : line,
+        )
+        .filter((line) => isSessionLineKept(line)),
+      ...keptSections.flat(),
+    ].join("\r\n") + "\r\n"
+  );
+}
+function isSessionLineKept(line) {
+  return /^(v=|o=|s=|t=|a=group:BUNDLE|a=msid-semantic:|a=ice-ufrag:|a=ice-pwd:|a=ice-options:|a=fingerprint:|a=setup:)/.test(
+    line,
+  );
+}
+function minifyCandidate(line) {
+  const parts = line.split(/\s+/);
+  return parts
+    .filter(
+      (part, index) =>
+        !["generation", "network-id", "network-cost"].includes(part) &&
+        !["generation", "network-id", "network-cost"].includes(
+          parts[index - 1],
+        ),
+    )
+    .join(" ");
+}
+function minifyMediaSection(section) {
+  const m = section[0];
+  const kind = m.split(/\s+/)[0].slice(2);
+  if (!["audio", "application"].includes(kind)) return [];
+  const mid = section.find((line) => line.startsWith("a=mid:"));
+  if (kind === "application")
+    return section
+      .filter(
+        (line) =>
+          line.startsWith("m=") ||
+          line === mid ||
+          /^(c=|a=ice-ufrag:|a=ice-pwd:|a=fingerprint:|a=setup:|a=sctp-port:|a=max-message-size:|a=candidate:|a=end-of-candidates)/.test(
+            line,
+          ),
+      )
+      .map((line) =>
+        line.startsWith("a=candidate:") ? minifyCandidate(line) : line,
+      );
+  const opusPayload = section
+    .map((line) => line.match(/^a=rtpmap:(\d+) opus\/48000\/2/i)?.[1])
+    .find(Boolean);
+  const header = opusPayload
+    ? m.split(/\s+/).slice(0, 3).concat(opusPayload).join(" ")
+    : m;
+  return section
+    .map((line) => (line === m ? header : line))
+    .filter((line) => {
+      if (
+        line.startsWith("a=rtpmap:") ||
+        line.startsWith("a=fmtp:") ||
+        line.startsWith("a=rtcp-fb:")
+      )
+        return (
+          !opusPayload ||
+          line.startsWith(`a=rtpmap:${opusPayload} `) ||
+          line.startsWith(`a=fmtp:${opusPayload} `)
+        );
+      return (
+        line.startsWith("m=") ||
+        line === mid ||
+        /^(c=|a=ice-ufrag:|a=ice-pwd:|a=fingerprint:|a=setup:|a=rtcp-mux|a=sendrecv|a=recvonly|a=sendonly|a=inactive|a=msid:|a=ssrc:|a=candidate:|a=end-of-candidates)/.test(
+          line,
+        )
+      );
+    })
+    .map((line) =>
+      line.startsWith("a=candidate:") ? minifyCandidate(line) : line,
+    );
+}
+async function encodeSignalPayload(payload) {
+  const body = {
+    v: 1,
+    app: "carryokie",
+    createdAt: Date.now(),
+    ...payload,
+  };
+  if (
+    typeof body.description === "object" &&
+    body.description !== null &&
+    "sdp" in body.description
+  ) {
+    const description = body.description;
+    body.description = {
+      type: description.type,
+      sdp: stripSdpForManual(description.sdp || ""),
+    };
+  }
+  const packed = await compress(enc.encode(JSON.stringify(body)));
+  const token = `ck1.${packed.alg}.${b64url(packed.bytes)}`;
+  const loc = globalThis.location || {
+    origin: "http://localhost",
+    pathname: "/player/",
+  };
+  return {
+    token,
+    url: `${loc.origin}${loc.pathname}#signal=${token}`,
+    chunks: chunkToken(token),
+  };
+}
+async function decodeSignalPayload(input) {
+  const parts = extractToken(input).split(".");
+  if (parts.length !== 3 || parts[0] !== "ck1")
+    throw new Error("Signal import failed: unsupported CarryOkie payload.");
+  const bytes = await decompress(parts[1], unb64url(parts[2]));
+  const payload = JSON.parse(dec.decode(bytes));
+  if (payload.app !== "carryokie")
+    throw new Error("Signal import failed: not a CarryOkie payload.");
+  return payload;
+}
+function extractToken(input) {
+  input = (input || "").trim();
+  if (input.startsWith("chunk:"))
+    throw new Error(
+      "Paste all chunks into the multi-chunk field before import.",
+    );
+  try {
+    const u = new URL(input);
+    const hash = new URLSearchParams(u.hash.slice(1));
+    if (hash.get("signal")) return hash.get("signal");
+  } catch {}
+  const m = input.match(/ck1\.[a-z]+\.[A-Za-z0-9_-]+/);
+  if (!m) throw new Error("Signal import failed: no payload found.");
+  return m[0];
+}
+function chunkToken(token, size = 240) {
+  let n = Math.ceil(token.length / size);
+  const maxPrefix = `chunk:${n}/${n}:`.length;
+  if (size + maxPrefix > 260) size = Math.max(1, 260 - maxPrefix);
+  n = Math.ceil(token.length / size);
+  return Array.from(
+    { length: n },
+    (_, i) => `chunk:${i + 1}/${n}:${token.slice(i * size, (i + 1) * size)}`,
+  );
+}
+function joinChunks(text) {
+  const parts = text
+    .split(/\n+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((l) => {
+      const m = l.match(/^chunk:(\d+)\/(\d+):(.+)$/);
+      if (!m) return null;
+      return {
+        i: +m[1],
+        n: +m[2],
+        data: m[3],
+      };
+    });
+  if (parts.some((p) => !p)) return text;
+  const n = parts[0].n;
+  if (parts.length !== n)
+    throw new Error(`Need ${n} chunks, got ${parts.length}.`);
+  return parts
+    .sort((a, b) => a.i - b.i)
+    .map((p) => p.data)
+    .join("");
+}
+function renderPayloadCard(target, encoded, label = "Signal payload") {
+  const urlField = () => target.querySelector("textarea");
+  const flashButton = (selector, text) => {
+    const button = target.querySelector(selector);
+    if (!button) return;
+    const originalText = button.textContent;
+    button.textContent = text;
+    setTimeout(() => (button.textContent = originalText), 1500);
+  };
+  const selectLinkFallback = () => {
+    const field = urlField();
+    if (!field) return false;
+    field.focus();
+    field.select();
+    field.setSelectionRange?.(0, field.value.length);
+    return true;
+  };
+  const tryLegacyCopy = () => {
+    if (!selectLinkFallback()) return false;
+    try {
+      return !!document.execCommand?.("copy");
+    } catch {
+      return false;
+    }
+  };
+  let index = 0;
+  const renderQr = () => {
+    const qr = target.querySelector("[data-single-qr]");
+    const count = target.querySelector("[data-qr-count]");
+    if (qr) qr.innerHTML = qrSvg(encoded.chunks[index]);
+    if (count) count.textContent = `QR ${index + 1}/${encoded.chunks.length}`;
+  };
+  target.innerHTML = `<div class="payload"><h3>${label}</h3><p>One QR code is shown at a time. Scan it, then use Next only if this payload needs another local chunk. Link/share/copy remains available.</p><figure><figcaption data-qr-count></figcaption><div data-single-qr></div></figure><div class="actions"><button data-prev>Prev QR</button><button data-next>Next QR</button><button data-copy>Copy link</button><button data-share>Share</button></div><textarea readonly>${encoded.url}</textarea><details><summary>Text fallback (${encoded.chunks.length} local chunk${encoded.chunks.length === 1 ? "" : "s"})</summary><textarea readonly>${encoded.chunks.join("\n")}</textarea></details></div>`;
+  renderQr();
+  const syncButtons = () => {
+    target.querySelector("[data-prev]").disabled = index === 0;
+    target.querySelector("[data-next]").disabled =
+      index === encoded.chunks.length - 1;
+  };
+  syncButtons();
+  target.querySelector("[data-prev]").onclick = () => {
+    index = Math.max(0, index - 1);
+    renderQr();
+    syncButtons();
+  };
+  target.querySelector("[data-next]").onclick = () => {
+    index = Math.min(encoded.chunks.length - 1, index + 1);
+    renderQr();
+    syncButtons();
+  };
+  target.querySelector("[data-copy]").onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(encoded.url);
+      flashButton("[data-copy]", "Copied!");
+    } catch (err) {
+      console.error("Copy failed:", err);
+      if (tryLegacyCopy()) {
+        flashButton("[data-copy]", "Copied!");
+        return;
+      }
+      selectLinkFallback();
+      flashButton("[data-copy]", "Press ⌘/Ctrl+C");
+    }
+  };
+  target.querySelector("[data-share]").onclick = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: "CarryOkie signal",
+          text: encoded.url,
+        });
+        flashButton("[data-share]", "Shared!");
+      } else {
+        await navigator.clipboard.writeText(encoded.url);
+        flashButton("[data-share]", "Copied!");
+      }
+    } catch (err) {
+      console.error("Share failed:", err);
+      if (tryLegacyCopy()) {
+        flashButton("[data-share]", "Copied!");
+        return;
+      }
+      selectLinkFallback();
+      flashButton("[data-share]", "Press ⌘/Ctrl+C");
+    }
+  };
+}
+async function scanQrInto(target, log = () => {}) {
+  const Detector = globalThis.BarcodeDetector;
+  if (!Detector)
+    throw new Error(
+      "Camera QR import needs Chrome/Android BarcodeDetector support. Use copy/paste fallback on this browser.",
+    );
+  if (!navigator.mediaDevices)
+    throw new Error("Camera QR import needs camera permission and HTTPS.");
+  if (!navigator.mediaDevices.getUserMedia)
+    throw new Error("Camera QR import needs camera permission and HTTPS.");
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "environment" },
+    audio: false,
+  });
+  const video = document.createElement("video");
+  video.playsInline = true;
+  video.muted = true;
+  video.autoplay = true;
+  video.srcObject = stream;
+  video.style.cssText =
+    "width:100%;max-height:280px;background:#000;border-radius:12px;margin:.5rem 0";
+  target.insertAdjacentElement("beforebegin", video);
+  await video.play();
+  const detector = new Detector({ formats: ["qr_code"] });
+  log("Scanning QR with camera…");
+  return new Promise((resolve, reject) => {
+    const stop = () => {
+      stream.getTracks().forEach((t) => t.stop());
+      video.remove();
+    };
+    const timeout = window.setTimeout(() => {
+      stop();
+      reject(
+        /* @__PURE__ */ new Error(
+          "No QR found. Try brighter light or paste the link/chunks.",
+        ),
+      );
+    }, 3e4);
+    const tick = async () => {
+      try {
+        const raw = (await detector.detect(video))[0]?.rawValue?.trim();
+        if (raw) {
+          window.clearTimeout(timeout);
+          stop();
+          target.value =
+            raw.startsWith("chunk:") && target.value.trim()
+              ? `${target.value.trim()}\n${raw}`
+              : raw;
+          target.dispatchEvent(new Event("input", { bubbles: true }));
+          log("QR imported.");
+          resolve(raw);
+          return;
+        }
+        requestAnimationFrame(tick);
+      } catch (e) {
+        window.clearTimeout(timeout);
+        stop();
+        reject(e);
+      }
+    };
+    tick();
+  });
+}
+//#endregion
+//#region src/webrtc.ts
+var rtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+var RPC = {
+  ROOM_HELLO: "ROOM_HELLO",
+  ROOM_STATE_SNAPSHOT: "ROOM_STATE_SNAPSHOT",
+  PLAYER_JOINED: "PLAYER_JOINED",
+  PLAYER_LEFT: "PLAYER_LEFT",
+  QUEUE_ADD_REQUEST: "QUEUE_ADD_REQUEST",
+  QUEUE_UPDATE_REQUEST: "QUEUE_UPDATE_REQUEST",
+  QUEUE_ACCEPTED: "QUEUE_ACCEPTED",
+  QUEUE_REJECTED: "QUEUE_REJECTED",
+  QUEUE_UPDATED: "QUEUE_UPDATED",
+  SINGER_JOIN_REQUEST: "SINGER_JOIN_REQUEST",
+  SINGER_ASSIGNED: "SINGER_ASSIGNED",
+  SINGER_REMOVED: "SINGER_REMOVED",
+  MIC_ENABLED: "MIC_ENABLED",
+  MIC_MUTED: "MIC_MUTED",
+  MIC_UNMUTED: "MIC_UNMUTED",
+  PLAYBACK_STARTED: "PLAYBACK_STARTED",
+  PLAYBACK_PAUSED: "PLAYBACK_PAUSED",
+  PLAYBACK_SEEKED: "PLAYBACK_SEEKED",
+  PLAYBACK_SYNC: "PLAYBACK_SYNC",
+  LATENCY_PING: "LATENCY_PING",
+  LATENCY_PONG: "LATENCY_PONG",
+  SIGNAL_RELAY_OFFER: "SIGNAL_RELAY_OFFER",
+  SIGNAL_RELAY_ANSWER: "SIGNAL_RELAY_ANSWER",
+  SIGNAL_RELAY_ICE: "SIGNAL_RELAY_ICE",
+  ERROR_NOTICE: "ERROR_NOTICE",
+};
+var fallbackTrackIds = /* @__PURE__ */ new WeakMap();
+var fallbackTrackId = 0;
+function mediaTrackKey(track) {
+  if (track.id) return `${track.kind}:${track.id}`;
+  let id = fallbackTrackIds.get(track);
+  if (!id) {
+    fallbackTrackId += 1;
+    id = `anon-${fallbackTrackId}`;
+    fallbackTrackIds.set(track, id);
+  }
+  return `${track.kind}:${id}`;
+}
+function streamTracks(stream) {
+  return typeof stream.getTracks === "function" ? stream.getTracks() : [];
+}
+function streamTrackKeys(stream) {
+  return streamTracks(stream).map(mediaTrackKey);
+}
+function assertWebRtcSupported() {
+  if (typeof RTCPeerConnection === "undefined")
+    throw new Error(
+      "WebRTC is unavailable in this browser/context. On phones, open the GitHub Pages HTTPS URL or serve local testing over HTTPS; local HTTP hostnames may block offer creation.",
+    );
+}
+var PeerNode = class extends EventTarget {
+  localPeerId;
+  peers;
+  clockOffsetMs;
+  localStreams;
+  relayedStreams;
+  constructor(localPeerId) {
+    super();
+    this.localPeerId = localPeerId;
+    this.peers = /* @__PURE__ */ new Map();
+    this.clockOffsetMs = 0;
+    this.localStreams = [];
+    this.relayedStreams = [];
+  }
+  makeConnection(
+    remotePeerId,
+    { manual = true, initiator = false, replace = false } = {},
+  ) {
+    assertWebRtcSupported();
+    const existing = this.peers.get(remotePeerId);
+    if (existing && !replace) return existing;
+    if (existing && replace) {
+      existing.pc.close?.();
+      this.peers.delete(remotePeerId);
+    }
+    const pc = new RTCPeerConnection(rtcConfig);
+    const edge = {
+      remotePeerId,
+      pc,
+      dc: null,
+      streams: [],
+      sentTrackKeys: /* @__PURE__ */ new Set(),
+      manual,
+      initiator,
+    };
+    pc.oniceconnectionstatechange = () =>
+      this.emit("ice", {
+        remotePeerId,
+        state: pc.iceConnectionState,
+      });
+    pc.onconnectionstatechange = () => {
+      this.emit("connection", {
+        remotePeerId,
+        state: pc.connectionState,
+      });
+      if (pc.connectionState === "failed")
+        this.emit("error", {
+          message:
+            "WebRTC failed. Strict mode has STUN but no TURN; try same Wi-Fi or a less restrictive network.",
+          remotePeerId,
+        });
+    };
+    pc.ontrack = (ev) => {
+      const stream =
+        ev.streams[0] || (ev.track ? new MediaStream([ev.track]) : void 0);
+      this.emit("track", {
+        remotePeerId,
+        stream,
+        track: ev.track,
+      });
+      if (stream)
+        this.emit("duet", {
+          remotePeerId,
+          stream,
+        });
+    };
+    pc.ondatachannel = (ev) => this.attachChannel(edge, ev.channel);
+    pc.onnegotiationneeded = () => {
+      if (edge.negotiating) {
+        edge.needsNegotiation = true;
+        return;
+      }
+      this.negotiate(edge).catch((e) =>
+        this.emit("error", {
+          message: `Renegotiation failed: ${e.message}`,
+          remotePeerId: edge.remotePeerId,
+        }),
+      );
+    };
+    if (initiator)
+      this.attachChannel(
+        edge,
+        pc.createDataChannel("room-rpc", { ordered: true }),
+      );
+    this.localStreams.forEach((stream) => this.addStreamToEdge(edge, stream));
+    this.relayedStreams
+      .filter((s) => s.sourcePeerId !== remotePeerId)
+      .forEach(({ stream }) => this.addStreamToEdge(edge, stream));
+    this.peers.set(remotePeerId, edge);
+    return edge;
+  }
+  addStreamToEdge(edge, stream) {
+    const newTracks = streamTracks(stream).filter(
+      (track) => !edge.sentTrackKeys.has(mediaTrackKey(track)),
+    );
+    if (!newTracks.length) return false;
+    if (!edge.streams.includes(stream)) edge.streams.push(stream);
+    newTracks.forEach((track) => {
+      edge.sentTrackKeys.add(mediaTrackKey(track));
+      edge.pc.addTrack(track, stream);
+    });
+    return true;
+  }
+  attachChannel(edge, dc) {
+    edge.dc = dc;
+    dc.onopen = () => {
+      this.emit("open", { remotePeerId: edge.remotePeerId });
+      if (edge.streams.length) this.requestNegotiation(edge);
+    };
+    dc.onclose = () => this.emit("close", { remotePeerId: edge.remotePeerId });
+    dc.onmessage = (ev) => {
+      try {
+        this.handleMessage(edge.remotePeerId, JSON.parse(ev.data));
+      } catch (e) {
+        this.emit("error", { message: e.message });
+      }
+    };
+  }
+  handleMessage(remotePeerId, msg) {
+    if (msg.type === RPC.LATENCY_PING)
+      this.send(remotePeerId, {
+        type: RPC.LATENCY_PONG,
+        t0: msg.t0,
+        h1: Date.now(),
+      });
+    if (msg.type === RPC.LATENCY_PONG) {
+      const t2 = Date.now();
+      this.clockOffsetMs = msg.h1 + (t2 - msg.t0) / 2 - t2;
+      this.emit("clock", { offsetMs: this.clockOffsetMs });
+    }
+    if (
+      [
+        RPC.SIGNAL_RELAY_OFFER,
+        RPC.SIGNAL_RELAY_ANSWER,
+        RPC.SIGNAL_RELAY_ICE,
+      ].includes(msg.type) &&
+      msg.toPeerId &&
+      msg.toPeerId !== this.localPeerId
+    ) {
+      this.send(msg.toPeerId, {
+        ...msg,
+        relayedByPeerId: this.localPeerId,
+      });
+      this.emit("relay", {
+        fromPeerId: remotePeerId,
+        toPeerId: msg.toPeerId,
+        msg,
+      });
+      return;
+    }
+    if (
+      msg.type === RPC.SIGNAL_RELAY_OFFER &&
+      msg.toPeerId === this.localPeerId
+    ) {
+      this.acceptRenegotiationOffer(remotePeerId, msg).catch((e) =>
+        this.emit("error", {
+          message: e.message,
+          remotePeerId,
+        }),
+      );
+      return;
+    }
+    if (
+      msg.type === RPC.SIGNAL_RELAY_ANSWER &&
+      msg.toPeerId === this.localPeerId
+    ) {
+      this.acceptRenegotiationAnswer(remotePeerId, msg).catch((e) =>
+        this.emit("error", {
+          message: e.message,
+          remotePeerId,
+        }),
+      );
+      return;
+    }
+    this.emit("message", {
+      remotePeerId,
+      msg,
+    });
+  }
+  signalDescription(msg) {
+    const signal = msg.signal;
+    return signal?.description || signal;
+  }
+  async acceptRenegotiationOffer(remotePeerId, msg) {
+    const edge =
+      this.peers.get(remotePeerId) ||
+      this.makeConnection(remotePeerId, {
+        manual: false,
+        initiator: false,
+      });
+    if (edge.pc.signalingState === "have-local-offer")
+      await edge.pc.setLocalDescription({ type: "rollback" });
+    await edge.pc.setRemoteDescription(this.signalDescription(msg));
+    const answer = await edge.pc.createAnswer();
+    await edge.pc.setLocalDescription(answer);
+    await waitForIceComplete(edge.pc);
+    this.send(remotePeerId, {
+      type: RPC.SIGNAL_RELAY_ANSWER,
+      fromPeerId: this.localPeerId,
+      toPeerId: remotePeerId,
+      signal: edge.pc.localDescription,
+    });
+  }
+  async acceptRenegotiationAnswer(remotePeerId, msg) {
+    const edge = this.peers.get(remotePeerId);
+    if (!edge) throw new Error("No peer connection for renegotiation answer.");
+    await edge.pc.setRemoteDescription(this.signalDescription(msg));
+    clearTimeout(edge.negotiationTimer);
+    edge.negotiating = false;
+    if (edge.needsNegotiation) this.requestNegotiation(edge);
+  }
+  requestNegotiation(edge) {
+    if (
+      !edge.dc ||
+      edge.dc.readyState !== "open" ||
+      edge.negotiating ||
+      edge.pc.signalingState !== "stable"
+    ) {
+      edge.needsNegotiation = true;
+      return;
+    }
+    this.negotiate(edge).catch((e) =>
+      this.emit("error", {
+        message: `Renegotiation failed: ${e.message}`,
+        remotePeerId: edge.remotePeerId,
+      }),
+    );
+  }
+  async negotiate(edge) {
+    if (
+      !edge.dc ||
+      edge.dc.readyState !== "open" ||
+      edge.negotiating ||
+      edge.pc.signalingState !== "stable"
+    ) {
+      edge.needsNegotiation = true;
+      return;
+    }
+    edge.negotiating = true;
+    edge.needsNegotiation = false;
+    try {
+      const offer = await edge.pc.createOffer({ offerToReceiveAudio: true });
+      await edge.pc.setLocalDescription(offer);
+      await waitForIceComplete(edge.pc);
+      this.send(edge.remotePeerId, {
+        type: RPC.SIGNAL_RELAY_OFFER,
+        fromPeerId: this.localPeerId,
+        toPeerId: edge.remotePeerId,
+        signal: edge.pc.localDescription,
+      });
+      clearTimeout(edge.negotiationTimer);
+      edge.negotiationTimer = setTimeout(async () => {
+        if (edge.negotiating) {
+          edge.negotiating = false;
+          try {
+            if (edge.pc.signalingState === "have-local-offer")
+              await edge.pc.setLocalDescription({ type: "rollback" });
+          } catch {}
+          if (edge.needsNegotiation) this.requestNegotiation(edge);
+        }
+      }, 15e3);
+    } catch (err) {
+      edge.negotiating = false;
+      throw err;
+    }
+  }
+  send(remotePeerId, msg) {
+    const edge = this.peers.get(remotePeerId);
+    if (edge?.dc?.readyState === "open") edge.dc.send(JSON.stringify(msg));
+  }
+  broadcast(msg) {
+    for (const id of this.peers.keys()) this.send(id, msg);
+  }
+  pingAll() {
+    this.broadcast({
+      type: RPC.LATENCY_PING,
+      t0: Date.now(),
+    });
+  }
+  relaySignal(type, fromPeerId, toPeerId, signal) {
+    if (
+      ![
+        RPC.SIGNAL_RELAY_OFFER,
+        RPC.SIGNAL_RELAY_ANSWER,
+        RPC.SIGNAL_RELAY_ICE,
+      ].includes(type)
+    )
+      throw new Error(`Unsupported relay type ${type}`);
+    this.send(toPeerId, {
+      type,
+      fromPeerId,
+      toPeerId,
+      signal,
+      sentAt: Date.now(),
+    });
+  }
+  async createManualOffer(remotePeerId) {
+    const edge = this.makeConnection(remotePeerId, {
+      manual: true,
+      initiator: true,
+      replace: true,
+    });
+    const offer = await edge.pc.createOffer({ offerToReceiveAudio: true });
+    await edge.pc.setLocalDescription(offer);
+    await waitForIceComplete(edge.pc);
+    return encodeSignalPayload({
+      kind: "offer",
+      fromPeerId: this.localPeerId,
+      toPeerId: remotePeerId,
+      description: edge.pc.localDescription,
+    });
+  }
+  async acceptManualOffer(text) {
+    const payload = await decodeSignalPayload(joinChunks(text));
+    if (payload.kind !== "offer") throw new Error("Expected offer payload.");
+    const edge = this.makeConnection(payload.fromPeerId, {
+      manual: true,
+      initiator: false,
+      replace: true,
+    });
+    await edge.pc.setRemoteDescription(payload.description);
+    const answer = await edge.pc.createAnswer();
+    await edge.pc.setLocalDescription(answer);
+    await waitForIceComplete(edge.pc);
+    return encodeSignalPayload({
+      kind: "answer",
+      fromPeerId: this.localPeerId,
+      toPeerId: payload.fromPeerId,
+      description: edge.pc.localDescription,
+    });
+  }
+  async acceptManualAnswer(text) {
+    const payload = await decodeSignalPayload(joinChunks(text));
+    if (payload.kind !== "answer") throw new Error("Expected answer payload.");
+    const edge =
+      (payload.fromPeerId ? this.peers.get(payload.fromPeerId) : void 0) ||
+      (payload.toPeerId ? this.peers.get(payload.toPeerId) : void 0) ||
+      [...this.peers.values()].find(
+        (e) => e.initiator && e.pc.signalingState !== "stable",
+      );
+    if (!edge) throw new Error("No pending offer for this answer.");
+    if (payload.fromPeerId && edge.remotePeerId !== payload.fromPeerId) {
+      this.peers.delete(edge.remotePeerId);
+      edge.remotePeerId = payload.fromPeerId;
+      this.peers.set(edge.remotePeerId, edge);
+    }
+    await edge.pc.setRemoteDescription(payload.description);
+    if (edge.streams.length) this.requestNegotiation(edge);
+    return payload;
+  }
+  addLocalStream(stream) {
+    if (
+      streamTrackKeys(stream).filter(
+        (key) =>
+          !this.localStreams.some((localStream) =>
+            streamTrackKeys(localStream).includes(key),
+          ),
+      ).length
+    )
+      this.localStreams.push(stream);
+    for (const edge of this.peers.values())
+      if (this.addStreamToEdge(edge, stream)) this.requestNegotiation(edge);
+  }
+  relayRemoteStream(sourcePeerId, stream) {
+    const newKeys = streamTrackKeys(stream).filter(
+      (key) =>
+        !this.relayedStreams.some(
+          (stream) =>
+            stream.sourcePeerId === sourcePeerId &&
+            stream.trackKeys.includes(key),
+        ),
+    );
+    if (newKeys.length)
+      this.relayedStreams.push({
+        sourcePeerId,
+        stream,
+        trackKeys: newKeys,
+      });
+    for (const edge of this.peers.values()) {
+      if (edge.remotePeerId === sourcePeerId) continue;
+      if (this.addStreamToEdge(edge, stream)) this.requestNegotiation(edge);
+    }
+  }
+  emit(type, detail) {
+    this.dispatchEvent(new CustomEvent(type, { detail }));
+  }
+};
+function waitForIceComplete(pc, timeoutMs = 4e3, idleMs = 1e3) {
+  if (pc.iceGatheringState === "complete") return Promise.resolve();
+  return new Promise((resolve) => {
+    let idleTimer = null;
+    const done = () => {
+      pc.removeEventListener("icegatheringstatechange", on);
+      pc.removeEventListener("icecandidate", onCandidate);
+      clearTimeout(timer);
+      clearTimeout(idleTimer ?? void 0);
+      resolve();
+    };
+    const on = () => {
+      if (pc.iceGatheringState === "complete") done();
+    };
+    const onCandidate = (event) => {
+      if (!event.candidate) return;
+      clearTimeout(idleTimer ?? void 0);
+      idleTimer = setTimeout(done, idleMs);
+    };
+    const timer = setTimeout(done, timeoutMs);
+    pc.addEventListener("icegatheringstatechange", on);
+    pc.addEventListener("icecandidate", onCandidate);
+  });
+}
+//#endregion
+//#region src/audio.ts
+var PhoneAudio = class {
+  log;
+  ctx;
+  master;
+  remoteGain;
+  backingGain;
+  localStream;
+  publishedStream;
+  pendingMicRequest;
+  micSource;
+  micDestination;
+  micFilters;
+  voicePreset;
+  localMonitorGain;
+  backingAudio;
+  backingSource;
+  pushToSing;
+  gateThreshold;
+  gateEnabled;
+  gateProcessor;
+  wakeLock = null;
+  remoteSources;
+  remoteStreams;
+  constructor(log = () => {}) {
+    this.log = log;
+    this.ctx = null;
+    this.master = null;
+    this.remoteGain = null;
+    this.backingGain = null;
+    this.localStream = null;
+    this.publishedStream = null;
+    this.pendingMicRequest = null;
+    this.micSource = null;
+    this.micDestination = null;
+    this.micFilters = {};
+    this.voicePreset = "clean";
+    this.localMonitorGain = 0;
+    this.backingAudio = null;
+    this.backingSource = null;
+    this.pushToSing = false;
+    this.gateThreshold = 0.03;
+    this.gateEnabled = false;
+    this.gateProcessor = null;
+    this.remoteSources = [];
+    this.remoteStreams = /* @__PURE__ */ new Set();
+  }
+  async init() {
+    this.ctx = this.ctx || new AudioContext();
+    if (!this.master || !this.remoteGain || !this.backingGain) {
+      this.master = this.ctx.createGain();
+      this.remoteGain = this.ctx.createGain();
+      this.backingGain = this.ctx.createGain();
+      this.master.gain.value = 1;
+      this.remoteGain.gain.value = 1;
+      this.backingGain.gain.value = 0;
+      this.localMonitorGain = 0;
+      this.remoteGain.connect(this.master);
+      this.backingGain.connect(this.master);
+      this.master.connect(this.ctx.destination);
+    }
+    if (this.ctx.state === "suspended")
+      await this.ctx.resume?.().catch(() => {});
+  }
+  async requestMic({ pushToSing = false } = {}) {
+    if (!navigator.mediaDevices)
+      throw new Error(
+        "Mic requires HTTPS. Connect via GitHub Pages or localhost.",
+      );
+    if (!navigator.mediaDevices.getUserMedia)
+      throw new Error("Browser doesn't support getUserMedia API.");
+    this.pushToSing = pushToSing;
+    if (this.hasLiveMic()) {
+      await this.init();
+      this.setMicMuted(pushToSing);
+      return this.publishedStream;
+    }
+    if (!this.pendingMicRequest)
+      this.pendingMicRequest = this.openMic(pushToSing).finally(() => {
+        this.pendingMicRequest = null;
+      });
+    const stream = await this.pendingMicRequest;
+    this.pushToSing = pushToSing;
+    this.setMicMuted(pushToSing);
+    return stream;
+  }
+  async openMic(pushToSing) {
+    await this.init();
+    this.localStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+      video: false,
+    });
+    this.applyGate();
+    this.publishedStream = this.buildMicFilterStream(this.localStream);
+    this.setMicMuted(pushToSing);
+    return this.publishedStream;
+  }
+  hasLiveMic() {
+    return (
+      this.streamHasLiveAudio(this.localStream) &&
+      this.streamHasLiveAudio(this.publishedStream)
+    );
+  }
+  streamHasLiveAudio(stream) {
+    if (!stream) return false;
+    return (
+      typeof stream.getAudioTracks === "function"
+        ? stream.getAudioTracks()
+        : typeof stream.getTracks === "function"
+          ? stream.getTracks().filter((track) => track.kind === "audio")
+          : []
+    ).some((track) => track.readyState !== "ended");
+  }
+  setMicMuted(muted) {
+    this.localStream?.getAudioTracks().forEach((t) => {
+      t.enabled = !muted;
+    });
+    this.publishedStream?.getAudioTracks().forEach((t) => {
+      t.enabled = !muted;
+    });
+  }
+  buildMicFilterStream(stream) {
+    if (
+      !this.ctx?.createMediaStreamDestination ||
+      !this.ctx.createBiquadFilter ||
+      !this.ctx.createDynamicsCompressor
+    )
+      return stream;
+    try {
+      this.micSource?.disconnect();
+      this.micSource = this.ctx.createMediaStreamSource(stream);
+      this.micDestination = this.ctx.createMediaStreamDestination();
+      const highpass = this.ctx.createBiquadFilter();
+      const tone = this.ctx.createBiquadFilter();
+      const presence = this.ctx.createBiquadFilter();
+      const compressor = this.ctx.createDynamicsCompressor();
+      const output = this.ctx.createGain();
+      highpass.type = "highpass";
+      tone.type = "lowshelf";
+      presence.type = "peaking";
+      this.micSource.connect(highpass);
+      highpass.connect(tone);
+      tone.connect(presence);
+      presence.connect(compressor);
+      compressor.connect(output);
+      output.connect(this.micDestination);
+      this.micFilters = {
+        highpass,
+        tone,
+        presence,
+        compressor,
+        output,
+      };
+      this.applyVoicePreset();
+      return this.micDestination.stream;
+    } catch (err) {
+      this.log(`Mic filters unavailable: ${err.message}. Using clean mic.`);
+      return stream;
+    }
+  }
+  setVoicePreset(preset) {
+    this.voicePreset = [
+      "clean",
+      "alto",
+      "bravo",
+      "bass",
+      "radio",
+      "autotune",
+    ].includes(preset)
+      ? preset
+      : "clean";
+    this.applyVoicePreset();
+  }
+  applyVoicePreset() {
+    const { highpass, tone, presence, compressor, output } = this.micFilters;
+    if (!highpass || !tone || !presence || !compressor || !output) return;
+    const presets = {
+      clean: {
+        hp: 70,
+        lowGain: 0,
+        presenceFreq: 3200,
+        presenceGain: 0,
+        ratio: 2,
+        threshold: -24,
+        out: 1,
+      },
+      alto: {
+        hp: 95,
+        lowGain: 2,
+        presenceFreq: 2400,
+        presenceGain: 1.5,
+        ratio: 3,
+        threshold: -26,
+        out: 1.05,
+      },
+      bravo: {
+        hp: 120,
+        lowGain: -1,
+        presenceFreq: 4200,
+        presenceGain: 4,
+        ratio: 3.5,
+        threshold: -28,
+        out: 1.08,
+      },
+      bass: {
+        hp: 55,
+        lowGain: 4,
+        presenceFreq: 1800,
+        presenceGain: -1,
+        ratio: 3,
+        threshold: -25,
+        out: 1,
+      },
+      radio: {
+        hp: 180,
+        lowGain: -6,
+        presenceFreq: 2800,
+        presenceGain: 5,
+        ratio: 6,
+        threshold: -32,
+        out: 1.1,
+      },
+      autotune: {
+        hp: 100,
+        lowGain: -1,
+        presenceFreq: 3600,
+        presenceGain: 3,
+        ratio: 8,
+        threshold: -34,
+        out: 1.12,
+      },
+    };
+    const p = presets[this.voicePreset] || presets.clean;
+    highpass.frequency.value = p.hp;
+    tone.gain.value = p.lowGain;
+    presence.frequency.value = p.presenceFreq;
+    presence.Q.value = 1;
+    presence.gain.value = p.presenceGain;
+    compressor.threshold.value = p.threshold;
+    compressor.knee.value = 12;
+    compressor.ratio.value = p.ratio;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.18;
+    output.gain.value = p.out;
+  }
+  addRemoteStream(stream, label = "remote singer") {
+    if (this.remoteStreams.has(stream)) return;
+    this.remoteStreams.add(stream);
+    this.init().then(() => {
+      if (!this.ctx || !this.remoteGain) return;
+      const src = this.ctx.createMediaStreamSource(stream);
+      this.remoteSources.push(src);
+      src.connect(this.remoteGain);
+      this.log(`Receiving ${label}`);
+    });
+  }
+  async startBackingMonitor(url) {
+    await this.init();
+    if (
+      !this.backingAudio ||
+      !this.backingSource ||
+      !this.ctx ||
+      !this.backingGain
+    ) {
+      this.backingAudio = new Audio(url);
+      this.backingAudio.loop = false;
+      this.backingAudio.crossOrigin = "anonymous";
+      this.backingSource = this.ctx.createMediaElementSource(this.backingAudio);
+      this.backingSource.connect(this.backingGain);
+    } else if (this.backingAudio.src !== url) this.backingAudio.src = url;
+    this.backingGain.gain.value = this.backingGain.gain.value || 0.35;
+    await this.backingAudio.play();
+    return this.backingAudio;
+  }
+  pauseBackingMonitor() {
+    this.backingAudio?.pause();
+  }
+  setGain(kind, value) {
+    if (kind === "remote" && this.remoteGain)
+      this.remoteGain.gain.value = value;
+    if (kind === "backing" && this.backingGain)
+      this.backingGain.gain.value = value;
+    if (kind === "master" && this.master) this.master.gain.value = value;
+  }
+  wakeLockVideo = null;
+  async tryWakeLock() {
+    try {
+      if ("wakeLock" in navigator) {
+        this.wakeLock = await navigator.wakeLock.request("screen");
+        return "active";
+      }
+      if (!this.wakeLockVideo) {
+        this.wakeLockVideo = document.createElement("video");
+        this.wakeLockVideo.loop = true;
+        this.wakeLockVideo.muted = true;
+        this.wakeLockVideo.style.cssText =
+          "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;";
+        document.body.appendChild(this.wakeLockVideo);
+      }
+      this.wakeLockVideo.src = new URL(
+        "" + new URL("../silent_loop.mp4", import.meta.url).href,
+        "" + import.meta.url,
+      ).toString();
+      await this.wakeLockVideo.play().catch(() => {});
+      return "video-fallback";
+    } catch {
+      return "failed";
+    }
+  }
+  stopWakeLock() {
+    if (this.wakeLock) {
+      this.wakeLock.release();
+      this.wakeLock = null;
+    }
+    if (this.wakeLockVideo) {
+      this.wakeLockVideo.pause();
+      this.wakeLockVideo.remove();
+      this.wakeLockVideo = null;
+    }
+  }
+  applyGate() {
+    if (!this.localStream || !this.ctx || !this.gateEnabled) return;
+    try {
+      const source = this.ctx.createMediaStreamSource(this.localStream);
+      const processor = this.ctx.createScriptProcessor(4096, 1, 1);
+      processor.onaudioprocess = (e) => {
+        const input = e.inputBuffer.getChannelData(0);
+        const output = e.outputBuffer.getChannelData(0);
+        let rms = 0;
+        for (let i = 0; i < input.length; i++) rms += input[i] * input[i];
+        rms = Math.sqrt(rms / input.length);
+        if (rms < this.gateThreshold)
+          for (let i = 0; i < output.length; i++) output[i] = 0;
+        else for (let i = 0; i < output.length; i++) output[i] = input[i];
+      };
+      source.connect(processor);
+      processor.connect(this.ctx.destination);
+      this.gateProcessor = processor;
+      this.log(`Noise gate enabled (threshold: ${this.gateThreshold}).`);
+    } catch (err) {
+      this.log(`Noise gate failed: ${err.message}. Continuing without gate.`);
+    }
+  }
+  setGateEnabled(enabled, threshold) {
+    this.gateEnabled = enabled;
+    if (threshold !== void 0) this.gateThreshold = threshold;
+    if (enabled && this.localStream) this.applyGate();
+  }
+  duetMonitorGains = /* @__PURE__ */ new Map();
+  enableDuetMonitoring(peerId, enabled) {
+    if (!this.ctx) return;
+    if (enabled && !this.duetMonitorGains.has(peerId)) {
+      const gain = this.ctx.createGain();
+      gain.gain.value = 0.5;
+      gain.connect(this.master);
+      this.duetMonitorGains.set(peerId, gain);
+      this.log(`Duet monitoring enabled for ${peerId}`);
+    } else if (!enabled && this.duetMonitorGains.has(peerId)) {
+      this.duetMonitorGains.get(peerId)?.disconnect();
+      this.duetMonitorGains.delete(peerId);
+      this.log(`Duet monitoring disabled for ${peerId}`);
+    }
+  }
+  connectDuetStream(stream, peerId) {
+    if (!this.ctx || !this.duetMonitorGains.has(peerId)) return;
+    this.ctx
+      .createMediaStreamSource(stream)
+      .connect(this.duetMonitorGains.get(peerId));
+  }
+};
+var singerWarning =
+  "TV backing track bleed risk: your phone mic can hear the TV backing track. Use headphones or push-to-sing to avoid sending backing track to everyone.";
+//#endregion
+//#region src/mediaKey.ts
+var MEDIA_KEY_B64 = "NvV8BCkbvZNWft8N71lX+8pYS3/cqwjNcCz3N1zF5IE=";
+//#endregion
+//#region src/protectedMedia.ts
+var blobUrlCache = /* @__PURE__ */ new Map();
+var keyPromise;
+function hasWebCryptoAes() {
+  return (
+    !!globalThis.crypto?.subtle?.importKey &&
+    !!globalThis.crypto?.subtle?.decrypt
+  );
+}
+function b64ToBytes(value) {
+  const bin = atob(value);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+function resolveAppAssetUrl(url) {
+  if (!url) return null;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return url;
+  const publicPath = url.startsWith("/public/") ? url.slice(7) : url;
+  if (publicPath.startsWith("/"))
+    return new URL(".." + publicPath, import.meta.url).toString();
+  return new URL(publicPath, import.meta.url).toString();
+}
+function resolveEncryptedMedia(media) {
+  return media
+    ? {
+        ...media,
+        url: resolveAppAssetUrl(media.url),
+      }
+    : void 0;
+}
+function normalizeProtectedSong(song) {
+  const resolved = {
+    ...song,
+    encryptedMedia: resolveEncryptedMedia(song.encryptedMedia),
+    encryptedAudio: resolveEncryptedMedia(song.encryptedAudio),
+    castMediaUrl: resolveAppAssetUrl(song.castMediaUrl),
+    phoneBackingAudioUrl: resolveAppAssetUrl(song.phoneBackingAudioUrl),
+    lyricsJsonUrl: resolveAppAssetUrl(song.lyricsJsonUrl),
+    lyricsVttUrl: resolveAppAssetUrl(song.lyricsVttUrl),
+    thumbnailUrl: resolveAppAssetUrl(song.thumbnailUrl),
+    defaultCastMediaUrl: resolveAppAssetUrl(song.defaultCastMediaUrl),
+  };
+  if (!resolved.encryptedMedia) return resolved;
+  return {
+    ...resolved,
+    castMediaUrl: null,
+    phoneBackingAudioUrl: null,
+    lyricsJsonUrl: null,
+    lyricsVttUrl: null,
+    thumbnailUrl: null,
+    needsClientDecrypt: true,
+  };
+}
+async function importMediaKey() {
+  if (!hasWebCryptoAes())
+    throw new Error(
+      "Protected media decrypt needs Web Crypto. Use HTTPS/GitHub Pages, localhost, or the clear Cast export fallback for local phone testing.",
+    );
+  keyPromise ||= globalThis.crypto.subtle.importKey(
+    "raw",
+    b64ToBytes(MEDIA_KEY_B64),
+    { name: "AES-GCM" },
+    false,
+    ["decrypt"],
+  );
+  return keyPromise;
+}
+async function loadProtectedCatalog(
+  catalogUrl = resolveAppAssetUrl("/protected/catalog.json"),
+) {
+  try {
+    const response = await fetch(catalogUrl);
+    if (!response.ok) return [];
+    return ((await response.json()).songs || []).map(normalizeProtectedSong);
+  } catch {
+    return [];
+  }
+}
+async function decryptProtectedMedia(song) {
+  if (!song?.encryptedMedia) return null;
+  const media = song.encryptedMedia;
+  if (blobUrlCache.has(song.songId)) return blobUrlCache.get(song.songId);
+  const response = await fetch(resolveAppAssetUrl(media.url));
+  if (!response.ok)
+    throw new Error(`Protected media fetch failed: ${response.status}`);
+  const encrypted = new Uint8Array(await response.arrayBuffer());
+  const key = await importMediaKey();
+  const plain = await globalThis.crypto.subtle.decrypt(
+    {
+      name: "AES-GCM",
+      iv: b64ToBytes(media.iv),
+      tagLength: (media.tagBytesAppended || 16) * 8,
+    },
+    key,
+    encrypted,
+  );
+  const blobUrl = URL.createObjectURL(
+    new Blob([plain], { type: media.mimeType || "video/mp4" }),
+  );
+  blobUrlCache.set(song.songId, blobUrl);
+  return blobUrl;
+}
+async function resolvePlayableMediaUrl(song) {
+  if (song?.encryptedMedia) {
+    if (!hasWebCryptoAes() && song.defaultCastMediaUrl)
+      return song.defaultCastMediaUrl;
+    return decryptProtectedMedia(song);
+  }
+  return song?.castMediaUrl || song?.phoneBackingAudioUrl || null;
+}
+function resolveDefaultCastMediaUrl(song) {
+  return (
+    song?.defaultCastMediaUrl ||
+    (!song?.encryptedMedia ? song?.castMediaUrl : null) ||
+    null
+  );
+}
+function resolveDefaultCastMediaType(song) {
+  return (
+    song?.defaultCastMediaMimeType ||
+    song?.encryptedMedia?.mimeType ||
+    "video/mp4"
+  );
+}
+function isProtectedMedia(song) {
+  return !!song?.encryptedMedia;
+}
+//#endregion
+//#region src/sync.ts
+function deriveTvMediaPositionMs(
+  playbackState,
+  nowMs = Date.now(),
+  hostOffsetMs = 0,
+) {
+  if (
+    !playbackState ||
+    playbackState.syncDegraded ||
+    playbackState.tvMediaTimeSampledAtHostMs == null
+  )
+    return {
+      positionMs: playbackState?.tvMediaTimeMs || 0,
+      syncDegraded: true,
+    };
+  const hostNowMs = nowMs + hostOffsetMs;
+  const elapsedMs = Math.max(
+    0,
+    hostNowMs - playbackState.tvMediaTimeSampledAtHostMs,
+  );
+  const status = playbackState.paused
+    ? "paused"
+    : playbackState.status || "playing";
+  const shouldAdvance =
+    !playbackState.paused &&
+    !["paused", "idle", "ended", "host_lost", "error"].includes(status);
+  const rate = playbackState.playbackRate ?? 1;
+  const baseMs = playbackState.tvMediaTimeMs || 0;
+  const offsetMs = playbackState.seekOffsetMs || 0;
+  return {
+    positionMs: Math.max(
+      0,
+      baseMs + offsetMs + (shouldAdvance ? elapsedMs * rate : 0),
+    ),
+    syncDegraded: false,
+  };
+}
+//#endregion
+//#region src/cast.ts
+function escapeHtml$1(value) {
+  return String(value ?? "").replace(
+    /[&<>"']/g,
+    (c) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[c],
+  );
+}
+function castGlobal() {
+  return globalThis;
+}
+var CAST_NAMESPACE = "urn:x-cast:com.carryokie.room";
+var DEFAULT_MEDIA_RECEIVER_APP_ID = "CC1AD845";
+var CAST_TYPES = [
+  "CAST_LOAD_SONG",
+  "CAST_PLAY",
+  "CAST_PAUSE",
+  "CAST_SEEK",
+  "CAST_STOP",
+  "CAST_SET_SINGERS",
+  "CAST_UPDATE_QUEUE_PREVIEW",
+  "CAST_SHOW_JOIN_QR",
+  "CAST_SYNC_PLAYBACK_STATE",
+  "CAST_SHOW_ERROR",
+];
+function castOriginOverride() {
+  try {
+    return (
+      new URLSearchParams(location.search).get("castOrigin") ||
+      localStorage.getItem("carryokie.castOrigin")
+    );
+  } catch {
+    return null;
+  }
+}
+function rewriteCastUrlForReceiver(url) {
+  const origin = castOriginOverride();
+  if (!origin) return url;
+  try {
+    const u = new URL(url, location.href);
+    return new URL(u.pathname + u.search + u.hash, origin).toString();
+  } catch {
+    return url;
+  }
+}
+function shouldLoadCastReceiverFramework() {
+  try {
+    const params = new URLSearchParams(location.search);
+    if (params.get("castReceiver") === "1") return true;
+    if (params.has("room")) return false;
+    return /\bCrKey\b|Chromecast/i.test(navigator.userAgent);
+  } catch {
+    return false;
+  }
+}
+function loadCastReceiverFramework() {
+  if (castGlobal().cast?.framework?.CastReceiverContext)
+    return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector("script[src*=caf_receiver]");
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener(
+        "error",
+        () =>
+          reject(
+            /* @__PURE__ */ new Error("Cast Receiver SDK failed to load."),
+          ),
+        { once: true },
+      );
+      return;
+    }
+    const script = document.createElement("script");
+    script.src =
+      "https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js";
+    script.onload = () => resolve();
+    script.onerror = () =>
+      reject(/* @__PURE__ */ new Error("Cast Receiver SDK failed to load."));
+    document.head.appendChild(script);
+  });
+}
+var CastController = class extends EventTarget {
+  appId;
+  available = false;
+  connected = false;
+  remotePlayer = null;
+  controller = null;
+  session = null;
+  currentMediaLoaded = false;
+  constructor(appId = DEFAULT_MEDIA_RECEIVER_APP_ID) {
+    super();
+    this.appId = appId;
+  }
+  get usesDefaultMediaReceiver() {
+    return this.appId === DEFAULT_MEDIA_RECEIVER_APP_ID;
+  }
+  async init() {
+    if (castGlobal().cast?.framework) {
+      if (!this.available) this.configure();
+      return;
+    }
+    return new Promise((resolve, reject) => {
+      const w = window;
+      w.__onGCastApiAvailable = (ok) => {
+        if (ok) {
+          this.configure();
+          resolve();
+        } else {
+          const error = /* @__PURE__ */ new Error(
+            "Cast Sender unavailable in this browser.",
+          );
+          this.emit("error", { message: error.message });
+          reject(error);
+        }
+      };
+      if (!document.querySelector("script[src*=cast_sender]")) {
+        const s = document.createElement("script");
+        s.src =
+          "https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1";
+        document.head.appendChild(s);
+      }
+    });
+  }
+  configure() {
+    cast.framework.CastContext.getInstance().setOptions({
+      receiverApplicationId: this.appId,
+      autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
+    });
+    this.remotePlayer = new cast.framework.RemotePlayer();
+    this.controller = new cast.framework.RemotePlayerController(
+      this.remotePlayer,
+    );
+    this.controller.addEventListener(
+      cast.framework.RemotePlayerEventType.CURRENT_TIME_CHANGED,
+      () => this.sampleMediaStatus(),
+    );
+    this.controller.addEventListener(
+      cast.framework.RemotePlayerEventType.IS_PAUSED_CHANGED,
+      () => this.sampleMediaStatus(),
+    );
+    this.available = true;
+    this.emit("state", this.state());
+  }
+  async requestSession() {
+    if (!castGlobal().cast?.framework)
+      throw new Error(
+        "Cast SDK not ready. Use Chrome on macOS/Android, click Init Cast, then wait a moment. Safari/Firefox will not work.",
+      );
+    const context = cast.framework.CastContext.getInstance();
+    this.session =
+      context.getCurrentSession?.() || (await context.requestSession());
+    this.connected = !!this.session;
+    this.emit("state", this.state());
+    return this.session;
+  }
+  async ensureSession() {
+    if (this.session) return this.session;
+    if (castGlobal().cast?.framework) {
+      const current =
+        cast.framework.CastContext.getInstance().getCurrentSession?.();
+      if (current) {
+        this.session = current;
+        this.connected = true;
+        this.emit("state", this.state());
+        return current;
+      }
+    }
+    return this.requestSession();
+  }
+  send(type, payload = {}) {
+    if (!CAST_TYPES.includes(type))
+      throw new Error(`Unknown Cast message ${type}`);
+    if (this.usesDefaultMediaReceiver) return Promise.resolve(false);
+    if (!this.session) return Promise.resolve(false);
+    return Promise.resolve(
+      this.session.sendMessage(CAST_NAMESPACE, {
+        type,
+        payload,
+        sentAt: Date.now(),
+      }),
+    ).then(() => true);
+  }
+  sendSafe(type, payload = {}) {
+    return Promise.resolve(this.send(type, payload)).catch((error) => {
+      this.emit("error", {
+        message: `Cast message ${type} failed: ${error?.message || error}`,
+      });
+      return false;
+    });
+  }
+  async loadSong(song, room) {
+    await this.ensureSession();
+    const rawMediaUrl = this.usesDefaultMediaReceiver
+      ? resolveDefaultCastMediaUrl(song)
+      : await resolvePlayableMediaUrl(song);
+    if (!rawMediaUrl)
+      throw new Error(
+        this.usesDefaultMediaReceiver
+          ? "Default Chromecast needs a clear cast export. Run npm run exportCastMedia."
+          : "No playable media URL for song.",
+      );
+    const mediaUrl = this.usesDefaultMediaReceiver
+      ? rewriteCastUrlForReceiver(rawMediaUrl)
+      : rawMediaUrl;
+    const mediaInfo = new chrome.cast.media.MediaInfo(
+      mediaUrl,
+      resolveDefaultCastMediaType(song),
+    );
+    mediaInfo.metadata = new chrome.cast.media.GenericMediaMetadata();
+    mediaInfo.metadata.title = `${song.title} — ${song.artist}`;
+    mediaInfo.customData = {
+      roomCode: room.roomCode,
+      note: "TV plays backing/lyrics only; no live mic.",
+    };
+    const request = new chrome.cast.media.LoadRequest(mediaInfo);
+    request.autoplay = true;
+    await this.session.loadMedia(request);
+    this.currentMediaLoaded = true;
+    this.emit("state", this.state());
+    this.sendSafe("CAST_LOAD_SONG", {
+      song,
+      roomCode: room.roomCode,
+    });
+    await this.play();
+    this.sampleMediaStatus();
+  }
+  async play() {
+    await this.ensureSession();
+    if (!this.remotePlayer || this.remotePlayer.isPaused)
+      this.controller?.playOrPause();
+    this.sendSafe("CAST_PLAY");
+  }
+  pause() {
+    if (!this.remotePlayer || !this.remotePlayer.isPaused)
+      this.controller?.playOrPause();
+    this.sendSafe("CAST_PAUSE");
+  }
+  seek(seconds) {
+    if (this.remotePlayer) {
+      this.remotePlayer.currentTime = seconds;
+      this.controller?.seek();
+    }
+    this.send("CAST_SEEK", { seconds });
+  }
+  sampleMediaStatus() {
+    if (!this.remotePlayer) return;
+    const paused = !!this.remotePlayer.isPaused;
+    const sample = {
+      tvMediaTimeMs: Math.round((this.remotePlayer.currentTime || 0) * 1e3),
+      tvMediaTimeSampledAtHostMs: Date.now(),
+      paused,
+      status: paused ? "paused" : "playing",
+      playbackRate: 1,
+      source: "RemotePlayerController.currentTime",
+    };
+    this.emit("playbackSample", sample);
+    this.sendSafe("CAST_SYNC_PLAYBACK_STATE", sample);
+  }
+  state() {
+    return {
+      available: this.available,
+      connected: this.connected,
+      receiverReady: this.connected,
+      currentMediaLoaded: this.currentMediaLoaded,
+      defaultMediaReceiver: this.usesDefaultMediaReceiver,
+      error: null,
+    };
+  }
+  emit(type, detail) {
+    this.dispatchEvent(new CustomEvent(type, { detail }));
+  }
+};
+function receiverApp(root) {
+  const initialRoomCode =
+    new URLSearchParams(location.search).get("room") || "------";
+  const state = {
+    roomCode: initialRoomCode,
+    song: null,
+    singers: [],
+    queue: [],
+    mediaTimeMs: 0,
+    lines: [],
+    status: "Waiting for host tab…",
+    playbackState: null,
+  };
+  root.innerHTML = `<main class="tv"><section class="tv-info"><p class="eyebrow">CarryOkie receiver</p><h1>CarryOkie</h1><div class="stage-art receiver-stage" aria-hidden="true"><div class="stage-orb"></div><div class="stage-mic"></div><div class="soundwave"><span></span><span></span><span></span><span></span><span></span></div></div><div class="room" id="room">${escapeHtml$1(initialRoomCode)}</div><div id="joinQr"></div><p>Scan/open /player. Tab-cast receiver mirrors host room, queue, singers, backing track, and live singer mics.</p><section id="singers"></section><section id="receiverStatus"></section><section id="liveMics"><h2>Live mics</h2><p>Waiting for host tab audio…</p><button id="retryLiveMics">Start / retry live mics</button></section></section><section class="tv-stage"><video id="media" class="castMediaElement" controls playsinline></video><section id="lyrics" class="lyrics big"></section><section id="queue"></section></section></main>`;
+  const media = root.querySelector("#media");
+  const liveMics = root.querySelector("#liveMics");
+  const retryLiveMicsButton = root.querySelector("#retryLiveMics");
+  const receiverId = crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+  let loadedSongId = "";
+  let pendingPlay = false;
+  function activeLine() {
+    const t = state.mediaTimeMs;
+    return (
+      state.lines.findLast?.((l) => t >= l.startMs) ||
+      state.lines.filter((l) => t >= l.startMs).pop() ||
+      state.lines[0]
+    );
+  }
+  function render() {
+    root.querySelector("#room").textContent = state.roomCode;
+    const playerUrl = new URL(
+      `../player/?room=${encodeURIComponent(state.roomCode)}`,
+      location.href,
+    ).toString();
+    root.querySelector("#joinQr").innerHTML =
+      state.roomCode === "------"
+        ? ""
+        : qrSvg(playerUrl, {
+            scale: 3,
+            title: "Join CarryOkie room",
+          });
+    const queueSingerLabel = (queueItem) =>
+      (queueItem.singerNames?.length
+        ? queueItem.singerNames
+        : (queueItem.singerNumbers || []).map(
+            (singerNumber) => `#${singerNumber}`,
+          )
+      ).join(", ");
+    root.querySelector("#queue").innerHTML =
+      "<h2>Queue</h2><ol>" +
+      state.queue
+        .map(
+          (q) =>
+            `<li>${escapeHtml$1(q.title || q.songId)} singers ${escapeHtml$1(queueSingerLabel(q))}</li>`,
+        )
+        .join("") +
+      "</ol>";
+    root.querySelector("#singers").innerHTML =
+      "<h2>Singers</h2>" +
+      ((state.singers || [])
+        .map(
+          (p) =>
+            `<p>#${escapeHtml$1(p.playerNumber)} ${escapeHtml$1(p.displayName)}</p>`,
+        )
+        .join("") || "<p>No active singers</p>");
+    root.querySelector("#receiverStatus").innerHTML =
+      `<p class="status-pill">${escapeHtml$1(state.status)}</p>`;
+    const active = activeLine();
+    root.querySelector("#lyrics").innerHTML = state.lines.length
+      ? state.lines
+          .map(
+            (l) =>
+              `<p class="${l === active ? "active" : ""}">${escapeHtml$1(l.text)}</p>`,
+          )
+          .join("")
+      : "<p>Waiting for lyrics…</p>";
+  }
+  async function loadLyrics(song) {
+    if (isProtectedMedia(song)) {
+      state.lines = [];
+      render();
+      return;
+    }
+    if (!song?.lyricsJsonUrl) return;
+    try {
+      state.lines =
+        (await fetch(song.lyricsJsonUrl).then((r) => r.json())).lines || [];
+    } catch {
+      state.lines = [];
+      state.status = "Lyrics unavailable; backing track still loaded.";
+    }
+    render();
+  }
+  function loadSong(song, roomCode) {
+    if (!song) return;
+    state.song = song;
+    state.roomCode = roomCode || state.roomCode;
+    if (song.songId === loadedSongId) {
+      render();
+      return;
+    }
+    loadedSongId = song.songId;
+    state.status = "Loading backing track…";
+    resolvePlayableMediaUrl(song)
+      .then((url) => {
+        if (!url) {
+          state.status = "No playable media for receiver tab.";
+          render();
+          return;
+        }
+        media.src = url;
+        const attemptPlay = () => {
+          if (pendingPlay) {
+            pendingPlay = false;
+            media.play().catch(() => {
+              state.status = "Tap receiver once to start backing track/audio.";
+              render();
+            });
+          }
+        };
+        media
+          .play()
+          .then(() => {
+            state.status = "Backing track playing.";
+            attemptPlay();
+            render();
+          })
+          .catch(() => {
+            attemptPlay();
+            state.status = "Tap receiver once to start backing track/audio.";
+            render();
+          });
+      })
+      .catch((error) => {
+        state.status = error?.message || "Failed to load backing track.";
+        render();
+      });
+    loadLyrics(song);
+  }
+  function unpack(data) {
+    try {
+      return typeof data === "string" ? JSON.parse(data) : data;
+    } catch {
+      return null;
+    }
+  }
+  function handle(raw) {
+    const msg = unpack(raw);
+    if (!msg?.type) return;
+    const payload = msg.payload;
+    if (msg.type === "CAST_LOAD_SONG" && payload)
+      loadSong(payload.song, payload.roomCode);
+    if (msg.type === "CAST_PLAY") {
+      if (!media.src && state.song) loadSong(state.song, state.roomCode);
+      if (media.src) media.play().catch(() => {});
+      else pendingPlay = true;
+    }
+    if (msg.type === "CAST_PAUSE" && media.src) media.pause();
+    if (msg.type === "CAST_SEEK" && payload)
+      media.currentTime = payload.seconds;
+    if (msg.type === "CAST_SET_SINGERS" && payload)
+      state.singers = payload.players || payload.singers;
+    if (
+      (msg.type === "CAST_SYNC_PLAYBACK_STATE" ||
+        msg.type === "RECEIVER_PLAYBACK_SYNC") &&
+      payload
+    ) {
+      state.playbackState = payload;
+      state.mediaTimeMs = deriveTvMediaPositionMs(payload).positionMs;
+    }
+    if (msg.type === "CAST_SHOW_JOIN_QR" && payload)
+      state.roomCode = payload.roomCode;
+    if (msg.type === "CAST_UPDATE_QUEUE_PREVIEW" && payload)
+      state.queue = payload.queue || [];
+    if (msg.type === "RECEIVER_STATE" && payload) {
+      state.roomCode = payload.roomCode || state.roomCode;
+      state.queue = payload.queue || state.queue;
+      state.singers = payload.singers || state.singers;
+      if (payload.playbackState) {
+        state.playbackState = payload.playbackState;
+        state.mediaTimeMs = deriveTvMediaPositionMs(
+          payload.playbackState,
+        ).positionMs;
+      }
+      loadSong(payload.song, payload.roomCode);
+    }
+    render();
+  }
+  const liveMicStream = new MediaStream();
+  const liveMicTrackIds = /* @__PURE__ */ new Set();
+  let liveMicAudio = null;
+  function ensureLiveMicAudio() {
+    if (liveMicAudio) return liveMicAudio;
+    liveMics.innerHTML =
+      '<h2>Live mics</h2><p class="subtle">Playing all forwarded singer mics.</p><button id="retryLiveMics">Start / retry live mics</button>';
+    liveMics.querySelector("#retryLiveMics")?.addEventListener("click", () => {
+      tryPlayLiveMics();
+    });
+    liveMicAudio = document.createElement("audio");
+    liveMicAudio.autoplay = true;
+    liveMicAudio.controls = true;
+    liveMicAudio.playsInline = true;
+    liveMicAudio.muted = false;
+    liveMicAudio.volume = 1;
+    liveMicAudio.srcObject = liveMicStream;
+    liveMics.appendChild(liveMicAudio);
+    return liveMicAudio;
+  }
+  async function tryPlayLiveMics() {
+    const audio = ensureLiveMicAudio();
+    try {
+      await audio.play();
+      state.status = `Playing ${liveMicTrackIds.size} live mic${liveMicTrackIds.size === 1 ? "" : "s"}.`;
+    } catch {
+      state.status = "Tap receiver once or press Start / retry live mics.";
+    }
+    render();
+  }
+  function addLiveMic(stream) {
+    const audioTracks =
+      stream.getAudioTracks?.() ||
+      stream.getTracks().filter((track) => track.kind === "audio");
+    for (const track of audioTracks) {
+      if (liveMicTrackIds.has(track.id)) continue;
+      liveMicTrackIds.add(track.id);
+      liveMicStream.addTrack(track);
+    }
+    if (!audioTracks.length) return;
+    tryPlayLiveMics();
+  }
+  function removeStaleLiveMicTracks() {
+    const currentIds = /* @__PURE__ */ new Set();
+    for (const track of liveMicStream.getTracks())
+      if (track.readyState === "ended") {
+        liveMicStream.removeTrack(track);
+        liveMicTrackIds.delete(track.id);
+      } else currentIds.add(track.id);
+  }
+  function plainRtcDescription(description) {
+    return description
+      ? {
+          type: description.type,
+          sdp: description.sdp,
+        }
+      : null;
+  }
+  if (typeof BroadcastChannel !== "undefined") {
+    const channel = new BroadcastChannel("carryokie.receiver");
+    let pc = null;
+    channel.onmessage = async (ev) => {
+      const msg = ev.data || {};
+      if (msg.type === "RECEIVER_STATE") handle(msg);
+      if (
+        msg.type === "RECEIVER_OFFER" &&
+        (!msg.receiverId || msg.receiverId === receiverId)
+      )
+        try {
+          if (!pc || pc.signalingState === "closed") {
+            pc?.close?.();
+            pc = new RTCPeerConnection(rtcConfig);
+            pc.ontrack = (event) => {
+              const stream = event.streams[0];
+              if (stream) addLiveMic(stream);
+              else if (event.track) addLiveMic(new MediaStream([event.track]));
+            };
+          }
+          if (pc.signalingState === "have-local-offer")
+            await pc.setLocalDescription({ type: "rollback" });
+          removeStaleLiveMicTracks();
+          await pc.setRemoteDescription(msg.description);
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          await waitForIceComplete(pc);
+          channel.postMessage({
+            type: "RECEIVER_ANSWER",
+            receiverId,
+            description: plainRtcDescription(pc.localDescription),
+          });
+        } catch (err) {
+          state.status = `Receiver audio error: ${err.message}`;
+          render();
+          pc?.close?.();
+          pc = null;
+        }
+    };
+    channel.postMessage({
+      type: "RECEIVER_READY",
+      receiverId,
+      roomCode: state.roomCode,
+    });
+    setInterval(
+      () =>
+        channel.postMessage({
+          type: "RECEIVER_READY",
+          receiverId,
+          roomCode: state.roomCode,
+        }),
+      3e3,
+    );
+  }
+  retryLiveMicsButton.addEventListener("click", () => {
+    tryPlayLiveMics();
+  });
+  root.addEventListener("pointerdown", () => {
+    if (liveMicTrackIds.size) tryPlayLiveMics();
+  });
+  window.addEventListener("message", (ev) => handle(ev.data));
+  function syncReceiverVideo() {
+    if (!state.playbackState || !media.src || media.readyState < 1) return;
+    const derived = deriveTvMediaPositionMs(state.playbackState);
+    const seconds = Math.max(0, derived.positionMs / 1e3);
+    if (
+      Number.isFinite(seconds) &&
+      Math.abs((media.currentTime || 0) - seconds) > 0.75
+    )
+      media.currentTime = seconds;
+    if (
+      !(
+        !!state.playbackState.paused ||
+        ["paused", "idle", "ended", "host_lost", "error"].includes(
+          state.playbackState.status || "",
+        )
+      )
+    )
+      media.play().catch(() => {});
+    else media.pause();
+  }
+  setInterval(syncReceiverVideo, 500);
+  media.addEventListener("timeupdate", () => {
+    if (!state.playbackState)
+      state.mediaTimeMs = Math.round(media.currentTime * 1e3);
+    render();
+  });
+  async function startCastReceiverFramework() {
+    if (!shouldLoadCastReceiverFramework()) return;
+    try {
+      await loadCastReceiverFramework();
+    } catch (error) {
+      state.status = error.message;
+      render();
+      return;
+    }
+    if (!castGlobal().cast?.framework?.CastReceiverContext) return;
+    const context = cast.framework.CastReceiverContext.getInstance();
+    context.addCustomMessageListener(CAST_NAMESPACE, (event) =>
+      handle(event.data),
+    );
+    context.start();
+  }
+  startCastReceiverFramework();
+  render();
+}
+//#endregion
+//#region src/app/dom.ts
+function $(selector, root = document) {
+  return root.querySelector(selector);
+}
+function escapeHtml(value) {
+  return String(value ?? "").replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[character],
+  );
+}
+function localHttpWarning(locationLike = location) {
+  const hostname = locationLike.hostname;
+  return locationLike.protocol === "http:" &&
+    hostname !== "localhost" &&
+    hostname !== "127.0.0.1"
+    ? '<p class="warn">Phone browser is on local HTTP. If offer creation, camera QR, or protected video fails, use the GitHub Pages HTTPS URL for the full flow.</p>'
+    : "";
+}
+function commonChrome(root, title) {
+  root.innerHTML = `<main class="shell"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>${title}</h1>${localHttpWarning()}</div><div class="mini-stage" aria-hidden="true"><span></span><span></span><span></span></div></header><section id="main"></section><section class="activity-card"><h2>Log</h2><div id="log" class="log"></div></section></main>`;
+}
+function logToPage(message) {
+  const logContainer = $("#log");
+  if (!logContainer) return;
+  logContainer.prepend(
+    Object.assign(document.createElement("div"), {
+      textContent: `${/* @__PURE__ */ new Date().toLocaleTimeString()} ${String(message)}`,
+    }),
+  );
+}
+//#endregion
+//#region src/app/catalog.ts
+function assetUrl(path, baseUrl = import.meta.url) {
+  if (!path) return null;
+  const publicPath = path.startsWith("/public/") ? path.slice(7) : path;
+  return publicPath.startsWith("/")
+    ? new URL(".." + publicPath, baseUrl).toString()
+    : new URL(publicPath, baseUrl).toString();
+}
+function normalizeSong(song, baseUrl = import.meta.url) {
+  return {
+    ...song,
+    lyricsJsonUrl: assetUrl(song.lyricsJsonUrl, baseUrl),
+    lyricsVttUrl: assetUrl(song.lyricsVttUrl, baseUrl),
+    castMediaUrl: assetUrl(song.castMediaUrl, baseUrl),
+    phoneBackingAudioUrl: assetUrl(song.phoneBackingAudioUrl, baseUrl),
+    thumbnailUrl: assetUrl(song.thumbnailUrl, baseUrl),
+  };
+}
+async function loadSongCatalog(baseUrl = import.meta.url) {
+  const protectedSongs = await loadProtectedCatalog();
+  let plainSongs = [];
+  try {
+    const plainUrl = assetUrl("/songs/catalog.json", baseUrl);
+    const plainRes = plainUrl ? await fetch(plainUrl) : null;
+    if (plainRes?.ok)
+      plainSongs = ((await plainRes.json()).songs || []).map((song) =>
+        normalizeSong(song, baseUrl),
+      );
+  } catch {
+    plainSongs = [];
+  }
+  return [...protectedSongs, ...plainSongs];
+}
+function formatSongTitle(song, songId) {
+  return song
+    ? `${song.title || song.songId}${song.artist ? " — " + song.artist : ""}`
+    : songId;
+}
+//#endregion
+//#region src/app/lyricsView.ts
+function lyricView(lines = [], positionMs) {
+  const activeLine =
+    lines.findLast?.((line) => positionMs >= line.startMs) ||
+    lines.filter((line) => positionMs >= line.startMs).pop() ||
+    lines[0];
+  return `<div>${lines.map((line) => `<p class="${line === activeLine ? "active" : ""}">${escapeHtml(line.text)}</p>`).join("")}</div>`;
+}
+//#endregion
+//#region src/app/queueService.ts
+function pairedActor$1(room, remotePeerId, messagePlayerId) {
+  return room?.players?.find(
+    (roomPlayer) =>
+      roomPlayer.playerId === messagePlayerId &&
+      roomPlayer.peerId === remotePeerId,
+  );
+}
+function validSingerNumbers(room, singerNumbers) {
+  const playerNumbersInRoom = new Set(
+    room?.players
+      ?.map((roomPlayer) => roomPlayer.playerNumber)
+      .filter(Boolean) || [],
+  );
+  return [
+    ...new Set(
+      (Array.isArray(singerNumbers) ? singerNumbers : []).filter(
+        (singerNumber) =>
+          Number.isInteger(singerNumber) &&
+          playerNumbersInRoom.has(singerNumber),
+      ),
+    ),
+  ];
+}
+function handleQueueAddRequest$1(room, catalog, remotePeerId, message) {
+  const queueItem = message.item || {};
+  const actor = pairedActor$1(
+    room,
+    remotePeerId,
+    queueItem.requestedByPlayerId,
+  );
+  if (!actor?.playerNumber)
+    throw new Error("Queue request needs a paired requester.");
+  if (!catalog.some((song) => song.songId === queueItem.songId))
+    throw new Error("Queue request song is not in this room catalog.");
+  const singerNumbers = validSingerNumbers(room, queueItem.singerNumbers);
+  enqueueRequest(room, {
+    ...queueItem,
+    requestedByPlayerId: actor.playerId,
+    singerNumbers: singerNumbers.length ? singerNumbers : [actor.playerNumber],
+  });
+}
+function applyPhoneQueueUpdate$1(room, remotePeerId, message) {
+  const actor = pairedActor$1(room, remotePeerId, message.playerId);
+  if (!actor?.playerNumber)
+    throw new Error("Queue update needs a paired player number.");
+  const queueItem = room.queue.find(
+    (item) => item.queueItemId === message.queueItemId,
+  );
+  if (!queueItem) throw new Error("Queue item not found.");
+  if (message.action === "join")
+    addSingerToQueueItem(room, queueItem.queueItemId, actor.playerNumber);
+  else if (message.action === "leave")
+    removeSingerFromQueueItem(room, queueItem.queueItemId, actor.playerNumber);
+  else if (
+    message.action === "remove" &&
+    queueItem.requestedByPlayerId === actor.playerId &&
+    !["active", "ended"].includes(queueItem.status)
+  )
+    removeQueueItem(room, queueItem.queueItemId);
+  else throw new Error("Queue update not allowed.");
+}
+//#endregion
+//#region src/app/queueView.ts
+function singerNames(room, singerNumbers) {
+  return singerNumbers
+    .map(
+      (singerNumber) =>
+        room.players.find(
+          (roomPlayer) => roomPlayer.playerNumber === singerNumber,
+        )?.displayName || `#${singerNumber}`,
+    )
+    .join(", ");
+}
+function queueHtml$1(room, mode = "host", songTitle, player) {
+  if (!room?.queue?.length) return '<p class="subtle">No songs queued yet.</p>';
+  return `<ul class="queue-items">${room.queue
+    .map((queueItem) => {
+      const queueId = escapeHtml(queueItem.queueItemId);
+      const status = escapeHtml(queueItem.status);
+      const requestedBy =
+        room.players.find(
+          (roomPlayer) => roomPlayer.playerId === queueItem.requestedByPlayerId,
+        )?.displayName || "Guest";
+      const hostControls = `${["requested", "rejected"].includes(queueItem.status) ? `<button class="acceptItem" data-queue-id="${queueId}" title="Accept/requeue">Approve</button>` : ""} ${queueItem.status === "queued" ? `<button class="startItem" data-queue-id="${queueId}" title="Start on TV">Start now</button>` : ""} ${queueItem.status === "requested" ? `<button class="rejectItem" data-queue-id="${queueId}" title="Reject">Not now</button>` : ""} <button class="moveUpItem" data-queue-id="${queueId}" title="Move earlier">↑</button> <button class="moveDownItem" data-queue-id="${queueId}" title="Move later">↓</button> <button class="removeItem" data-queue-id="${queueId}" title="Remove">Remove</button>`;
+      const phoneControls = !["active", "ended"].includes(queueItem.status)
+        ? `<button class="queueSelf" data-action="join" data-queue-id="${queueId}">Add me</button> <button class="queueSelf" data-action="leave" data-queue-id="${queueId}">Leave</button> ${queueItem.requestedByPlayerId === player?.playerId ? `<button class="queueSelf" data-action="remove" data-queue-id="${queueId}">Cancel request</button>` : ""}`
+        : "";
+      return `<li class="queue-item"><div class="queue-top"><strong>${escapeHtml(songTitle(queueItem.songId))}</strong><span class="queue-status queue-status-${status}">${status}</span></div><p class="subtle">Singers: ${escapeHtml(singerNames(room, queueItem.singerNumbers))} · requested by ${escapeHtml(requestedBy)}</p><div class="button-row queue-actions">${mode === "host" ? hostControls : phoneControls}</div></li>`;
+    })
+    .join("")}</ul>`;
+}
+//#endregion
+//#region src/app.ts
+var room = loadRoom();
+var player = JSON.parse(localStorage.getItem("carryokie.player") || "null");
+var peerNode;
+var audio;
+var catalog = [];
+var castController;
+var castListenersAttached = false;
+var phoneSyncTimer = null;
+var receiverChannel;
+var receiverPc;
+var receiverSessionId = null;
+var receiverAudioDirty = false;
+var receiverNegotiating = false;
+var receiverPendingRenegotiate = false;
+var receiverNegotiationTimer = null;
+var receiverTrackKeys = /* @__PURE__ */ new Set();
+var peerCloseTimers = /* @__PURE__ */ new Map();
+function persist() {
+  if (room) saveRoom(room);
+  if (player) localStorage.setItem("carryokie.player", JSON.stringify(player));
+}
+function log(msg) {
+  logToPage(msg);
+}
+async function loadCatalog() {
+  catalog = await loadSongCatalog(import.meta.url);
+}
+function unlockPhoneAudio() {
+  audio?.init().catch((error) => {
+    log(error?.message || "Phone audio unlock was ignored by the browser.");
+  });
+}
+function setupPeer(localPeerId) {
+  peerNode = new PeerNode(localPeerId);
+  peerNode.addEventListener("open", (e) => {
+    clearPeerCloseTimer(e.detail.remotePeerId);
+    log(`DataChannel open: ${e.detail.remotePeerId}`);
+    peerNode.send(e.detail.remotePeerId, {
+      type: RPC.ROOM_HELLO,
+      peerId: localPeerId,
+      player,
+    });
+    if (player?.isHost)
+      peerNode.send(e.detail.remotePeerId, {
+        type: RPC.ROOM_STATE_SNAPSHOT,
+        room,
+      });
+  });
+  peerNode.addEventListener("close", (e) =>
+    handlePeerClosed(e.detail.remotePeerId),
+  );
+  peerNode.addEventListener("connection", (e) => {
+    if (e.detail.state === "connected")
+      clearPeerCloseTimer(e.detail.remotePeerId);
+    if (e.detail.state === "disconnected")
+      schedulePeerClosed(e.detail.remotePeerId);
+    if (e.detail.state === "failed" || e.detail.state === "closed")
+      handlePeerClosed(e.detail.remotePeerId);
+  });
+  peerNode.addEventListener("message", (e) =>
+    handleRpc(e.detail.remotePeerId, e.detail.msg),
+  );
+  peerNode.addEventListener("error", (e) => log(e.detail.message));
+  peerNode.addEventListener("track", (e) => {
+    const remoteStream =
+      e.detail.stream ||
+      (e.detail.track ? new MediaStream([e.detail.track]) : null);
+    if (!remoteStream) return;
+    audio?.addRemoteStream(remoteStream, e.detail.remotePeerId);
+    if (player?.isHost) {
+      peerNode.relayRemoteStream(e.detail.remotePeerId, remoteStream);
+      receiverAudioDirty = true;
+      negotiateReceiverAudio().catch((err) => log(err.message));
+    }
+  });
+  setInterval(() => peerNode?.pingAll(), 5e3);
+  setInterval(() => {
+    if (
+      player?.isHost &&
+      room?.playbackState &&
+      !room.playbackState.paused &&
+      receiverChannel
+    ) {
+      const now = Date.now();
+      const derived = deriveTvMediaPositionMs(room.playbackState, now, 0);
+      room.playbackState = {
+        ...room.playbackState,
+        tvMediaTimeMs: derived.positionMs,
+        tvMediaTimeSampledAtHostMs: now,
+        lastUpdatedAtHostMs: now,
+      };
+      publishReceiverPlayback(room.playbackState);
+    }
+  }, 2e3);
+  return peerNode;
+}
+function isHostEdge(remotePeerId) {
+  return (
+    remotePeerId === "host" ||
+    (!!room?.hostPeerId && remotePeerId === room.hostPeerId)
+  );
+}
+function handlePeerClosed(remotePeerId) {
+  clearPeerCloseTimer(remotePeerId);
+  if (player?.isHost) {
+    handlePlayerLeft(remotePeerId);
+    return;
+  }
+  if (room && isHostEdge(remotePeerId)) {
+    lockHostLost(room);
+    persist();
+    log(
+      room.hostLostMessage ||
+        "Host disconnected. TV and queue controls are locked. Create a new room to continue.",
+    );
+    renderPlayer($("#main"));
+  }
+}
+function clearPeerCloseTimer(remotePeerId) {
+  clearTimeout(peerCloseTimers.get(remotePeerId));
+  peerCloseTimers.delete(remotePeerId);
+}
+function schedulePeerClosed(remotePeerId) {
+  if (peerCloseTimers.has(remotePeerId)) return;
+  peerCloseTimers.set(
+    remotePeerId,
+    setTimeout(() => handlePeerClosed(remotePeerId), 1e4),
+  );
+}
+function handlePlayerLeft(remotePeerId) {
+  if (!player?.isHost || !room) return;
+  const target = room.players.find((p) => p.peerId === remotePeerId);
+  if (!target || target.connectionState === "disconnected") return;
+  target.connectionState = "disconnected";
+  target.lastSeenAt = Date.now();
+  peerNode.send(remotePeerId, {
+    type: RPC.PLAYER_LEFT,
+    peerId: remotePeerId,
+  });
+  peerNode.broadcast({
+    type: RPC.PLAYER_LEFT,
+    peerId: remotePeerId,
+    room,
+  });
+  log(`Player #${target.playerNumber} ${target.displayName} disconnected.`);
+  persist();
+  renderHost($("#main"));
+}
+function broadcastRoom(type = RPC.ROOM_STATE_SNAPSHOT) {
+  peerNode?.broadcast({
+    type,
+    room,
+  });
+}
+function receiverUrl() {
+  return new URL(
+    `../receiver/?room=${encodeURIComponent(room?.roomCode || "")}`,
+    location.href,
+  ).toString();
+}
+function receiverPayload() {
+  return {
+    roomCode: room?.roomCode,
+    queue: queuePreview(),
+    singers: room?.players?.filter((p) => p.isSingerForCurrentSong) || [],
+    song: currentSong(),
+    playbackState: room?.playbackState,
+  };
+}
+function publishReceiverState() {
+  receiverChannel?.postMessage?.({
+    type: "RECEIVER_STATE",
+    payload: receiverPayload(),
+  });
+}
+function publishReceiverPlayback(sample = room?.playbackState) {
+  receiverChannel?.postMessage?.({
+    type: "RECEIVER_PLAYBACK_SYNC",
+    payload: sample,
+  });
+}
+function publishReceiverCommand(type, payload = {}) {
+  receiverChannel?.postMessage?.({
+    type,
+    payload,
+  });
+}
+function sendCastRoomUpdate(type, payload = {}) {
+  castController?.sendSafe?.(type, payload);
+  publishReceiverState();
+}
+function plainRtcDescription(description) {
+  return description
+    ? {
+        type: description.type,
+        sdp: description.sdp,
+      }
+    : null;
+}
+function resetReceiverAudio(receiverId) {
+  receiverPc?.close?.();
+  receiverPc = null;
+  receiverTrackKeys.clear();
+  receiverSessionId = receiverId;
+  receiverAudioDirty = true;
+  receiverPendingRenegotiate = false;
+  clearTimeout(receiverNegotiationTimer ?? void 0);
+  receiverNegotiationTimer = null;
+}
+async function negotiateReceiverAudio() {
+  if (!player?.isHost || !receiverPc || !peerNode || !receiverAudioDirty)
+    return;
+  if (receiverNegotiating || receiverPc.signalingState !== "stable") {
+    receiverPendingRenegotiate = true;
+    return;
+  }
+  receiverNegotiating = true;
+  receiverPendingRenegotiate = false;
+  receiverAudioDirty = false;
+  let offerSent = false;
+  try {
+    for (const { stream } of peerNode.relayedStreams || [])
+      stream
+        .getTracks()
+        .filter((track) => !receiverTrackKeys.has(mediaTrackKey(track)))
+        .forEach((track) => {
+          receiverTrackKeys.add(mediaTrackKey(track));
+          receiverPc.addTrack(track, stream);
+        });
+    if (!receiverTrackKeys.size) return;
+    const offer = await receiverPc.createOffer({ offerToReceiveAudio: true });
+    await receiverPc.setLocalDescription(offer);
+    await waitForIceComplete(receiverPc);
+    receiverChannel?.postMessage({
+      type: "RECEIVER_OFFER",
+      receiverId: receiverSessionId,
+      description: plainRtcDescription(receiverPc.localDescription),
+    });
+    offerSent = true;
+    clearTimeout(receiverNegotiationTimer ?? void 0);
+    receiverNegotiationTimer = setTimeout(async () => {
+      if (receiverNegotiating) {
+        receiverNegotiating = false;
+        try {
+          if (receiverPc?.signalingState === "have-local-offer")
+            await receiverPc.setLocalDescription({ type: "rollback" });
+        } catch {}
+        if (receiverPendingRenegotiate || receiverAudioDirty)
+          negotiateReceiverAudio().catch((e) => log(e.message));
+      }
+    }, 15e3);
+  } finally {
+    if (!offerSent) receiverNegotiating = false;
+  }
+}
+function setupReceiverBridge() {
+  if (receiverChannel || typeof BroadcastChannel === "undefined") return;
+  receiverChannel = new BroadcastChannel("carryokie.receiver");
+  receiverChannel.onmessage = async (ev) => {
+    const msg = ev.data || {};
+    if (msg.type === "RECEIVER_READY") {
+      const receiverId = msg.receiverId || "receiver";
+      publishReceiverState();
+      if (receiverSessionId !== receiverId) resetReceiverAudio(receiverId);
+      if (!receiverPc) {
+        receiverPc = new RTCPeerConnection(rtcConfig);
+        receiverPc.oniceconnectionstatechange = () =>
+          log(`Receiver tab audio ${receiverPc.iceConnectionState}`);
+      }
+      negotiateReceiverAudio().catch((e) => log(e.message));
+    }
+    if (
+      msg.type === "RECEIVER_ANSWER" &&
+      receiverPc &&
+      (!msg.receiverId || msg.receiverId === receiverSessionId)
+    ) {
+      await receiverPc
+        .setRemoteDescription(msg.description)
+        .catch(async (e) => {
+          log(e.message);
+          try {
+            if (receiverPc?.signalingState === "have-local-offer")
+              await receiverPc.setLocalDescription({ type: "rollback" });
+          } catch {}
+          receiverNegotiating = false;
+        });
+      clearTimeout(receiverNegotiationTimer ?? void 0);
+      receiverNegotiating = false;
+      if (receiverPendingRenegotiate || receiverAudioDirty)
+        negotiateReceiverAudio().catch((e) => log(e.message));
+    }
+  };
+}
+function songTitle(songId) {
+  return formatSongTitle(
+    catalog.find((s) => s.songId === songId),
+    songId,
+  );
+}
+function queueSingerNames(queueItem) {
+  return queueItem.singerNumbers.map(
+    (singerNumber) =>
+      room?.players?.find((p) => p.playerNumber === singerNumber)
+        ?.displayName || `#${singerNumber}`,
+  );
+}
+function queuePreview() {
+  return room.queue.map((q) => ({
+    ...q,
+    title: songTitle(q.songId),
+    singerNames: queueSingerNames(q),
+  }));
+}
+function queueHtml(r, mode = "host") {
+  return queueHtml$1(r, mode, songTitle, player);
+}
+function publishQueueUpdate() {
+  broadcastRoom(RPC.QUEUE_UPDATED);
+  sendCastRoomUpdate("CAST_UPDATE_QUEUE_PREVIEW", { queue: queuePreview() });
+  persist();
+}
+function attachCastListeners(cast) {
+  if (castListenersAttached) return;
+  castListenersAttached = true;
+  cast.addEventListener("state", (e) => {
+    const s = e.detail;
+    const el = $("#castStatus");
+    if (el)
+      el.textContent = s.connected
+        ? "Connected to TV"
+        : s.available
+          ? "Available, click to connect"
+          : "Chromecast not available";
+  });
+  cast.addEventListener("error", (e) => log(e.detail.message));
+  cast.addEventListener("playbackSample", (e) => {
+    room.playbackState = {
+      ...room.playbackState,
+      ...e.detail,
+      syncDegraded: false,
+      lastUpdatedAtHostMs: Date.now(),
+    };
+    peerNode?.broadcast({
+      type: RPC.PLAYBACK_SYNC,
+      sample: room.playbackState,
+    });
+    publishReceiverPlayback(room.playbackState);
+    persist();
+  });
+}
+function setOwnMicMuted(muted) {
+  audio?.setMicMuted(muted);
+  if (player?.micState) {
+    player.micState = {
+      ...player.micState,
+      muted,
+    };
+    persist();
+  }
+  const status = $("#micStatus");
+  if (status) status.textContent = muted ? "Mic muted." : "Mic live.";
+  peerNode?.broadcast({
+    type: muted ? RPC.MIC_MUTED : RPC.MIC_UNMUTED,
+    playerId: player?.playerId,
+  });
+}
+function registerRemotePlayer(remotePeerId, remotePlayer) {
+  if (!player?.isHost || !remotePlayer || !room) return false;
+  const existing = room.players.find(
+    (p) =>
+      p.peerId === remotePlayer.peerId || p.playerId === remotePlayer.playerId,
+  );
+  if (existing) {
+    const nextDisplayName = normalizeDisplayName(
+      remotePlayer.displayName,
+      existing.displayName || "Guest",
+    );
+    const changed =
+      existing.displayName !== nextDisplayName ||
+      existing.connectionState !== "connected" ||
+      existing.peerId !== (remotePlayer.peerId || remotePeerId);
+    existing.displayName = nextDisplayName;
+    existing.peerId = remotePlayer.peerId || remotePeerId;
+    existing.connectionState = "connected";
+    existing.lastSeenAt = Date.now();
+    return changed;
+  }
+  addPlayer(room, {
+    ...remotePlayer,
+    peerId: remotePlayer.peerId || remotePeerId,
+    displayName: normalizeDisplayName(remotePlayer.displayName, "Guest"),
+    role: "participant",
+    isHost: false,
+    connectionState: "connected",
+    lastSeenAt: Date.now(),
+  });
+  return true;
+}
+function currentSong() {
+  return catalog.find((s) => s.songId === room?.currentSongId) || catalog[0];
+}
+function castOrigin() {
+  return localStorage.getItem("carryokie.castOrigin") || location.origin;
+}
+function saveCastOrigin() {
+  const input = $("#castOrigin");
+  if (input?.value)
+    localStorage.setItem(
+      "carryokie.castOrigin",
+      input.value.replace(/\/$/, ""),
+    );
+}
+function showCastControls() {
+  ["castLoadBtn", "castPlayBtn", "castPause", "castSeek"].forEach((id) => {
+    const el = $("#" + id);
+    if (el) el.style.display = "inline";
+  });
+}
+async function loadCurrentSongOnTv() {
+  const song = currentSong();
+  if (!castController || !song) return false;
+  try {
+    await castController.loadSong(song, room);
+    castController.sendSafe("CAST_SHOW_JOIN_QR", { roomCode: room.roomCode });
+    publishReceiverState();
+    showCastControls();
+    $("#castStatus") &&
+      ($("#castStatus").textContent =
+        `Loaded ${song.title || song.songId} on TV`);
+    log(`TV media loaded: ${song.title || song.songId}`);
+    return true;
+  } catch (e) {
+    log(e.message);
+    return false;
+  }
+}
+function pauseCurrentPlayback() {
+  if (!room?.playbackState) return;
+  const derived = deriveTvMediaPositionMs(room.playbackState, Date.now(), 0);
+  room.playbackState = {
+    ...room.playbackState,
+    paused: true,
+    status: "paused",
+    pausedAtSongMs: derived.positionMs,
+    tvMediaTimeMs: derived.positionMs,
+    lastUpdatedAtHostMs: Date.now(),
+  };
+  publishReceiverPlayback(room.playbackState);
+  broadcastRoom(RPC.PLAYBACK_PAUSED);
+  persist();
+}
+function resumeCurrentPlayback() {
+  if (!room?.playbackState) return;
+  const now = Date.now();
+  const wasAt = room.playbackState.pausedAtSongMs || 0;
+  room.playbackState = {
+    ...room.playbackState,
+    paused: false,
+    status: "playing",
+    startedAtHostMs: now,
+    tvMediaTimeMs: wasAt,
+    tvMediaTimeSampledAtHostMs: now,
+    pausedAtSongMs: 0,
+    syncDegraded: false,
+    lastUpdatedAtHostMs: now,
+  };
+  publishReceiverPlayback(room.playbackState);
+  broadcastRoom(RPC.PLAYBACK_STARTED);
+  persist();
+}
+function startQueueItem(item) {
+  if (!item) {
+    log("Queue is empty. Add or accept a song first.");
+    return;
+  }
+  if (item.status !== "queued") {
+    log("Accept the queue item before starting it.");
+    return;
+  }
+  room.currentSongId = item.songId;
+  room.currentQueueItemId = item.queueItemId;
+  room.queue.forEach((q) => {
+    if (q.status === "active" && q.queueItemId !== item.queueItemId)
+      q.status = "ended";
+  });
+  item.status = "active";
+  if (!item.acceptedAt) item.acceptedAt = Date.now();
+  const singerIds = item.singerNumbers
+    .map((n) => room.players.find((p) => p.playerNumber === n)?.playerId)
+    .filter(Boolean);
+  assignSingers(room, singerIds);
+  room.playbackState = {
+    ...room.playbackState,
+    songId: item.songId,
+    status: "loading",
+    startedAtHostMs: null,
+    pausedAtSongMs: 0,
+    seekOffsetMs: 0,
+    tvMediaTimeMs: 0,
+    tvMediaTimeSampledAtHostMs: null,
+    paused: true,
+    syncDegraded: true,
+    lastUpdatedAtHostMs: Date.now(),
+  };
+  broadcastRoom(RPC.ROOM_STATE_SNAPSHOT);
+  sendCastRoomUpdate("CAST_UPDATE_QUEUE_PREVIEW", { queue: queuePreview() });
+  sendCastRoomUpdate("CAST_SET_SINGERS", {
+    players: room.players.filter((p) => p.isSingerForCurrentSong),
+  });
+  persist();
+  publishReceiverState();
+  if (castController?.state?.().connected) loadCurrentSongOnTv();
+  resumeCurrentPlayback();
+}
+function pairedActor(remotePeerId, msgPlayerId) {
+  return pairedActor$1(room, remotePeerId, msgPlayerId);
+}
+function handleQueueAddRequest(remotePeerId, msg) {
+  handleQueueAddRequest$1(room, catalog, remotePeerId, msg);
+}
+function applyPhoneQueueUpdate(remotePeerId, msg) {
+  applyPhoneQueueUpdate$1(room, remotePeerId, msg);
+}
+function handleRpc(remotePeerId, msg) {
+  log(`${msg.type} from ${remotePeerId}`);
+  if (msg.type === RPC.ROOM_HELLO && player?.isHost) {
+    const changed = registerRemotePlayer(remotePeerId, msg.player);
+    peerNode.send(remotePeerId, {
+      type: RPC.ROOM_STATE_SNAPSHOT,
+      room,
+    });
+    if (changed) {
+      broadcastRoom();
+      persist();
+      renderHost($("#main"));
+    }
+  }
+  if (msg.type === RPC.ROOM_STATE_SNAPSHOT && !player?.isHost) {
+    room = msg.room;
+    const self = room.players.find(
+      (p) => p.peerId === player.peerId || p.playerId === player.playerId,
+    );
+    if (self)
+      player = {
+        ...player,
+        ...self,
+      };
+    persist();
+    renderPlayer($("#main"));
+  }
+  if (msg.type === RPC.QUEUE_ADD_REQUEST && player?.isHost)
+    try {
+      handleQueueAddRequest(remotePeerId, msg);
+      publishQueueUpdate();
+      renderHost($("#main"));
+    } catch (e) {
+      peerNode.send(remotePeerId, {
+        type: RPC.ERROR_NOTICE,
+        message: e.message,
+      });
+      log(e.message);
+    }
+  if (msg.type === RPC.QUEUE_UPDATE_REQUEST && player?.isHost)
+    try {
+      applyPhoneQueueUpdate(remotePeerId, msg);
+      publishQueueUpdate();
+      renderHost($("#main"));
+    } catch (e) {
+      peerNode.send(remotePeerId, {
+        type: RPC.ERROR_NOTICE,
+        message: e.message,
+      });
+      log(e.message);
+    }
+  if (msg.type === RPC.QUEUE_UPDATED && !player?.isHost) {
+    room = msg.room;
+    persist();
+    renderPlayer($("#main"));
+  }
+  if (msg.type === RPC.PLAYBACK_SYNC) {
+    room.playbackState = {
+      ...room.playbackState,
+      ...msg.sample,
+      syncDegraded: false,
+    };
+    persist();
+    renderLyricsPanel();
+    syncPhoneVideo();
+  }
+  if (msg.type === RPC.SINGER_JOIN_REQUEST && player?.isHost) {
+    const actor = pairedActor(remotePeerId, msg.playerId);
+    if (actor) {
+      const singers = [
+        ...new Set([
+          ...room.players
+            .filter((p) => p.isSingerForCurrentSong)
+            .map((p) => p.playerId),
+          actor.playerId,
+        ]),
+      ].slice(0, 5);
+      assignSingers(room, singers);
+      broadcastRoom(RPC.SINGER_ASSIGNED);
+      sendCastRoomUpdate("CAST_SET_SINGERS", {
+        players: room.players.filter((p) => p.isSingerForCurrentSong),
+      });
+      persist();
+      renderHost($("#main"));
+    } else
+      peerNode.send(remotePeerId, {
+        type: RPC.ERROR_NOTICE,
+        message: "Singer request needs a paired player.",
+      });
+  }
+  if (msg.type === RPC.SINGER_ASSIGNED && !player?.isHost) {
+    room = msg.room;
+    const self = room.players.find(
+      (p) => p.peerId === player.peerId || p.playerId === player.playerId,
+    );
+    if (self)
+      player = {
+        ...player,
+        ...self,
+      };
+    persist();
+    renderPlayer($("#main"));
+  }
+  if (msg.type === RPC.PLAYER_LEFT && !player?.isHost) {
+    room = msg.room;
+    if (room?.playbackState?.status === "host_lost")
+      log(
+        "Host disconnected. TV and queue controls are locked. Create a new room to continue.",
+      );
+    else log(`Player ${msg.peerId} left the room.`);
+    persist();
+    renderPlayer($("#main"));
+  }
+  if (msg.type === RPC.MIC_MUTED && msg.playerId === player?.playerId) {
+    setOwnMicMuted(true);
+    log("Host muted your mic.");
+  }
+  if (msg.type === RPC.MIC_ENABLED && player?.isHost) {
+    const target = room.players.find((p) => p.playerId === msg.playerId);
+    if (target) {
+      target.micState = {
+        ...target.micState,
+        enabled: true,
+        publishing: true,
+      };
+      persist();
+      renderHost($("#main"));
+      log(`#${target.playerNumber} ${target.displayName} enabled mic.`);
+    }
+  }
+}
+async function hostPage(root) {
+  await loadCatalog();
+  if (!player?.isHost) {
+    player = makePlayer("host", "Host");
+    player.playerNumber = 1;
+    room = makeRoom(player);
+    persist();
+  }
+  setupPeer(player.peerId);
+  setupReceiverBridge();
+  commonChrome(root, "Host Controller");
+  renderHost($("#main"));
+}
+function renderHost(main) {
+  const setupComplete = room.players.length > 1 && room.queue.length > 0;
+  const tvBleedWarn = room.players.some((p) => p.isSingerForCurrentSong)
+    ? '<p class="warn">TV bleed risk: singers should use headphones. Lyrics/video on TV only.</p>'
+    : "";
+  const activeSingers = room.players.filter(
+    (p) => p.isSingerForCurrentSong,
+  ).length;
+  main.innerHTML = `<section class="host-dashboard"><div class="room-spotlight card"><div><p class="eyebrow">Host room</p><h2>Room ${escapeHtml(room.roomCode)}</h2><p class="subtle">${room.players.length}/5 players · ${activeSingers} active singer(s) · ${room.queue.length} queue item(s)</p><ol class="quickstart"><li><strong>Share room:</strong> singers open the player join link.</li><li><strong>Pair one phone:</strong> player makes a code, host answers once.</li><li><strong>Start room:</strong> approve queue, connect TV, pick singer.</li></ol></div><div class="stage-art compact" aria-hidden="true"><div class="stage-orb"></div><div class="soundwave"><span></span><span></span><span></span><span></span><span></span></div></div></div><section class="grid"><details class="card" open><summary>1. Share this room</summary><p><a href="../player/?room=${escapeHtml(room.roomCode)}">Open player join link</a></p><p><a href="${escapeHtml(receiverUrl())}" target="_blank" rel="noreferrer">Open TV receiver tab</a></p><p class="hint">Chrome tab cast path: open the receiver tab first, then cast that tab.</p><button id="newRoom">Start over with a new room</button>${tvBleedWarn}</details><details class="card"${setupComplete ? "" : " open"}><summary>2. Pair a phone</summary><p>Player creates a join code. Paste or scan it here, then send back the host answer.</p><textarea id="offer" placeholder="Paste player offer/link/chunks"></textarea><div class="button-row"><button id="scanOfferQr">Scan player QR</button><button id="answerOffer" class="primary">Create host answer</button></div><div id="answerOut"></div></details><div class="card queue-card"><h2>3. Run the room</h2><div class="button-row"><button id="acceptAll">Approve waiting songs</button><button id="startNext" class="primary">Start next song</button><button id="pauseSong">Pause song</button><button id="resumeSong">Resume song</button></div>${queueHtml(room, "host")}</div><details class="card"><summary>TV controls</summary><p id="castStatus" class="status-pill live-status">Click to connect to Chromecast</p><button id="castBtn" class="primary">Connect TV / cast current song</button><button id="castLoadBtn" style="display:none">Reload current song on TV</button><div class="button-row"><button id="castPlayBtn" style="display:none">Play</button><button id="castPause" style="display:none">Pause</button></div><label>Seek seconds <input id="castSeekSeconds" type="number" min="0" value="0"></label><button id="castSeek" style="display:none">Seek</button><label>Cast media origin <input id="castOrigin" value="${escapeHtml(castOrigin())}" placeholder="http://192.168.x.x:4174"></label><p class="hint">Default Chromecast receiver plays media only. For room UI and live mics, cast the receiver tab link above.</p><pre id="castState"></pre></details><details class="card singer-card"><summary>Singers / mic control</summary><p class="subtle">Check who should be live on this song.</p>${room.players.map((p) => `<div class="inline-choice"><label><input type="checkbox" class="singer" value="${escapeHtml(p.playerId)}" ${p.isSingerForCurrentSong ? "checked" : ""}> #${p.playerNumber} ${escapeHtml(p.displayName)}</label><button class="mutePlayer" data-player-id="${escapeHtml(p.playerId)}">Mute #${p.playerNumber}</button></div>`).join("")}<button id="setSingers" class="primary">Save singer list</button></details></section></section>`;
+  $("#newRoom").onclick = () => {
+    player = makePlayer("host", "Host");
+    player.playerNumber = 1;
+    room = makeRoom(player);
+    persist();
+    location.reload();
+  };
+  $("#scanOfferQr").onclick = async () => {
+    try {
+      await scanQrInto($("#offer"), log);
+    } catch (e) {
+      log(e.message);
+    }
+  };
+  $("#answerOffer").onclick = async () => {
+    try {
+      const encoded = await peerNode.acceptManualOffer($("#offer").value);
+      renderPayloadCard($("#answerOut"), encoded, "Host answer");
+    } catch (e) {
+      log(e.message);
+    }
+  };
+  $("#acceptAll").onclick = () => {
+    room.queue
+      .filter((q) => q.status === "requested")
+      .forEach((q) => acceptQueue(room, q.queueItemId));
+    publishQueueUpdate();
+    renderHost(main);
+  };
+  $("#startNext").onclick = () => {
+    startQueueItem(nextQueuedItem(room));
+    renderHost(main);
+  };
+  $("#pauseSong").onclick = () => {
+    publishReceiverCommand("CAST_PAUSE");
+    castController?.pause?.();
+    pauseCurrentPlayback();
+    renderHost(main);
+  };
+  $("#resumeSong").onclick = () => {
+    publishReceiverCommand("CAST_PLAY");
+    castController?.play?.().catch((e) => log(e.message));
+    resumeCurrentPlayback();
+    renderHost(main);
+  };
+  $("#setSingers").onclick = () => {
+    assignSingers(
+      room,
+      [...document.querySelectorAll(".singer:checked")].map((i) => i.value),
+    );
+    broadcastRoom(RPC.SINGER_ASSIGNED);
+    sendCastRoomUpdate("CAST_SET_SINGERS", {
+      players: room.players.filter((p) => p.isSingerForCurrentSong),
+    });
+    persist();
+    renderHost(main);
+  };
+  document.querySelectorAll(".acceptItem").forEach(
+    (b) =>
+      (b.onclick = () => {
+        acceptQueue(room, b.dataset.queueId);
+        publishQueueUpdate();
+        renderHost(main);
+      }),
+  );
+  document.querySelectorAll(".startItem").forEach(
+    (b) =>
+      (b.onclick = () => {
+        startQueueItem(
+          room.queue.find((q) => q.queueItemId === b.dataset.queueId),
+        );
+        renderHost(main);
+      }),
+  );
+  document.querySelectorAll(".rejectItem").forEach(
+    (b) =>
+      (b.onclick = () => {
+        rejectQueue(room, b.dataset.queueId);
+        publishQueueUpdate();
+        renderHost(main);
+      }),
+  );
+  document.querySelectorAll(".removeItem").forEach(
+    (b) =>
+      (b.onclick = () => {
+        removeQueueItem(room, b.dataset.queueId);
+        publishQueueUpdate();
+        renderHost(main);
+      }),
+  );
+  document.querySelectorAll(".moveUpItem").forEach(
+    (b) =>
+      (b.onclick = () => {
+        moveQueueItem(room, b.dataset.queueId, -1);
+        publishQueueUpdate();
+        renderHost(main);
+      }),
+  );
+  document.querySelectorAll(".moveDownItem").forEach(
+    (b) =>
+      (b.onclick = () => {
+        moveQueueItem(room, b.dataset.queueId, 1);
+        publishQueueUpdate();
+        renderHost(main);
+      }),
+  );
+  document.querySelectorAll(".mutePlayer").forEach(
+    (b) =>
+      (b.onclick = () => {
+        const playerId = b.dataset.playerId;
+        const target = room.players.find((p) => p.playerId === playerId);
+        if (target)
+          peerNode.send(target.peerId, {
+            type: RPC.MIC_MUTED,
+            playerId,
+          });
+        log(`Mute sent to #${target?.playerNumber || "?"}`);
+      }),
+  );
+  $("#castStatus").textContent = "Click to connect to Chromecast";
+  const cast =
+    castController || (castController = new CastController("CC1AD845"));
+  $("#castStatus").textContent = "Click to connect to Chromecast";
+  attachCastListeners(cast);
+  $("#castBtn").onclick = async () => {
+    try {
+      saveCastOrigin();
+      $("#castBtn").disabled = true;
+      $("#castStatus").textContent = "Connecting to Chromecast…";
+      await cast.init();
+      await cast.requestSession();
+      $("#castBtn").style.display = "none";
+      showCastControls();
+      $("#castStatus").textContent = "Connected to TV";
+      publishReceiverState();
+      log("Cast connected");
+      await loadCurrentSongOnTv();
+    } catch (e) {
+      $("#castBtn").disabled = false;
+      log(e.message);
+    }
+  };
+  $("#castLoadBtn").onclick = () => {
+    saveCastOrigin();
+    loadCurrentSongOnTv();
+  };
+  $("#castPlayBtn").onclick = () => {
+    publishReceiverCommand("CAST_PLAY");
+    cast.play().catch((e) => log(e.message));
+  };
+  $("#castPause").onclick = () => {
+    publishReceiverCommand("CAST_PAUSE");
+    cast.pause();
+  };
+  $("#castSeek").onclick = () => {
+    const seconds = +$("#castSeekSeconds").value || 0;
+    publishReceiverCommand("CAST_SEEK", { seconds });
+    cast.seek(seconds);
+    if (room?.playbackState) {
+      const now = Date.now();
+      room.playbackState = {
+        ...room.playbackState,
+        tvMediaTimeMs: seconds * 1e3,
+        tvMediaTimeSampledAtHostMs: now,
+        seekOffsetMs: 0,
+        lastUpdatedAtHostMs: now,
+      };
+      publishReceiverPlayback(room.playbackState);
+      persist();
+    }
+  };
+}
+async function playerPage(root) {
+  await loadCatalog();
+  if (!player?.playerId || player.isHost) {
+    player = makePlayer("participant", "Player");
+    persist();
+  }
+  player.displayName = normalizeDisplayName(player.displayName, "Player");
+  persist();
+  setupPeer(player.peerId);
+  audio = new PhoneAudio(log);
+  commonChrome(root, "Player Phone");
+  renderPlayer($("#main"));
+}
+function playerIsJoined() {
+  return !!(
+    room?.hostPeerId &&
+    player?.playerNumber &&
+    room.players?.some(
+      (p) => p.playerId === player.playerId || p.peerId === player.peerId,
+    )
+  );
+}
+function joinRoomHtml(roomCode) {
+  const reconnect = room?.hostPeerId
+    ? `<div class="card"><h2>Reconnect</h2><p>Previously in room <strong>${escapeHtml(room.roomCode)}</strong>. Make a fresh join code, then ask the host for a new answer.</p><button id="forgetRoom">Forget room, start fresh</button></div>`
+    : "";
+  return `<section class="phone-screen"><div class="phone-hero card"><p class="eyebrow">Player pairing</p><h2>Join room ${escapeHtml(roomCode || "")}</h2><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p class="subtle">Two steps: make a join code, then import the host answer. After joining, queue and mic controls appear.</p></div><details class="card" open><summary>Join room</summary><label>Your name<input id="displayName" value="${escapeHtml(player?.displayName || "Player")}" placeholder="Your name"></label><p class="subtle">Room code from link: <strong>${escapeHtml(roomCode || "not set")}</strong></p><button id="makeOffer" class="primary">1. Create phone pairing code</button><div id="offerOut"></div><label>Host answer<textarea id="answer" placeholder="Paste host answer/link/chunks"></textarea></label><div class="button-row"><button id="scanAnswerQr">Scan host answer QR</button><button id="importAnswer" class="primary">2. Finish pairing</button></div></details>${reconnect}</section>`;
+}
+function updatePlayerDisplayName() {
+  if (!player) return;
+  const input = $("#displayName");
+  const nextDisplayName = normalizeDisplayName(input?.value, "Player");
+  if (input) input.value = nextDisplayName;
+  const changed = player.displayName !== nextDisplayName;
+  player = {
+    ...player,
+    displayName: nextDisplayName,
+  };
+  persist();
+  if (changed && playerIsJoined() && room?.hostPeerId)
+    peerNode?.send(room.hostPeerId, {
+      type: RPC.ROOM_HELLO,
+      peerId: player.peerId,
+      player,
+    });
+}
+function attachJoinHandlers() {
+  document
+    .querySelectorAll("button")
+    .forEach((b) => b.addEventListener("click", unlockPhoneAudio));
+  $("#makeOffer").onclick = async () => {
+    const button = $("#makeOffer");
+    try {
+      if (button) {
+        button.disabled = true;
+        button.textContent = "Creating code...";
+      }
+      const offerOut = $("#offerOut");
+      if (offerOut) offerOut.textContent = "Creating phone pairing code...";
+      log("Creating phone pairing code...");
+      updatePlayerDisplayName();
+      assertWebRtcSupported();
+      const encoded = await peerNode.createManualOffer("host");
+      renderPayloadCard($("#offerOut"), encoded, "Player offer");
+      log("Phone pairing code ready.");
+    } catch (e) {
+      const offerOut = $("#offerOut");
+      if (offerOut) offerOut.textContent = e.message;
+      log(e.message);
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Create phone pairing code";
+      }
+    }
+  };
+  $("#scanAnswerQr").onclick = async () => {
+    try {
+      await scanQrInto($("#answer"), log);
+    } catch (e) {
+      log(e.message);
+    }
+  };
+  $("#importAnswer").onclick = async () => {
+    try {
+      updatePlayerDisplayName();
+      await peerNode.acceptManualAnswer($("#answer").value);
+      log("Answer imported. Waiting for DataChannel open.");
+    } catch (e) {
+      log(e.message);
+    }
+  };
+  $("#forgetRoom")?.addEventListener("click", () => {
+    localStorage.removeItem("carryokie.room");
+    localStorage.removeItem("carryokie.player");
+    location.reload();
+  });
+  $("#displayName")?.addEventListener("change", updatePlayerDisplayName);
+}
+function renderPlayer(main) {
+  const song =
+    catalog.find((s) => s.songId === (room?.currentSongId || "song_002")) ||
+    catalog[0];
+  const roomCode =
+    new URLSearchParams(location.search).get("room") || room?.roomCode || "";
+  const currentTitle = song
+    ? `${escapeHtml(song.title || song.songId)}${song.artist ? " — " + escapeHtml(song.artist) : ""}`
+    : "Pick a song";
+  if (!playerIsJoined()) {
+    main.innerHTML = joinRoomHtml(roomCode);
+    attachJoinHandlers();
+    return;
+  }
+  main.innerHTML = `<section class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie phone</p><h2>${currentTitle}</h2><p class="subtle">${escapeHtml(player.displayName || "Player")} · Room ${escapeHtml(roomCode || "joined")} · Player #${escapeHtml(player.playerNumber || "?")}</p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p id="micStatus" class="status-pill live-status">Mic muted until enabled.</p><div class="primary-actions"><button id="enableMic" class="primary">Enable my mic</button><button id="holdSing" class="hold-button">Hold to sing</button><button id="toggleSing">Live / mute</button><button id="muteMic" class="danger">Mute mic</button></div></div>
+<details class="card" open><summary>1. Queue this phone</summary><label>Your name<input id="displayName" value="${escapeHtml(player.displayName || "Player")}" placeholder="Your name"></label><label>Song<select id="song">${catalog.map((s) => `<option value="${s.songId}">${escapeHtml(s.title)} — ${escapeHtml(s.artist)}</option>`).join("")}</select></label><label>Singers<input id="singers" value="${player.playerNumber || 2}" placeholder="Singer numbers comma separated"></label><p class="subtle">Default singer is you. Add more numbers only for duets/groups.</p><div class="button-row"><button id="requestSong" class="primary">Queue selected song</button><button id="requestSinger">Singer only</button></div><div class="queue-list">${queueHtml(room, "phone")}</div></details>
+<details class="card" open><summary>2. Sing</summary><p class="warn compact">${escapeHtml(singerWarning)}</p><label class="check"><input type="checkbox" id="pushToSing"> Push-to-sing</label><label>Mic filter<select id="voicePreset"><option value="clean">Clean</option><option value="alto">Alto warm</option><option value="bravo">Bravo bright</option><option value="bass">Bass low</option><option value="radio">Radio</option><option value="autotune">Autotune-style polish</option></select></label><p id="wake" class="subtle"></p></details>
 <details class="card"><summary>Advanced audio</summary><div class="button-row"><button id="startBacking">Start backing monitor</button><button id="pauseBacking">Pause backing monitor</button></div><label>Remote gain <input id="remoteGain" type="range" min="0" max="2" value="1" step=".05"></label><label>Backing monitor gain <input id="backingGain" type="range" min="0" max="1" value="0.35" step=".05"></label><label>Master gain <input id="masterGain" type="range" min="0" max="2" value="1" step=".05"></label></details>
 <details class="card"><summary>4. Lyrics / sync</summary><video id="phoneVideo" controls playsinline muted></video><div id="lyricsPanel"></div><div class="button-row"><button id="earlier">Lyrics earlier</button><button id="later">Lyrics later</button><button id="resetSync">Reset sync</button></div></details>
-<details class="card"><summary>Debug room state</summary><pre id="playerDebugState"></pre></details></section>`,document.querySelectorAll(`button`).forEach(e=>e.addEventListener(`click`,Ft)),E(`#playerDebugState`).textContent=JSON.stringify(k||{status:`not paired`},null,2),E(`#displayName`).addEventListener(`change`,_n),E(`#requestSong`).onclick=()=>{let e=c(E(`#song`).value,E(`#singers`).value.split(`,`).map(e=>+e.trim()).filter(Boolean),A.playerId,k?.queue?.length||0);j.broadcast({type:b.QUEUE_ADD_REQUEST,item:e}),H(`Queue request sent.`)},E(`#requestSinger`).onclick=()=>{j.broadcast({type:b.SINGER_JOIN_REQUEST,playerId:A.playerId}),H(`Singer slot requested.`)},document.querySelectorAll(`.queueSelf`).forEach(e=>e.onclick=()=>{j.broadcast({type:b.QUEUE_UPDATE_REQUEST,action:e.dataset.action,queueItemId:e.dataset.queueId,playerId:A.playerId}),H(`Queue update sent.`)}),E(`#voicePreset`).onchange=e=>{let t=e.target;M?.setVoicePreset(t.value);let n=E(`#micStatus`);n&&(n.textContent=`Mic filter: ${t.selectedOptions?.[0]?.textContent||t.value}`)},E(`#enableMic`).onclick=async()=>{try{let e=E(`#pushToSing`).checked,t=await M.tryWakeLock();E(`#wake`).textContent=t===`active`?`Wake lock active`:`Keep this phone unlocked and tab open during song. Wake lock: `+t;let n=await M.requestMic({pushToSing:e});j.addLocalStream(n),A.micState={...A.micState,enabled:!0,publishing:!0,muted:e},V(),j.broadcast({type:b.MIC_ENABLED,playerId:A.playerId}),E(`#micStatus`).textContent=e?`Mic ready. Hold to sing.`:`Mic live.`,H(`Mic publishing. Own mic not locally monitored.`)}catch(e){E(`#micStatus`).textContent=e.message,H(e.message)}};let i=E(`#holdSing`),a=!1;i.onpointerdown=e=>{e.preventDefault(),a=!0;try{i.setPointerCapture?.(e.pointerId)}catch(e){H(e?.message||`Pointer capture unavailable for hold-to-sing.`)}Y(!1)},i.onpointerup=()=>{a=!1,Y(!0)},i.onpointercancel=()=>{a=!1,Y(!0)},i.onpointerleave=()=>{a&&(a=!1,Y(!0))},E(`#toggleSing`).onclick=()=>Y(!A?.micState?.muted),E(`#muteMic`).onclick=()=>Y(!0),E(`#startBacking`).onclick=async()=>M?.startBackingMonitor(await rt(t)).catch(e=>{E(`#micStatus`).textContent=e.message,H(e.message)}),E(`#pauseBacking`).onclick=()=>M?.pauseBackingMonitor(),E(`#remoteGain`).oninput=e=>M?.setGain(`remote`,+e.target.value),E(`#backingGain`).oninput=e=>M?.setGain(`backing`,+e.target.value),E(`#masterGain`).oninput=e=>M?.setGain(`master`,+e.target.value),E(`#earlier`).onclick=()=>{k.playbackState.seekOffsetMs-=250,V(),Q()},E(`#later`).onclick=()=>{k.playbackState.seekOffsetMs+=250,V(),Q()},E(`#resetSync`).onclick=()=>{k.playbackState.seekOffsetMs=0,V(),Q()},Q(),yn(t)}async function yn(e){let t=E(`#phoneVideo`);if(t){if(!ot(e)){t.style.display=`none`,t.removeAttribute(`src`);return}t.style.display=`block`,t.poster=``,t.muted=!0,t.playsInline=!0;try{let n=await rt(e);t.src!==n&&(t.src=n),At||=setInterval(bn,500),bn()}catch(e){H(e.message)}}}function bn(){let e=E(`#phoneVideo`);if(!e||e.style.display===`none`||!k?.playbackState)return;let t=C(k.playbackState,Date.now(),j?.clockOffsetMs||0),n=Math.max(0,t.positionMs/1e3);Number.isFinite(n)&&Math.abs((e.currentTime||0)-n)>.75&&(e.currentTime=n),!k.playbackState.paused&&k.playbackState.status!==`paused`&&e.play?.().catch(()=>H(`Tap the lyric video once if this browser blocks autoplay.`)),(k.playbackState.paused||k.playbackState.status===`paused`)&&e.pause?.()}async function Q(){let e=E(`#lyricsPanel`);if(!e||!N.length)return;let t=N.find(e=>e.songId===(k?.currentSongId||`song_002`))||N[0];if(ot(t)){e.innerHTML=`<p>Lyric video loaded above. No separate lyric file needed.</p>`;return}let n=await fetch(t.lyricsJsonUrl).then(e=>e.json()).catch(()=>({lines:[]})),r=k?.playbackState,i=C(r,Date.now(),j?.clockOffsetMs||0),a=i.positionMs;e.innerHTML=(i.syncDegraded?`<p class="warn">Sync degraded: waiting for actual TV Cast media status.</p>`:``)+St(n.lines,a)}async function xn(e){_t(e,`Debug`);let t=ie(),n=JSON.parse(localStorage.getItem(`carryokie.player`)||`null`);E(`#main`).innerHTML=`<section class="card"><h2>Local state</h2><button id="refresh">Refresh</button><pre id="debugLocalState"></pre><h2>Connection diagnostics</h2><pre id="debugConnectionState"></pre><p>ICE failures mean network may require TURN/different Wi-Fi. Strict MVP uses STUN only.</p><p>Keep phone unlocked and tab open; mobile browsers may suspend audio/WebRTC.</p></section><section class="card"><h2>Manual offer/answer</h2><p>Use these for manual pairing when WebRTC signaling fails.</p><div id="debugRole"></div><button id="debugOffer">Create offer</button><div id="offerOut"></div><textarea id="debugAnswer" placeholder="Paste answer/link/chunks"></textarea><button id="debugImport">Import answer</button><div id="answerOut"></div></section>`,E(`#debugLocalState`).textContent=JSON.stringify({room:t,player:n},null,2),E(`#debugConnectionState`).textContent=JSON.stringify({peerId:n?.peerId,hostPeerId:t?.hostPeerId,dataChannelPeerIds:j?[...j.peers.keys()]:[],clockOffsetMs:j?.clockOffsetMs??null,castState:P?.state?.()??t?.castState??null,micPermission:n?.micState?.permissionState??`unknown`},null,2),E(`#refresh`).onclick=()=>location.reload(),E(`#debugOffer`).onclick=async()=>{try{let e=await j.createManualOffer(`host`);Be(E(`#offerOut`),e,`Offer`)}catch(e){H(e.message)}},E(`#debugImport`).onclick=async()=>{try{let e=await j.acceptManualOffer(E(`#debugAnswer`).value);Be(E(`#answerOut`),e,`Answer`)}catch(e){H(e.message)}}}function Sn(e){ht(e)}var $=document.getElementById(`app`),Cn=$?.dataset.page||location.pathname.split(`/`).filter(Boolean)[0]||`home`;Cn===`host`&&pn($),Cn===`player`&&mn($),Cn===`receiver`&&Sn($),Cn===`debug`&&xn($);
+<details class="card"><summary>Debug room state</summary><pre id="playerDebugState"></pre></details></section>`;
+  document
+    .querySelectorAll("button")
+    .forEach((b) => b.addEventListener("click", unlockPhoneAudio));
+  $("#playerDebugState").textContent = JSON.stringify(
+    room || { status: "not paired" },
+    null,
+    2,
+  );
+  $("#displayName").addEventListener("change", updatePlayerDisplayName);
+  $("#requestSong").onclick = () => {
+    const item = queueRequest(
+      $("#song").value,
+      $("#singers")
+        .value.split(",")
+        .map((s) => +s.trim())
+        .filter(Boolean),
+      player.playerId,
+      room?.queue?.length || 0,
+    );
+    peerNode.broadcast({
+      type: RPC.QUEUE_ADD_REQUEST,
+      item,
+    });
+    log("Queue request sent.");
+  };
+  $("#requestSinger").onclick = () => {
+    peerNode.broadcast({
+      type: RPC.SINGER_JOIN_REQUEST,
+      playerId: player.playerId,
+    });
+    log("Singer slot requested.");
+  };
+  document.querySelectorAll(".queueSelf").forEach(
+    (b) =>
+      (b.onclick = () => {
+        peerNode.broadcast({
+          type: RPC.QUEUE_UPDATE_REQUEST,
+          action: b.dataset.action,
+          queueItemId: b.dataset.queueId,
+          playerId: player.playerId,
+        });
+        log("Queue update sent.");
+      }),
+  );
+  $("#voicePreset").onchange = (e) => {
+    const target = e.target;
+    audio?.setVoicePreset(target.value);
+    const status = $("#micStatus");
+    if (status)
+      status.textContent = `Mic filter: ${target.selectedOptions?.[0]?.textContent || target.value}`;
+  };
+  $("#enableMic").onclick = async () => {
+    const enableButton = $("#enableMic");
+    if (enableButton?.disabled) return;
+    if (enableButton) enableButton.disabled = true;
+    try {
+      const pushToSing = $("#pushToSing").checked;
+      const status = await audio.tryWakeLock();
+      $("#wake").textContent =
+        status === "active"
+          ? "Wake lock active"
+          : "Keep this phone unlocked and tab open during song. Wake lock: " +
+            status;
+      const stream = await audio.requestMic({ pushToSing });
+      const alreadyPublishing = !!player.micState?.publishing;
+      const isNewMicStream = !peerNode.localStreams?.includes(stream);
+      if (isNewMicStream) peerNode.addLocalStream(stream);
+      player.micState = {
+        ...player.micState,
+        enabled: true,
+        publishing: true,
+        muted: pushToSing,
+      };
+      persist();
+      if (isNewMicStream || !alreadyPublishing)
+        peerNode.broadcast({
+          type: RPC.MIC_ENABLED,
+          playerId: player.playerId,
+        });
+      $("#micStatus").textContent = pushToSing
+        ? "Mic ready. Hold to sing."
+        : "Mic live.";
+      log(
+        isNewMicStream
+          ? "Mic publishing. Own mic not locally monitored."
+          : "Mic already publishing. Own mic not locally monitored.",
+      );
+    } catch (e) {
+      $("#micStatus").textContent = e.message;
+      log(e.message);
+    } finally {
+      if (enableButton) enableButton.disabled = false;
+    }
+  };
+  const hold = $("#holdSing");
+  let holding = false;
+  hold.onpointerdown = (e) => {
+    e.preventDefault();
+    holding = true;
+    try {
+      hold.setPointerCapture?.(e.pointerId);
+    } catch (error) {
+      log(error?.message || "Pointer capture unavailable for hold-to-sing.");
+    }
+    setOwnMicMuted(false);
+  };
+  hold.onpointerup = () => {
+    holding = false;
+    setOwnMicMuted(true);
+  };
+  hold.onpointercancel = () => {
+    holding = false;
+    setOwnMicMuted(true);
+  };
+  hold.onpointerleave = () => {
+    if (holding) {
+      holding = false;
+      setOwnMicMuted(true);
+    }
+  };
+  $("#toggleSing").onclick = () => setOwnMicMuted(!player?.micState?.muted);
+  $("#muteMic").onclick = () => setOwnMicMuted(true);
+  $("#startBacking").onclick = async () =>
+    audio
+      ?.startBackingMonitor(await resolvePlayableMediaUrl(song))
+      .catch((e) => {
+        $("#micStatus").textContent = e.message;
+        log(e.message);
+      });
+  $("#pauseBacking").onclick = () => audio?.pauseBackingMonitor();
+  $("#remoteGain").oninput = (e) => audio?.setGain("remote", +e.target.value);
+  $("#backingGain").oninput = (e) => audio?.setGain("backing", +e.target.value);
+  $("#masterGain").oninput = (e) => audio?.setGain("master", +e.target.value);
+  $("#earlier").onclick = () => {
+    room.playbackState.seekOffsetMs -= 250;
+    persist();
+    renderLyricsPanel();
+  };
+  $("#later").onclick = () => {
+    room.playbackState.seekOffsetMs += 250;
+    persist();
+    renderLyricsPanel();
+  };
+  $("#resetSync").onclick = () => {
+    room.playbackState.seekOffsetMs = 0;
+    persist();
+    renderLyricsPanel();
+  };
+  renderLyricsPanel();
+  renderPhoneVideo(song);
+}
+async function renderPhoneVideo(song) {
+  const video = $("#phoneVideo");
+  if (!video) return;
+  if (!isProtectedMedia(song)) {
+    video.style.display = "none";
+    video.removeAttribute("src");
+    return;
+  }
+  video.style.display = "block";
+  video.poster = "";
+  video.muted = true;
+  video.playsInline = true;
+  try {
+    const url = await resolvePlayableMediaUrl(song);
+    if (video.src !== url) video.src = url;
+    if (!phoneSyncTimer) phoneSyncTimer = setInterval(syncPhoneVideo, 500);
+    syncPhoneVideo();
+  } catch (e) {
+    log(e.message);
+  }
+}
+function syncPhoneVideo() {
+  const video = $("#phoneVideo");
+  if (!video || video.style.display === "none" || !room?.playbackState) return;
+  const derived = deriveTvMediaPositionMs(
+    room.playbackState,
+    Date.now(),
+    peerNode?.clockOffsetMs || 0,
+  );
+  const seconds = Math.max(0, derived.positionMs / 1e3);
+  if (
+    Number.isFinite(seconds) &&
+    Math.abs((video.currentTime || 0) - seconds) > 0.75
+  )
+    video.currentTime = seconds;
+  if (!room.playbackState.paused && room.playbackState.status !== "paused")
+    video
+      .play?.()
+      .catch(() =>
+        log("Tap the lyric video once if this browser blocks autoplay."),
+      );
+  if (room.playbackState.paused || room.playbackState.status === "paused")
+    video.pause?.();
+}
+async function renderLyricsPanel() {
+  const panel = $("#lyricsPanel");
+  if (!panel || !catalog.length) return;
+  const song =
+    catalog.find((s) => s.songId === (room?.currentSongId || "song_002")) ||
+    catalog[0];
+  if (isProtectedMedia(song)) {
+    panel.innerHTML =
+      "<p>Lyric video loaded above. No separate lyric file needed.</p>";
+    return;
+  }
+  const lyrics = await fetch(song.lyricsJsonUrl)
+    .then((r) => r.json())
+    .catch(() => ({ lines: [] }));
+  const ps = room?.playbackState;
+  const derived = deriveTvMediaPositionMs(
+    ps,
+    Date.now(),
+    peerNode?.clockOffsetMs || 0,
+  );
+  let t = derived.positionMs;
+  panel.innerHTML =
+    (derived.syncDegraded
+      ? '<p class="warn">Sync degraded: waiting for actual TV Cast media status.</p>'
+      : "") + lyricView(lyrics.lines, t);
+}
+async function debugPage(root) {
+  commonChrome(root, "Debug");
+  const savedRoom = loadRoom();
+  const savedPlayer = JSON.parse(
+    localStorage.getItem("carryokie.player") || "null",
+  );
+  $("#main").innerHTML =
+    `<section class="card"><h2>Local state</h2><button id="refresh">Refresh</button><pre id="debugLocalState"></pre><h2>Connection diagnostics</h2><pre id="debugConnectionState"></pre><p>ICE failures mean network may require TURN/different Wi-Fi. Strict MVP uses STUN only.</p><p>Keep phone unlocked and tab open; mobile browsers may suspend audio/WebRTC.</p></section><section class="card"><h2>Manual offer/answer</h2><p>Use these for manual pairing when WebRTC signaling fails.</p><div id="debugRole"></div><button id="debugOffer">Create offer</button><div id="offerOut"></div><textarea id="debugAnswer" placeholder="Paste answer/link/chunks"></textarea><button id="debugImport">Import answer</button><div id="answerOut"></div></section>`;
+  $("#debugLocalState").textContent = JSON.stringify(
+    {
+      room: savedRoom,
+      player: savedPlayer,
+    },
+    null,
+    2,
+  );
+  $("#debugConnectionState").textContent = JSON.stringify(
+    {
+      peerId: savedPlayer?.peerId,
+      hostPeerId: savedRoom?.hostPeerId,
+      dataChannelPeerIds: peerNode ? [...peerNode.peers.keys()] : [],
+      clockOffsetMs: peerNode?.clockOffsetMs ?? null,
+      castState: castController?.state?.() ?? savedRoom?.castState ?? null,
+      micPermission: savedPlayer?.micState?.permissionState ?? "unknown",
+    },
+    null,
+    2,
+  );
+  $("#refresh").onclick = () => location.reload();
+  $("#debugOffer").onclick = async () => {
+    try {
+      const encoded = await peerNode.createManualOffer("host");
+      renderPayloadCard($("#offerOut"), encoded, "Offer");
+    } catch (e) {
+      log(e.message);
+    }
+  };
+  $("#debugImport").onclick = async () => {
+    try {
+      const encoded = await peerNode.acceptManualOffer($("#debugAnswer").value);
+      renderPayloadCard($("#answerOut"), encoded, "Answer");
+    } catch (e) {
+      log(e.message);
+    }
+  };
+}
+function receiverPage(root) {
+  receiverApp(root);
+}
+//#endregion
+//#region src/main.ts
+var root = document.getElementById("app");
+var page =
+  root?.dataset.page ||
+  location.pathname.split("/").filter(Boolean)[0] ||
+  "home";
+if (page === "host") hostPage(root);
+if (page === "player") playerPage(root);
+if (page === "receiver") receiverPage(root);
+if (page === "debug") debugPage(root);
+//#endregion

@@ -24,6 +24,7 @@ import {
   PeerNode,
   RPC,
   assertWebRtcSupported,
+  mediaTrackKey,
   rtcConfig,
   waitForIceComplete,
 } from "./webrtc.ts";
@@ -35,15 +36,9 @@ import {
 import { PhoneAudio, singerWarning } from "./audio.ts";
 import { CastController, receiverApp } from "./cast.ts";
 import { deriveTvMediaPositionMs } from "./sync.ts";
-import {
-  resolvePlayableMediaUrl,
-  isProtectedMedia,
-} from "./protectedMedia.ts";
+import { resolvePlayableMediaUrl, isProtectedMedia } from "./protectedMedia.ts";
 import { $, commonChrome, escapeHtml, logToPage } from "./app/dom.ts";
-import {
-  formatSongTitle,
-  loadSongCatalog,
-} from "./app/catalog.ts";
+import { formatSongTitle, loadSongCatalog } from "./app/catalog.ts";
 import { lyricView } from "./app/lyricsView.ts";
 import {
   applyPhoneQueueUpdate as applyPhoneQueueUpdateToRoom,
@@ -71,7 +66,7 @@ let receiverAudioDirty = false;
 let receiverNegotiating = false;
 let receiverPendingRenegotiate = false;
 let receiverNegotiationTimer: ReturnType<typeof setTimeout> | null = null;
-const receiverStreams = new Set();
+const receiverTrackKeys = new Set<string>();
 const peerCloseTimers = new Map<string, ReturnType<typeof setTimeout>>();
 function persist() {
   if (room) saveRoom(room);
@@ -120,7 +115,9 @@ function setupPeer(localPeerId) {
   );
   peerNode.addEventListener("error", (e) => log(e.detail.message));
   peerNode.addEventListener("track", (e) => {
-    const remoteStream = e.detail.stream || (e.detail.track ? new MediaStream([e.detail.track]) : null);
+    const remoteStream =
+      e.detail.stream ||
+      (e.detail.track ? new MediaStream([e.detail.track]) : null);
     if (!remoteStream) return;
     audio?.addRemoteStream(remoteStream, e.detail.remotePeerId);
     if (player?.isHost) {
@@ -131,7 +128,12 @@ function setupPeer(localPeerId) {
   });
   setInterval(() => peerNode?.pingAll(), 5000);
   setInterval(() => {
-    if (player?.isHost && room?.playbackState && !room.playbackState.paused && receiverChannel) {
+    if (
+      player?.isHost &&
+      room?.playbackState &&
+      !room.playbackState.paused &&
+      receiverChannel
+    ) {
       const now = Date.now();
       const derived = deriveTvMediaPositionMs(room.playbackState, now, 0);
       room.playbackState = {
@@ -228,14 +230,12 @@ function sendCastRoomUpdate(type, payload = {}) {
   publishReceiverState();
 }
 function plainRtcDescription(description: RTCSessionDescription | null) {
-  return description
-    ? { type: description.type, sdp: description.sdp }
-    : null;
+  return description ? { type: description.type, sdp: description.sdp } : null;
 }
 function resetReceiverAudio(receiverId) {
   receiverPc?.close?.();
   receiverPc = null;
-  receiverStreams.clear();
+  receiverTrackKeys.clear();
   receiverSessionId = receiverId;
   receiverAudioDirty = true;
   receiverPendingRenegotiate = false;
@@ -255,11 +255,15 @@ async function negotiateReceiverAudio() {
   let offerSent = false;
   try {
     for (const { stream } of peerNode.relayedStreams || []) {
-      if (receiverStreams.has(stream)) continue;
-      receiverStreams.add(stream);
-      stream.getTracks().forEach((t) => receiverPc.addTrack(t, stream));
+      const newTracks = stream
+        .getTracks()
+        .filter((track) => !receiverTrackKeys.has(mediaTrackKey(track)));
+      newTracks.forEach((track) => {
+        receiverTrackKeys.add(mediaTrackKey(track));
+        receiverPc.addTrack(track, stream);
+      });
     }
-    if (!receiverStreams.size) return;
+    if (!receiverTrackKeys.size) return;
     const offer = await receiverPc.createOffer({ offerToReceiveAudio: true });
     await receiverPc.setLocalDescription(offer);
     await waitForIceComplete(receiverPc);
@@ -276,7 +280,9 @@ async function negotiateReceiverAudio() {
         try {
           if (receiverPc?.signalingState === "have-local-offer")
             await receiverPc.setLocalDescription({ type: "rollback" });
-        } catch { /* best-effort rollback */ }
+        } catch {
+          /* best-effort rollback */
+        }
         if (receiverPendingRenegotiate || receiverAudioDirty)
           negotiateReceiverAudio().catch((e) => log(e.message));
       }
@@ -313,7 +319,9 @@ function setupReceiverBridge() {
           try {
             if (receiverPc?.signalingState === "have-local-offer")
               await receiverPc.setLocalDescription({ type: "rollback" });
-          } catch { /* best-effort rollback */ }
+          } catch {
+            /* best-effort rollback */
+          }
           receiverNegotiating = false;
         });
       clearTimeout(receiverNegotiationTimer ?? undefined);
@@ -330,8 +338,8 @@ function songTitle(songId) {
 function queueSingerNames(queueItem: QueueItem) {
   return queueItem.singerNumbers.map(
     (singerNumber) =>
-      room?.players?.find((p) => p.playerNumber === singerNumber)?.displayName ||
-      `#${singerNumber}`,
+      room?.players?.find((p) => p.playerNumber === singerNumber)
+        ?.displayName || `#${singerNumber}`,
   );
 }
 function queuePreview() {
@@ -463,11 +471,7 @@ async function loadCurrentSongOnTv() {
 }
 function pauseCurrentPlayback() {
   if (!room?.playbackState) return;
-  const derived = deriveTvMediaPositionMs(
-    room.playbackState,
-    Date.now(),
-    0,
-  );
+  const derived = deriveTvMediaPositionMs(room.playbackState, Date.now(), 0);
   room.playbackState = {
     ...room.playbackState,
     paused: true,
@@ -692,7 +696,9 @@ function renderHost(main) {
   const tvBleedWarn = room.players.some((p) => p.isSingerForCurrentSong)
     ? '<p class="warn">TV bleed risk: singers should use headphones. Lyrics/video on TV only.</p>'
     : "";
-  const activeSingers = room.players.filter((p) => p.isSingerForCurrentSong).length;
+  const activeSingers = room.players.filter(
+    (p) => p.isSingerForCurrentSong,
+  ).length;
   main.innerHTML = `<section class="host-dashboard"><div class="room-spotlight card"><div><p class="eyebrow">Host room</p><h2>Room ${escapeHtml(room.roomCode)}</h2><p class="subtle">${room.players.length}/5 players · ${activeSingers} active singer(s) · ${room.queue.length} queue item(s)</p><ol class="quickstart"><li><strong>Share room:</strong> singers open the player join link.</li><li><strong>Pair one phone:</strong> player makes a code, host answers once.</li><li><strong>Start room:</strong> approve queue, connect TV, pick singer.</li></ol></div><div class="stage-art compact" aria-hidden="true"><div class="stage-orb"></div><div class="soundwave"><span></span><span></span><span></span><span></span><span></span></div></div></div><section class="grid"><details class="card" open><summary>1. Share this room</summary><p><a href="../player/?room=${escapeHtml(room.roomCode)}">Open player join link</a></p><p><a href="${escapeHtml(receiverUrl())}" target="_blank" rel="noreferrer">Open TV receiver tab</a></p><p class="hint">Chrome tab cast path: open the receiver tab first, then cast that tab.</p><button id="newRoom">Start over with a new room</button>${tvBleedWarn}</details><details class="card"${setupComplete ? "" : " open"}><summary>2. Pair a phone</summary><p>Player creates a join code. Paste or scan it here, then send back the host answer.</p><textarea id="offer" placeholder="Paste player offer/link/chunks"></textarea><div class="button-row"><button id="scanOfferQr">Scan player QR</button><button id="answerOffer" class="primary">Create host answer</button></div><div id="answerOut"></div></details><div class="card queue-card"><h2>3. Run the room</h2><div class="button-row"><button id="acceptAll">Approve waiting songs</button><button id="startNext" class="primary">Start next song</button><button id="pauseSong">Pause song</button><button id="resumeSong">Resume song</button></div>${queueHtml(room, "host")}</div><details class="card"><summary>TV controls</summary><p id="castStatus" class="status-pill live-status">Click to connect to Chromecast</p><button id="castBtn" class="primary">Connect TV / cast current song</button><button id="castLoadBtn" style="display:none">Reload current song on TV</button><div class="button-row"><button id="castPlayBtn" style="display:none">Play</button><button id="castPause" style="display:none">Pause</button></div><label>Seek seconds <input id="castSeekSeconds" type="number" min="0" value="0"></label><button id="castSeek" style="display:none">Seek</button><label>Cast media origin <input id="castOrigin" value="${escapeHtml(castOrigin())}" placeholder="http://192.168.x.x:4174"></label><p class="hint">Default Chromecast receiver plays media only. For room UI and live mics, cast the receiver tab link above.</p><pre id="castState"></pre></details><details class="card singer-card"><summary>Singers / mic control</summary><p class="subtle">Check who should be live on this song.</p>${room.players.map((p) => `<div class="inline-choice"><label><input type="checkbox" class="singer" value="${escapeHtml(p.playerId)}" ${p.isSingerForCurrentSong ? "checked" : ""}> #${p.playerNumber} ${escapeHtml(p.displayName)}</label><button class="mutePlayer" data-player-id="${escapeHtml(p.playerId)}">Mute #${p.playerNumber}</button></div>`).join("")}<button id="setSingers" class="primary">Save singer list</button></details></section></section>`;
   $("#newRoom").onclick = () => {
     player = makePlayer("host", "Host");
@@ -1028,6 +1034,9 @@ function renderPlayer(main) {
       status.textContent = `Mic filter: ${target.selectedOptions?.[0]?.textContent || target.value}`;
   };
   $("#enableMic").onclick = async () => {
+    const enableButton = $("#enableMic") as HTMLButtonElement;
+    if (enableButton?.disabled) return;
+    if (enableButton) enableButton.disabled = true;
     try {
       const pushToSing = $("#pushToSing").checked;
       const status = await audio.tryWakeLock();
@@ -1037,7 +1046,9 @@ function renderPlayer(main) {
           : "Keep this phone unlocked and tab open during song. Wake lock: " +
             status;
       const stream = await audio.requestMic({ pushToSing });
-      peerNode.addLocalStream(stream);
+      const alreadyPublishing = !!player.micState?.publishing;
+      const isNewMicStream = !peerNode.localStreams?.includes(stream);
+      if (isNewMicStream) peerNode.addLocalStream(stream);
       player.micState = {
         ...player.micState,
         enabled: true,
@@ -1045,14 +1056,24 @@ function renderPlayer(main) {
         muted: pushToSing,
       };
       persist();
-      peerNode.broadcast({ type: RPC.MIC_ENABLED, playerId: player.playerId });
+      if (isNewMicStream || !alreadyPublishing)
+        peerNode.broadcast({
+          type: RPC.MIC_ENABLED,
+          playerId: player.playerId,
+        });
       $("#micStatus").textContent = pushToSing
         ? "Mic ready. Hold to sing."
         : "Mic live.";
-      log("Mic publishing. Own mic not locally monitored.");
+      log(
+        isNewMicStream
+          ? "Mic publishing. Own mic not locally monitored."
+          : "Mic already publishing. Own mic not locally monitored.",
+      );
     } catch (e) {
       $("#micStatus").textContent = e.message;
       log(e.message);
+    } finally {
+      if (enableButton) enableButton.disabled = false;
     }
   };
   const hold = $("#holdSing");
@@ -1067,11 +1088,21 @@ function renderPlayer(main) {
     }
     setOwnMicMuted(false);
   };
-  hold.onpointerup = () => { holding = false; setOwnMicMuted(true); };
-  hold.onpointercancel = () => { holding = false; setOwnMicMuted(true); };
-  hold.onpointerleave = () => { if (holding) { holding = false; setOwnMicMuted(true); } };
-  $("#toggleSing").onclick = () =>
-    setOwnMicMuted(!player?.micState?.muted);
+  hold.onpointerup = () => {
+    holding = false;
+    setOwnMicMuted(true);
+  };
+  hold.onpointercancel = () => {
+    holding = false;
+    setOwnMicMuted(true);
+  };
+  hold.onpointerleave = () => {
+    if (holding) {
+      holding = false;
+      setOwnMicMuted(true);
+    }
+  };
+  $("#toggleSing").onclick = () => setOwnMicMuted(!player?.micState?.muted);
   $("#muteMic").onclick = () => setOwnMicMuted(true);
   $("#startBacking").onclick = async () =>
     audio

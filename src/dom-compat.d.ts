@@ -6,10 +6,18 @@ interface Element {
   onclick: ((this: GlobalEventHandlers, ev: MouseEvent) => unknown) | null;
   onchange: ((this: GlobalEventHandlers, ev: Event) => unknown) | null;
   oninput: ((this: GlobalEventHandlers, ev: Event) => unknown) | null;
-  onpointerdown: ((this: GlobalEventHandlers, ev: PointerEvent) => unknown) | null;
-  onpointerup: ((this: GlobalEventHandlers, ev: PointerEvent) => unknown) | null;
-  onpointercancel: ((this: GlobalEventHandlers, ev: PointerEvent) => unknown) | null;
-  onpointerleave: ((this: GlobalEventHandlers, ev: PointerEvent) => unknown) | null;
+  onpointerdown:
+    | ((this: GlobalEventHandlers, ev: PointerEvent) => unknown)
+    | null;
+  onpointerup:
+    | ((this: GlobalEventHandlers, ev: PointerEvent) => unknown)
+    | null;
+  onpointercancel:
+    | ((this: GlobalEventHandlers, ev: PointerEvent) => unknown)
+    | null;
+  onpointerleave:
+    | ((this: GlobalEventHandlers, ev: PointerEvent) => unknown)
+    | null;
   value: string;
   checked: boolean;
   disabled: boolean;

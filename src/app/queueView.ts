@@ -4,8 +4,9 @@ import { escapeHtml } from "./dom.ts";
 function singerNames(room: Room, singerNumbers: number[]): string {
   const labels = singerNumbers.map(
     (singerNumber) =>
-      room.players.find((roomPlayer) => roomPlayer.playerNumber === singerNumber)
-        ?.displayName || `#${singerNumber}`,
+      room.players.find(
+        (roomPlayer) => roomPlayer.playerNumber === singerNumber,
+      )?.displayName || `#${singerNumber}`,
   );
   return labels.join(", ");
 }

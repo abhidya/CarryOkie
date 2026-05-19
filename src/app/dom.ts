@@ -1,4 +1,7 @@
-export function $(selector: string, root: ParentNode = document): Element | null {
+export function $(
+  selector: string,
+  root: ParentNode = document,
+): Element | null {
   return root.querySelector(selector);
 }
 

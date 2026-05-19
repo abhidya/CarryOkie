@@ -2,10 +2,14 @@ import { spawn } from "node:child_process";
 
 const port = process.env.E2E_PORT || "4180";
 const baseUrl = process.env.E2E_BASE_URL || `http://127.0.0.1:${port}/`;
-const server = spawn("npx", ["vite", "preview", "--port", port, "--host", "127.0.0.1"], {
-  stdio: ["ignore", "pipe", "pipe"],
-  env: { ...process.env },
-});
+const server = spawn(
+  "npx",
+  ["vite", "preview", "--port", port, "--host", "127.0.0.1"],
+  {
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env },
+  },
+);
 
 let ready = false;
 const deadline = Date.now() + 30_000;

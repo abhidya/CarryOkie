@@ -36,13 +36,16 @@ export function validSingerNumbers(
   singerNumbers: unknown,
 ): number[] {
   const playerNumbersInRoom = new Set(
-    room?.players?.map((roomPlayer) => roomPlayer.playerNumber).filter(Boolean) || [],
+    room?.players
+      ?.map((roomPlayer) => roomPlayer.playerNumber)
+      .filter(Boolean) || [],
   );
   return [
     ...new Set(
       (Array.isArray(singerNumbers) ? singerNumbers : []).filter(
         (singerNumber): singerNumber is number =>
-          Number.isInteger(singerNumber) && playerNumbersInRoom.has(singerNumber),
+          Number.isInteger(singerNumber) &&
+          playerNumbersInRoom.has(singerNumber),
       ),
     ),
   ];

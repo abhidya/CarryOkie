@@ -6,6 +6,7 @@ export class PhoneAudio {
   backingGain: GainNode | null;
   localStream: MediaStream | null;
   publishedStream: MediaStream | null;
+  pendingMicRequest: Promise<MediaStream> | null;
   micSource: MediaStreamAudioSourceNode | null;
   micDestination: MediaStreamAudioDestinationNode | null;
   micFilters: {
@@ -35,6 +36,7 @@ export class PhoneAudio {
     this.backingGain = null;
     this.localStream = null;
     this.publishedStream = null;
+    this.pendingMicRequest = null;
     this.micSource = null;
     this.micDestination = null;
     this.micFilters = {};
@@ -72,14 +74,32 @@ export class PhoneAudio {
     pushToSing?: boolean;
   } = {}): Promise<MediaStream> {
     if (!navigator.mediaDevices) {
-      throw new Error("Mic requires HTTPS. Connect via GitHub Pages or localhost.");
+      throw new Error(
+        "Mic requires HTTPS. Connect via GitHub Pages or localhost.",
+      );
     }
     if (!navigator.mediaDevices.getUserMedia) {
       throw new Error("Browser doesn't support getUserMedia API.");
     }
 
-    await this.init();
     this.pushToSing = pushToSing;
+    if (this.hasLiveMic()) {
+      await this.init();
+      this.setMicMuted(pushToSing);
+      return this.publishedStream!;
+    }
+    if (!this.pendingMicRequest) {
+      this.pendingMicRequest = this.openMic(pushToSing).finally(() => {
+        this.pendingMicRequest = null;
+      });
+    }
+    const stream = await this.pendingMicRequest;
+    this.pushToSing = pushToSing;
+    this.setMicMuted(pushToSing);
+    return stream;
+  }
+  async openMic(pushToSing: boolean): Promise<MediaStream> {
+    await this.init();
     this.localStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
@@ -88,10 +108,26 @@ export class PhoneAudio {
       },
       video: false,
     });
-    if (pushToSing) this.setMicMuted(true);
     this.applyGate();
     this.publishedStream = this.buildMicFilterStream(this.localStream);
+    this.setMicMuted(pushToSing);
     return this.publishedStream;
+  }
+  hasLiveMic(): boolean {
+    return (
+      this.streamHasLiveAudio(this.localStream) &&
+      this.streamHasLiveAudio(this.publishedStream)
+    );
+  }
+  streamHasLiveAudio(stream: MediaStream | null): boolean {
+    if (!stream) return false;
+    const tracks =
+      typeof stream.getAudioTracks === "function"
+        ? stream.getAudioTracks()
+        : typeof stream.getTracks === "function"
+          ? stream.getTracks().filter((track) => track.kind === "audio")
+          : [];
+    return tracks.some((track) => track.readyState !== "ended");
   }
   setMicMuted(muted: boolean): void {
     this.localStream?.getAudioTracks().forEach((t) => {
@@ -254,7 +290,9 @@ export class PhoneAudio {
       this.backingAudio = new Audio(url);
       this.backingAudio.loop = false;
       this.backingAudio.crossOrigin = "anonymous";
-      this.backingSource = this.ctx!.createMediaElementSource(this.backingAudio);
+      this.backingSource = this.ctx!.createMediaElementSource(
+        this.backingAudio,
+      );
       this.backingSource!.connect(this.backingGain!);
     } else if (this.backingAudio.src !== url) {
       this.backingAudio.src = url;

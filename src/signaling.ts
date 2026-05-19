@@ -547,39 +547,44 @@ export function renderPayloadCard(
     renderQr();
     syncButtons();
   };
-  (target.querySelector("[data-copy]") as HTMLButtonElement)!.onclick = async () => {
-    try {
-      await navigator.clipboard.writeText(encoded.url);
-      flashButton("[data-copy]", "Copied!");
-    } catch (err) {
-      console.error("Copy failed:", err);
-      if (tryLegacyCopy()) {
-        flashButton("[data-copy]", "Copied!");
-        return;
-      }
-      selectLinkFallback();
-      flashButton("[data-copy]", "Press ⌘/Ctrl+C");
-    }
-  };
-  (target.querySelector("[data-share]") as HTMLButtonElement)!.onclick = async () => {
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "CarryOkie signal", text: encoded.url });
-        flashButton("[data-share]", "Shared!");
-      } else {
+  (target.querySelector("[data-copy]") as HTMLButtonElement)!.onclick =
+    async () => {
+      try {
         await navigator.clipboard.writeText(encoded.url);
-        flashButton("[data-share]", "Copied!");
+        flashButton("[data-copy]", "Copied!");
+      } catch (err) {
+        console.error("Copy failed:", err);
+        if (tryLegacyCopy()) {
+          flashButton("[data-copy]", "Copied!");
+          return;
+        }
+        selectLinkFallback();
+        flashButton("[data-copy]", "Press ⌘/Ctrl+C");
       }
-    } catch (err) {
-      console.error("Share failed:", err);
-      if (tryLegacyCopy()) {
-        flashButton("[data-share]", "Copied!");
-        return;
+    };
+  (target.querySelector("[data-share]") as HTMLButtonElement)!.onclick =
+    async () => {
+      try {
+        if (navigator.share) {
+          await navigator.share({
+            title: "CarryOkie signal",
+            text: encoded.url,
+          });
+          flashButton("[data-share]", "Shared!");
+        } else {
+          await navigator.clipboard.writeText(encoded.url);
+          flashButton("[data-share]", "Copied!");
+        }
+      } catch (err) {
+        console.error("Share failed:", err);
+        if (tryLegacyCopy()) {
+          flashButton("[data-share]", "Copied!");
+          return;
+        }
+        selectLinkFallback();
+        flashButton("[data-share]", "Press ⌘/Ctrl+C");
       }
-      selectLinkFallback();
-      flashButton("[data-share]", "Press ⌘/Ctrl+C");
-    }
-  };
+    };
 }
 
 export async function scanQrInto(

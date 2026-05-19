@@ -27,13 +27,16 @@ function roomWithParticipant() {
 
 test("catalog song normalization preserves ids and rewrites public paths", () => {
   const appModuleUrl = new URL("../src/app.ts", import.meta.url);
-  const song = normalizeSong({
-    songId: "song_1",
-    title: "Title",
-    artist: "Artist",
-    lyricsJsonUrl: "/public/protected/song.lyrics.json",
-    castMediaUrl: "media/song.mp4",
-  }, appModuleUrl);
+  const song = normalizeSong(
+    {
+      songId: "song_1",
+      title: "Title",
+      artist: "Artist",
+      lyricsJsonUrl: "/public/protected/song.lyrics.json",
+      castMediaUrl: "media/song.mp4",
+    },
+    appModuleUrl,
+  );
   assert.equal(song.songId, "song_1");
   assert.ok(song.lyricsJsonUrl.endsWith("/protected/song.lyrics.json"));
   assert.ok(song.castMediaUrl.endsWith("/media/song.mp4"));

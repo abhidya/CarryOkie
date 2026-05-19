@@ -95,10 +95,8 @@ Module._resolveFilename = function (request, parent) {
 };
 
 // Now import the module
-const {
-  PeerJsRoomTransport,
-  ConnectionState,
-} = await import("../src/peer/PeerJsRoomTransport.ts");
+const { PeerJsRoomTransport, ConnectionState } =
+  await import("../src/peer/PeerJsRoomTransport.ts");
 
 const tests = [];
 function test(name, fn) {
@@ -130,7 +128,9 @@ test("readRoomCodeFromUrl normalizes to uppercase", () => {
 });
 
 test("readRoomCodeFromUrl trims whitespace", () => {
-  globalThis.location = new URL("http://localhost:5173/player/#room=  ABC123  ");
+  globalThis.location = new URL(
+    "http://localhost:5173/player/#room=  ABC123  ",
+  );
   const code = PeerJsRoomTransport.readRoomCodeFromUrl();
   assert.equal(code, "ABC123");
 });

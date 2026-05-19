@@ -129,6 +129,138 @@ test("phone mic input requests echo-cancelled audio and mute toggles tracks", as
   }
 });
 
+test("phone mic enable is idempotent while the current mic stream is live", async () => {
+  const oldAudioContext = globalThis.AudioContext;
+  const oldNavigator = globalThis.navigator;
+  const calls = [];
+  const rawTrack = { enabled: true, kind: "audio", readyState: "live" };
+  const rawStream = {
+    getAudioTracks() {
+      return [rawTrack];
+    },
+    getTracks() {
+      return [rawTrack];
+    },
+  };
+  const duplicateStream = {
+    getAudioTracks() {
+      return [{ enabled: true, kind: "audio", readyState: "live" }];
+    },
+  };
+  globalThis.AudioContext = class {
+    constructor() {
+      this.destination = {};
+    }
+    createGain() {
+      return { gain: { value: 0 }, connect() {} };
+    }
+    createMediaStreamSource() {
+      return { connect() {} };
+    }
+    createScriptProcessor() {
+      return { connect() {}, onaudioprocess: null };
+    }
+  };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: {
+      mediaDevices: {
+        async getUserMedia(constraints) {
+          calls.push(constraints);
+          return calls.length === 1 ? rawStream : duplicateStream;
+        },
+      },
+    },
+  });
+  try {
+    const audio = new PhoneAudio(() => {});
+    const first = await audio.requestMic();
+    const second = await audio.requestMic({ pushToSing: true });
+    assert.equal(second, first);
+    assert.equal(
+      calls.length,
+      1,
+      "live mic retry must not request another capture stream",
+    );
+    assert.equal(
+      rawTrack.enabled,
+      false,
+      "push-to-sing retry should mute the active stream",
+    );
+  } finally {
+    globalThis.AudioContext = oldAudioContext;
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: oldNavigator,
+    });
+  }
+});
+
+test("concurrent phone mic enables share one pending capture stream", async () => {
+  const oldAudioContext = globalThis.AudioContext;
+  const oldNavigator = globalThis.navigator;
+  const calls = [];
+  let resolveCapture;
+  const rawTrack = { enabled: true, kind: "audio", readyState: "live" };
+  const rawStream = {
+    getAudioTracks() {
+      return [rawTrack];
+    },
+    getTracks() {
+      return [rawTrack];
+    },
+  };
+  globalThis.AudioContext = class {
+    constructor() {
+      this.destination = {};
+    }
+    createGain() {
+      return { gain: { value: 0 }, connect() {} };
+    }
+    createMediaStreamSource() {
+      return { connect() {} };
+    }
+    createScriptProcessor() {
+      return { connect() {}, onaudioprocess: null };
+    }
+  };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: {
+      mediaDevices: {
+        getUserMedia(constraints) {
+          calls.push(constraints);
+          return new Promise((resolve) => {
+            resolveCapture = () => resolve(rawStream);
+          });
+        },
+      },
+    },
+  });
+  try {
+    const audio = new PhoneAudio(() => {});
+    const firstPending = audio.requestMic();
+    const secondPending = audio.requestMic({ pushToSing: true });
+    await Promise.resolve();
+    assert.equal(calls.length, 1);
+    resolveCapture();
+    const [first, second] = await Promise.all([firstPending, secondPending]);
+    assert.equal(first, rawStream);
+    assert.equal(second, rawStream);
+    assert.equal(
+      rawTrack.enabled,
+      false,
+      "latest push-to-sing retry should control the shared stream",
+    );
+  } finally {
+    globalThis.AudioContext = oldAudioContext;
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: oldNavigator,
+    });
+  }
+});
+
 test("phone mic publishes filtered WebAudio stream and PeerNode routes filtered track", async () => {
   const oldAudioContext = globalThis.AudioContext;
   const oldNavigator = globalThis.navigator;
@@ -678,7 +810,11 @@ test("payload card falls back to selecting text when clipboard/share are unavail
     let selected = 0;
     let focused = 0;
     const elements = new Map();
-    const makeButton = () => ({ textContent: "", onclick: null, disabled: false });
+    const makeButton = () => ({
+      textContent: "",
+      onclick: null,
+      disabled: false,
+    });
     const urlTextarea = {
       value: "https://x/#signal=fallback",
       focus() {

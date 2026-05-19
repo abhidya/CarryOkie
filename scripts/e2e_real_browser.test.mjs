@@ -26,7 +26,10 @@ receiver.on("console", (msg) =>
 );
 
 async function pageLog(page) {
-  return page.locator("#log").innerText().catch(() => "");
+  return page
+    .locator("#log")
+    .innerText()
+    .catch(() => "");
 }
 
 try {
@@ -65,7 +68,8 @@ try {
   await player.click("#importAnswer");
   await player.waitForSelector("text=CarryOkie phone", { timeout: 15000 });
   await player.waitForFunction(
-    () => document.querySelector("#log")?.textContent?.includes("DataChannel open"),
+    () =>
+      document.querySelector("#log")?.textContent?.includes("DataChannel open"),
     null,
     { timeout: 15000 },
   );
@@ -88,8 +92,8 @@ try {
   await host.waitForSelector(".startItem", { timeout: 10000 });
   await player.waitForSelector(".queue-status-queued", { timeout: 10000 });
   await host.click(".startItem");
-await host.waitForSelector(".queue-status-active", { timeout: 10000 });
-await player.waitForSelector(".queue-status-active", { timeout: 10000 });
+  await host.waitForSelector(".queue-status-active", { timeout: 10000 });
+  await player.waitForSelector(".queue-status-active", { timeout: 10000 });
   await receiver.waitForSelector("text=singers Real E2E", { timeout: 15000 });
 
   await player.click("#enableMic");
@@ -118,7 +122,7 @@ await player.waitForSelector(".queue-status-active", { timeout: 10000 });
   await player.waitForSelector("text=Mic live.", { timeout: 5000 });
   await host.waitForSelector("text=MIC_UNMUTED", { timeout: 10000 });
   await player.click("text=Advanced audio");
-await player.locator("#remoteGain").fill("1.5");
+  await player.locator("#remoteGain").fill("1.5");
   await player.locator("#backingGain").fill("0.5");
   await player.locator("#masterGain").fill("1.2");
   await player.click("#muteMic");
@@ -132,7 +136,13 @@ await player.locator("#remoteGain").fill("1.5");
 } catch (error) {
   console.error("Host log:\n" + (await pageLog(host)));
   console.error("Player log:\n" + (await pageLog(player)));
-  console.error("Receiver body:\n" + (await receiver.locator("body").innerText().catch(() => "")));
+  console.error(
+    "Receiver body:\n" +
+      (await receiver
+        .locator("body")
+        .innerText()
+        .catch(() => "")),
+  );
   console.error("Console logs:", JSON.stringify(logs, null, 2));
   throw error;
 } finally {

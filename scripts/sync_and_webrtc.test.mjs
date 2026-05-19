@@ -233,6 +233,52 @@ test("local mic stream is added to all current and future peer connections", () 
   }
 });
 
+test("local mic routing dedupes the same track wrapped in new streams", async () => {
+  const old = globalThis.RTCPeerConnection;
+  globalThis.RTCPeerConnection = FakePc;
+  try {
+    const node = new PeerNode("singer");
+    const first = node.makeConnection("host", { initiator: true });
+    first.pc.signalingState = "stable";
+    const track = { kind: "audio", id: "same-mic", enabled: true };
+    const streamA = {
+      id: "mic-stream-a",
+      getTracks() {
+        return [track];
+      },
+    };
+    const streamB = {
+      id: "mic-stream-b",
+      getTracks() {
+        return [track];
+      },
+    };
+    const secondTrack = { kind: "audio", id: "second-mic", enabled: true };
+    const streamC = {
+      id: "mic-stream-c",
+      getTracks() {
+        return [track, secondTrack];
+      },
+    };
+
+    node.addLocalStream(streamA);
+    node.addLocalStream(streamB);
+    node.addLocalStream(streamC);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(first.pc.addedTracks.length, 2);
+    assert.equal(first.pc.addedTracks[0].track, track);
+    assert.equal(first.pc.addedTracks[1].track, secondTrack);
+    assert.equal(first.dc.sent.length, 1);
+
+    const later = node.makeConnection("listener", { initiator: true });
+    assert.equal(later.pc.addedTracks.length, 2);
+    assert.equal(later.pc.addedTracks[0].track, track);
+    assert.equal(later.pc.addedTracks[1].track, secondTrack);
+  } finally {
+    globalThis.RTCPeerConnection = old;
+  }
+});
+
 test("mic tracks renegotiate over the existing host DataChannel", async () => {
   const old = globalThis.RTCPeerConnection;
   globalThis.RTCPeerConnection = FakePc;
@@ -349,6 +395,54 @@ test("host relays singer mic streams to listener peer connections", async () => 
       RPC.SIGNAL_RELAY_OFFER,
       "host should renegotiate listener audio receive path",
     );
+  } finally {
+    globalThis.RTCPeerConnection = old;
+  }
+});
+
+test("host relay dedupes the same source track wrapped in new streams", async () => {
+  const old = globalThis.RTCPeerConnection;
+  globalThis.RTCPeerConnection = FakePc;
+  try {
+    const host = new PeerNode("host");
+    const singerEdge = host.makeConnection("singer", { initiator: true });
+    const listenerEdge = host.makeConnection("listener", { initiator: true });
+    listenerEdge.pc.signalingState = "stable";
+    const track = { kind: "audio", id: "same-remote-mic", enabled: true };
+    const streamA = {
+      id: "singer-stream-a",
+      getTracks() {
+        return [track];
+      },
+    };
+    const streamB = {
+      id: "singer-stream-b",
+      getTracks() {
+        return [track];
+      },
+    };
+    const secondTrack = {
+      kind: "audio",
+      id: "second-remote-mic",
+      enabled: true,
+    };
+    const streamC = {
+      id: "singer-stream-c",
+      getTracks() {
+        return [track, secondTrack];
+      },
+    };
+
+    host.relayRemoteStream("singer", streamA);
+    host.relayRemoteStream("singer", streamB);
+    host.relayRemoteStream("singer", streamC);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(singerEdge.pc.addedTracks?.length || 0, 0);
+    assert.equal(listenerEdge.pc.addedTracks.length, 2);
+    assert.equal(listenerEdge.pc.addedTracks[0].track, track);
+    assert.equal(listenerEdge.pc.addedTracks[1].track, secondTrack);
+    assert.equal(host.relayedStreams.length, 2);
+    assert.equal(listenerEdge.dc.sent.length, 1);
   } finally {
     globalThis.RTCPeerConnection = old;
   }

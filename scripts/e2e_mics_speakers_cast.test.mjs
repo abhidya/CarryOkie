@@ -421,7 +421,9 @@ test("E2E: Full room with 3 singers, 2 listeners, and Chromecast", async () => {
     audioNodes.set(singer.playerId, audio);
 
     // Create a fake published stream for each singer
-    const singerStream = new FakeMediaStream([new FakeMediaStreamTrack("audio")]);
+    const singerStream = new FakeMediaStream([
+      new FakeMediaStreamTrack("audio"),
+    ]);
     singerStreams.set(singer.playerId, singerStream);
 
     // Design Req #12: Singer enables mic with explicit permission

@@ -32,10 +32,7 @@ if (fs.existsSync("downloads/mp4")) {
     .readdirSync("downloads/mp4")
     .filter((f) => f.endsWith(".mp4"))
     .filter((f) => isPlayableMp4(path.join("downloads/mp4", f)));
-  assert.equal(
-    catalog.songs.length,
-    playableDownloads.length,
-  );
+  assert.equal(catalog.songs.length, playableDownloads.length);
 }
 
 for (const song of catalog.songs) {

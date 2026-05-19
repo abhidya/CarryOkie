@@ -70,10 +70,11 @@ const appSources = [
   .join("\n");
 const compactAppSources = appSources.replace(/\s+/g, "");
 const hasAppSource = (needle) => appSources.includes(needle);
-const hasCompactAppSource = (needle) => compactAppSources.includes(needle.replace(/\s+/g, ""));
+const hasCompactAppSource = (needle) =>
+  compactAppSources.includes(needle.replace(/\s+/g, ""));
 checks.push([
   "phone offer creation has WebRTC/local HTTP guidance",
-    webrtc.includes("assertWebRtcSupported") &&
+  webrtc.includes("assertWebRtcSupported") &&
     webrtc.includes("local HTTP hostnames may block offer creation") &&
     app.includes("Create phone pairing code") &&
     hasAppSource("GitHub Pages HTTPS URL"),
@@ -123,7 +124,9 @@ checks.push([
   "cast load autoplays TV media",
   fs.readFileSync("src/cast.ts", "utf8").includes("request.autoplay = true") &&
     fs.readFileSync("src/cast.ts", "utf8").includes("await this.play()") &&
-    /media\.play\?\.|media\.play\(/.test(fs.readFileSync("src/cast.ts", "utf8")) &&
+    /media\.play\?\.|media\.play\(/.test(
+      fs.readFileSync("src/cast.ts", "utf8"),
+    ) &&
     fs
       .readFileSync("src/cast.ts", "utf8")
       .includes("Tap receiver once to start backing track/audio"),
@@ -209,7 +212,8 @@ checks.push([
 ]);
 checks.push([
   "host tracks MIC_ENABLED from players",
-  hasCompactAppSource("msg.type === RPC.MIC_ENABLED") && app.includes("micState"),
+  hasCompactAppSource("msg.type === RPC.MIC_ENABLED") &&
+    app.includes("micState"),
 ]);
 checks.push([
   "host has reject/remove queue controls",

@@ -60,7 +60,10 @@ export async function loadSongCatalog(
   return [...protectedSongs, ...plainSongs];
 }
 
-export function formatSongTitle(song: SongCatalogItem | undefined, songId: string): string {
+export function formatSongTitle(
+  song: SongCatalogItem | undefined,
+  songId: string,
+): string {
   return song
     ? `${song.title || song.songId}${song.artist ? " — " + song.artist : ""}`
     : songId;

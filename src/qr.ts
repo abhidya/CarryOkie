@@ -228,7 +228,11 @@ export function qrMatrix(text: string): boolean[][] {
 }
 export function qrSvg(
   text: string,
-  { scale = 4, quiet = 4, title = "CarryOkie QR" }: { scale?: number; quiet?: number; title?: string } = {},
+  {
+    scale = 4,
+    quiet = 4,
+    title = "CarryOkie QR",
+  }: { scale?: number; quiet?: number; title?: string } = {},
 ): string {
   const m = qrMatrix(text);
   const n = m.length + quiet * 2;
