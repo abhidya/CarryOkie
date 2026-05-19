@@ -160,7 +160,31 @@ export class PhoneAudio {
       highpass.connect(tone);
       tone.connect(presence);
       presence.connect(compressor);
-      compressor.connect(output);
+      /* Insert noise gate into the published mic filter chain
+         between compressor and output so it only affects the
+         stream sent to peers — never to ctx.destination. */
+      if (this.gateEnabled && this.ctx.createScriptProcessor) {
+        const gateNode = this.ctx.createScriptProcessor(4096, 1, 1);
+        gateNode.onaudioprocess = (e: AudioProcessingEvent) => {
+          const input = e.inputBuffer.getChannelData(0);
+          const outputBuf = e.outputBuffer.getChannelData(0);
+          let rms = 0;
+          for (let i = 0; i < input.length; i++) rms += input[i] * input[i];
+          rms = Math.sqrt(rms / input.length);
+          if (rms < this.gateThreshold) {
+            for (let i = 0; i < outputBuf.length; i++) outputBuf[i] = 0;
+          } else {
+            for (let i = 0; i < outputBuf.length; i++) outputBuf[i] = input[i];
+          }
+        };
+        compressor.connect(gateNode);
+        gateNode.connect(output);
+        this.gateProcessor = gateNode;
+        this.log(`Noise gate enabled in mic filter chain (threshold: ${this.gateThreshold}).`);
+      } else {
+        compressor.connect(output);
+        this.gateProcessor = null;
+      }
       output.connect(this.micDestination);
       this.micFilters = { highpass, tone, presence, compressor, output };
       this.applyVoicePreset();
@@ -348,36 +372,13 @@ export class PhoneAudio {
     }
   }
   applyGate(): void {
-    if (!this.localStream || !this.ctx || !this.gateEnabled) return;
-    try {
-      const source = this.ctx.createMediaStreamSource(this.localStream);
-      const processor = this.ctx.createScriptProcessor(4096, 1, 1);
-      processor.onaudioprocess = (e: AudioProcessingEvent) => {
-        const input = e.inputBuffer.getChannelData(0);
-        const output = e.outputBuffer.getChannelData(0);
-        let rms = 0;
-        for (let i = 0; i < input.length; i++) rms += input[i] * input[i];
-        rms = Math.sqrt(rms / input.length);
-        if (rms < this.gateThreshold) {
-          for (let i = 0; i < output.length; i++) output[i] = 0;
-        } else {
-          for (let i = 0; i < output.length; i++) output[i] = input[i];
-        }
-      };
-      source.connect(processor);
-      processor.connect(this.ctx.destination);
-      this.gateProcessor = processor;
-      this.log(`Noise gate enabled (threshold: ${this.gateThreshold}).`);
-    } catch (err: unknown) {
-      this.log(
-        `Noise gate failed: ${(err as Error).message}. Continuing without gate.`,
-      );
-    }
   }
   setGateEnabled(enabled: boolean, threshold?: number): void {
     this.gateEnabled = enabled;
     if (threshold !== undefined) this.gateThreshold = threshold;
-    if (enabled && this.localStream) this.applyGate();
+    if (this.localStream && this.publishedStream) {
+      this.publishedStream = this.buildMicFilterStream(this.localStream);
+    }
   }
   duetMonitorGains: Map<string, GainNode> = new Map();
   enableDuetMonitoring(peerId: string, enabled: boolean): void {

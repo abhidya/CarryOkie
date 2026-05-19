@@ -620,6 +620,15 @@ test("noise gate mutes low RMS and passes loud input", async () => {
       processor = { connect() {}, onaudioprocess: null };
       return processor;
     }
+    createBiquadFilter() {
+      return { type: "", frequency: { value: 0 }, gain: { value: 0 }, Q: { value: 0 }, connect() {} };
+    }
+    createDynamicsCompressor() {
+      return { threshold: { value: 0 }, knee: { value: 0 }, ratio: { value: 0 }, attack: { value: 0 }, release: { value: 0 }, connect() {} };
+    }
+    createMediaStreamDestination() {
+      return { stream, connect() {} };
+    }
   };
   Object.defineProperty(globalThis, "navigator", {
     configurable: true,
@@ -635,9 +644,11 @@ test("noise gate mutes low RMS and passes loud input", async () => {
     const audio = new PhoneAudio((m) => logs.push(m));
     audio.setGateEnabled(true, 0.5);
     await audio.requestMic({ headphonesConfirmed: true });
-    assert.ok(processor.onaudioprocess);
+    const gateProcessor = audio.gateProcessor;
+    assert.ok(gateProcessor, "gateProcessor should be set when gate is enabled");
+    assert.ok(gateProcessor.onaudioprocess, "gateProcessor should have onaudioprocess handler");
     const lowOut = [9, 9, 9];
-    processor.onaudioprocess({
+    gateProcessor.onaudioprocess({
       inputBuffer: {
         getChannelData() {
           return [0.01, 0.01, 0.01];
@@ -651,7 +662,7 @@ test("noise gate mutes low RMS and passes loud input", async () => {
     });
     assert.deepEqual(lowOut, [0, 0, 0]);
     const loudOut = [0, 0, 0];
-    processor.onaudioprocess({
+    gateProcessor.onaudioprocess({
       inputBuffer: {
         getChannelData() {
           return [1, 0.5, -1];

@@ -294,6 +294,14 @@ checks.push([
     cast.includes("usesDefaultMediaReceiver"),
 ]);
 checks.push([
+  "host publishes RECEIVER_AUDIO_STATUS over BroadcastChannel",
+  app.includes("RECEIVER_AUDIO_STATUS") && app.includes("publishAudioPipelineStatus") && app.includes("audioPipeline"),
+]);
+checks.push([
+  "receiver handles RECEIVER_AUDIO_STATUS and renders audio diagnostics",
+  cast.includes("RECEIVER_AUDIO_STATUS") && cast.includes("audioDiagnostics") && cast.includes("audioOutputUnlocked") && cast.includes("startReceiverAudio"),
+]);
+checks.push([
   "receiver renders join QR lyrics singers and tab-cast live mics",
   cast.includes("import { qrSvg }") &&
     cast.includes('id="joinQr"') &&
@@ -329,6 +337,14 @@ checks.push([
 const audio = fs.readFileSync("src/audio.ts", "utf8");
 checks.push(["AEC warning copy", audio.includes("TV backing track")]);
 checks.push(["push-to-sing support", audio.includes("pushToSing")]);
+checks.push([
+  "noise gate never connects to ctx.destination",
+  !audio.includes("processor.connect(this.ctx.destination)") &&
+  !audio.includes("processor.connect(ctx.destination)") &&
+  audio.includes("ScriptProcessor") &&
+  audio.includes("gateThreshold") &&
+  audio.includes("setGateEnabled"),
+]);
 checks.push([
   "noise gate implemented",
   audio.includes("ScriptProcessor") &&

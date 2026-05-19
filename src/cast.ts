@@ -415,6 +415,8 @@ export function receiverApp(root: HTMLElement): void {
     lines: Array<{ startMs: number; endMs: number; text: string }>;
     status: string;
     playbackState: Record<string, unknown> | null;
+    audioOutputUnlocked: boolean;
+    audioDiagnostics: Record<string, unknown> | null;
   } = {
     roomCode: initialRoomCode,
     song: null,
@@ -424,12 +426,16 @@ export function receiverApp(root: HTMLElement): void {
     lines: [],
     status: "Waiting for host tab…",
     playbackState: null,
+    audioOutputUnlocked: false,
+    audioDiagnostics: null,
   };
-  root.innerHTML = `<main class="tv"><section class="tv-info"><p class="eyebrow">CarryOkie receiver</p><h1>CarryOkie</h1><div class="stage-art receiver-stage" aria-hidden="true"><div class="stage-orb"></div><div class="stage-mic"></div><div class="soundwave"><span></span><span></span><span></span><span></span><span></span></div></div><div class="room" id="room">${escapeHtml(initialRoomCode)}</div><div id="joinQr"></div><p>Scan/open /player. Tab-cast receiver mirrors host room, queue, singers, backing track, and live singer mics.</p><section id="singers"></section><section id="receiverStatus"></section><section id="liveMics"><h2>Live mics</h2><p>Waiting for host tab audio…</p><button id="retryLiveMics">Start / retry live mics</button></section></section><section class="tv-stage"><video id="media" class="castMediaElement" controls playsinline></video><section id="lyrics" class="lyrics big"></section><section id="queue"></section></section></main>`;
+  root.innerHTML = `<main class="tv"><section class="tv-info"><p class="eyebrow">CarryOkie receiver</p><h1>CarryOkie</h1><div class="stage-art receiver-stage" aria-hidden="true"><div class="stage-orb"></div><div class="stage-mic"></div><div class="soundwave"><span></span><span></span><span></span><span></span><span></span></div></div><div class="room" id="room">${escapeHtml(initialRoomCode)}</div><div id="joinQr"></div><p>Scan/open /player. Tab-cast receiver mirrors host room, queue, singers, backing track, and live singer mics.</p><section id="singers"></section><section id="receiverStatus"></section><section id="audioDiagnostics"></section><section id="liveMics"><h2>Live mics</h2><p>Waiting for host tab audio…</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button></section></section><section class="tv-stage"><video id="media" class="castMediaElement" controls playsinline></video><section id="lyrics" class="lyrics big"></section><section id="queue"></section></section></main>`;
   const media = root.querySelector<HTMLVideoElement>("#media")!;
   const liveMics = root.querySelector<HTMLElement>("#liveMics")!;
   const retryLiveMicsButton =
     root.querySelector<HTMLButtonElement>("#retryLiveMics")!;
+  const startReceiverAudioButton =
+    root.querySelector<HTMLButtonElement>("#startReceiverAudio")!;
   const receiverId = crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
   let loadedSongId = "";
   let mediaReady = false;
@@ -480,6 +486,13 @@ export function receiverApp(root: HTMLElement): void {
         .join("") || "<p>No active singers</p>");
     root.querySelector("#receiverStatus")!.innerHTML =
       `<p class="status-pill">${escapeHtml(state.status)}</p>`;
+    const diagEl = root.querySelector("#audioDiagnostics");
+    if (diagEl && state.audioDiagnostics) {
+      const d = state.audioDiagnostics;
+      diagEl.innerHTML = `<h2>Audio pipeline</h2><p>Host remote tracks: ${d.hostRemoteAudioTracks ?? "?"} · Relayed streams: ${d.hostRelayedStreams ?? "?"} · Receiver ready: ${d.receiverReady ? "yes" : "no"}</p><p>Receiver PC: ${d.receiverPcConnectionState ?? "?"} · ICE: ${d.receiverPcIceState ?? "?"} · Tracks added: ${d.receiverTracksAdded ?? 0}</p>${d.receiverOfferSentAt ? `<p>Offer sent: ${new Date(d.receiverOfferSentAt as number).toLocaleTimeString()}</p>` : ""}${d.receiverAnswerReceivedAt ? `<p>Answer received: ${new Date(d.receiverAnswerReceivedAt as number).toLocaleTimeString()}</p>` : ""}${d.receiverLastError ? `<p class="warn">Error: ${escapeHtml(String(d.receiverLastError))}</p>` : ""}<p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p>`;
+    } else if (diagEl) {
+      diagEl.innerHTML = `<h2>Audio pipeline</h2><p>No diagnostics received yet. Waiting for host tab…</p><p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p>`;
+    }
     const active = activeLine();
     root.querySelector("#lyrics")!.innerHTML = state.lines.length
       ? state.lines
@@ -627,7 +640,11 @@ export function receiverApp(root: HTMLElement): void {
   function ensureLiveMicAudio(): HTMLAudioElement {
     if (liveMicAudio) return liveMicAudio;
     liveMics.innerHTML =
-      '<h2>Live mics</h2><p class="subtle">Playing all forwarded singer mics.</p><button id="retryLiveMics">Start / retry live mics</button>';
+      '<h2>Live mics</h2><p class="subtle">Playing all forwarded singer mics.</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>';
+    liveMics.querySelector("#startReceiverAudio")?.addEventListener("click", () => {
+      state.audioOutputUnlocked = true;
+      void tryPlayLiveMics();
+    });
     liveMics.querySelector("#retryLiveMics")?.addEventListener("click", () => {
       void tryPlayLiveMics();
     });
@@ -642,6 +659,11 @@ export function receiverApp(root: HTMLElement): void {
     return liveMicAudio;
   }
   async function tryPlayLiveMics(): Promise<void> {
+    if (!state.audioOutputUnlocked) {
+      state.status = "Press 'Start receiver audio' to enable live mic audio.";
+      render();
+      return;
+    }
     const audio = ensureLiveMicAudio();
     try {
       await audio.play();
@@ -685,6 +707,14 @@ export function receiverApp(root: HTMLElement): void {
     channel.onmessage = async (ev) => {
       const msg = ev.data || {};
       if (msg.type === "RECEIVER_STATE") handle(msg);
+    if (msg.type === "RECEIVER_AUDIO_STATUS" && msg.payload) {
+      state.audioDiagnostics = msg.payload as Record<string, unknown>;
+      const diagEl = root.querySelector("#audioDiagnostics");
+      if (diagEl) {
+        const d = msg.payload as Record<string, unknown>;
+        diagEl.innerHTML = `<h2>Audio pipeline</h2><p>Host remote tracks: ${d.hostRemoteAudioTracks ?? "?"} · Relayed streams: ${d.hostRelayedStreams ?? "?"} · Receiver ready: ${d.receiverReady ? "yes" : "no"}</p><p>Receiver PC: ${d.receiverPcConnectionState ?? "?"} · ICE: ${d.receiverPcIceState ?? "?"} · Tracks added: ${d.receiverTracksAdded ?? 0}</p>${d.receiverOfferSentAt ? `<p>Offer sent: ${new Date(d.receiverOfferSentAt as number).toLocaleTimeString()}</p>` : ""}${d.receiverAnswerReceivedAt ? `<p>Answer received: ${new Date(d.receiverAnswerReceivedAt as number).toLocaleTimeString()}</p>` : ""}${d.receiverLastError ? `<p class="warn">Error: ${escapeHtml(String(d.receiverLastError))}</p>` : ""}<p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p>`;
+      }
+    }
       if (
         msg.type === "RECEIVER_OFFER" &&
         (!msg.receiverId || msg.receiverId === receiverId)
@@ -740,7 +770,14 @@ export function receiverApp(root: HTMLElement): void {
   retryLiveMicsButton.addEventListener("click", () => {
     void tryPlayLiveMics();
   });
+  startReceiverAudioButton.addEventListener("click", () => {
+    state.audioOutputUnlocked = true;
+    void tryPlayLiveMics();
+  });
   root.addEventListener("pointerdown", () => {
+    if (!state.audioOutputUnlocked && liveMicTrackIds.size) {
+      state.audioOutputUnlocked = true;
+    }
     if (liveMicTrackIds.size) void tryPlayLiveMics();
   });
   window.addEventListener("message", (ev) => handle(ev.data));

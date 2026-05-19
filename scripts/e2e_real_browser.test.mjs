@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 
-const baseUrl = process.env.E2E_BASE_URL || "http://localhost:4174/";
+const baseUrl =
+  process.env.E2E_BASE_URL || "https://abhidya.github.io/CarryOkie/";
 const headed = process.env.HEADLESS !== "1";
 const keepBrowserOpen = true;
 const browser = await chromium.launch({
