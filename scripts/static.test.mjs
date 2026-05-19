@@ -213,7 +213,16 @@ checks.push([
 checks.push([
   "host tracks MIC_ENABLED from players",
   hasCompactAppSource("msg.type === RPC.MIC_ENABLED") &&
-    app.includes("micState"),
+    app.includes("updateRoomMicState") &&
+    app.includes("broadcastRoom(RPC.ROOM_STATE_SNAPSHOT)") &&
+    app.includes("publishReceiverState()"),
+]);
+checks.push([
+  "host relays MIC_MUTED and MIC_UNMUTED to room state",
+  app.includes("RPC.MIC_MUTED") &&
+    app.includes("RPC.MIC_UNMUTED") &&
+    app.includes("setOwnMicMuted(muted)") &&
+    app.includes("muted: !!msg.muted"),
 ]);
 checks.push([
   "host has reject/remove queue controls",
@@ -247,6 +256,18 @@ checks.push([
     app.includes("Autotune-style polish") &&
     fs.readFileSync("src/audio.ts", "utf8").includes("setVoicePreset") &&
     fs.readFileSync("src/audio.ts", "utf8").includes("DynamicsCompressor"),
+]);
+checks.push([
+  "receiver audio diagnostics include singer mic summary",
+  fs.readFileSync("src/cast.ts", "utf8").includes("Mic track connected, but singer is muted.") &&
+    fs.readFileSync("src/cast.ts", "utf8").includes("Publishing singers:") &&
+    fs.readFileSync("src/cast.ts", "utf8").includes("liveMicStatus()"),
+]);
+checks.push([
+  "receiver negotiation includes host local streams",
+  app.includes("peerNode.localStreams") &&
+    app.includes("peerNode.relayedStreams") &&
+    app.includes("getAudioTracks()"),
 ]);
 const styles = fs.readFileSync("src/styles.css", "utf8");
 checks.push([

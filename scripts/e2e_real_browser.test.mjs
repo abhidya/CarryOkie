@@ -44,6 +44,7 @@ try {
     waitUntil: "networkidle",
   });
   await receiver.locator("body").click();
+  await receiver.click("#startReceiverAudio");
   await receiver.waitForSelector(`text=${roomCode}`);
 
   await player.goto(`${baseUrl}/player/?room=${roomCode}`, {
@@ -98,7 +99,14 @@ try {
   await receiver.waitForSelector("text=singers Real E2E", { timeout: 15000 });
 
   await player.click("#enableMic");
-  await player.waitForSelector("text=Mic live.", { timeout: 15000 });
+  await player.waitForFunction(
+    () =>
+      /Mic live\.|Mic ready\. Hold to sing\.|Mic publishing\./.test(
+        document.body.textContent || "",
+      ),
+    null,
+    { timeout: 15000 },
+  );
   await host.waitForFunction(
     () => document.querySelector("#log")?.textContent?.includes("enabled mic"),
     null,
@@ -106,7 +114,15 @@ try {
   );
   await receiver.waitForFunction(
     () =>
-      /Playing all forwarded singer mics|Playing \d+ live mic|Tap receiver once to start all live mic audio/.test(
+      /Playing all forwarded singer mics|Playing \d+ unmuted live mic|Mic track connected, but singer is muted\.|Tap receiver once to start all live mic audio/.test(
+        document.body.textContent || "",
+      ),
+    null,
+    { timeout: 20000 },
+  );
+  await receiver.waitForFunction(
+    () =>
+      /Playing \d+ unmuted live mic|Mic track connected, but singer is muted\.|No live mic tracks connected\./.test(
         document.body.textContent || "",
       ),
     null,
@@ -119,9 +135,23 @@ try {
   await player.click("#toggleSing");
   await player.waitForSelector("text=Mic muted.", { timeout: 5000 });
   await host.waitForSelector("text=MIC_MUTED", { timeout: 10000 });
+  await receiver.waitForFunction(
+    () =>
+      document.body.textContent?.includes(
+        "Mic track connected, but singer is muted.",
+      ),
+    null,
+    { timeout: 20000 },
+  );
   await player.click("#toggleSing");
   await player.waitForSelector("text=Mic live.", { timeout: 5000 });
   await host.waitForSelector("text=MIC_UNMUTED", { timeout: 10000 });
+  await receiver.waitForFunction(
+    () =>
+      /Playing \d+ unmuted live mic/.test(document.body.textContent || ""),
+    null,
+    { timeout: 20000 },
+  );
   await player.click("text=Advanced audio");
   await player.locator("#remoteGain").fill("1.5");
   await player.locator("#backingGain").fill("0.5");

@@ -78,7 +78,12 @@ const audioPipeline = {
   receiverAnswerReceivedAt: null,
   receiverLastError: null,
 };
+function renderAudioPipelineStatus() {
+  const el = $("#audioPipelineStatus");
+  if (el) el.textContent = JSON.stringify(audioPipeline, null, 2);
+}
 function publishAudioPipelineStatus() {
+  renderAudioPipelineStatus();
   receiverChannel?.postMessage?.({
     type: "RECEIVER_AUDIO_STATUS",
     payload: { ...audioPipeline },
@@ -252,6 +257,40 @@ function sendCastRoomUpdate(type, payload = {}) {
   castController?.sendSafe?.(type, payload);
   publishReceiverState();
 }
+function findRoomPlayerByMessage(remotePeerId, playerId) {
+  if (!room?.players?.length) return null;
+  return (
+    room.players.find((p) => p.playerId === playerId) ||
+    room.players.find((p) => p.peerId === remotePeerId) ||
+    null
+  );
+}
+function updateRoomMicState(remotePeerId, playerId, patch) {
+  const target = findRoomPlayerByMessage(remotePeerId, playerId);
+  if (!target) return null;
+
+  target.micState = {
+    ...target.micState,
+    ...patch,
+  };
+  target.lastSeenAt = Date.now();
+
+  if (player?.playerId === target.playerId) {
+    player = {
+      ...player,
+      micState: target.micState,
+    };
+  }
+
+  persist();
+  return target;
+}
+function publishMicStateChange(target) {
+  if (!target) return;
+  broadcastRoom(RPC.ROOM_STATE_SNAPSHOT);
+  publishReceiverState();
+  renderHost($("#main"));
+}
 function plainRtcDescription(description: RTCSessionDescription | null) {
   return description ? { type: description.type, sdp: description.sdp } : null;
 }
@@ -291,9 +330,16 @@ async function negotiateReceiverAudio() {
         try { receiverPc.removeTrack(sender); } catch {}
       }
     }
-    for (const { stream } of peerNode.relayedStreams || []) {
+    const receiverStreams = [
+      ...(peerNode.localStreams || []).map((stream) => ({
+        sourcePeerId: peerNode.localPeerId,
+        stream,
+      })),
+      ...(peerNode.relayedStreams || []),
+    ].filter(({ stream }) => stream?.getAudioTracks?.().length);
+    for (const { stream } of receiverStreams) {
       const newTracks = stream
-        .getTracks()
+        .getAudioTracks()
         .filter((track) => !receiverTrackKeys.has(mediaTrackKey(track)));
       newTracks.forEach((track) => {
         receiverTrackKeys.add(mediaTrackKey(track));
@@ -444,14 +490,32 @@ function attachCastListeners(cast) {
 function setOwnMicMuted(muted) {
   audio?.setMicMuted(muted);
   if (player?.micState) {
-    player.micState = { ...player.micState, muted };
-    persist();
+    player.micState = {
+      ...player.micState,
+      enabled: true,
+      publishing: true,
+      muted,
+    };
   }
+  if (room?.players?.length && player?.playerId) {
+    const target = findRoomPlayerByMessage(player.peerId, player.playerId);
+    if (target) {
+      target.micState = {
+        ...target.micState,
+        enabled: true,
+        publishing: true,
+        muted,
+      };
+      target.lastSeenAt = Date.now();
+    }
+  }
+  persist();
   const status = $("#micStatus");
   if (status) status.textContent = muted ? "Mic muted." : "Mic live.";
   peerNode?.broadcast({
     type: muted ? RPC.MIC_MUTED : RPC.MIC_UNMUTED,
     playerId: player?.playerId,
+    muted,
   });
 }
 function registerRemotePlayer(remotePeerId, remotePlayer) {
@@ -719,17 +783,51 @@ function handleRpc(remotePeerId, msg) {
     persist();
     renderPlayer($("#main"));
   }
-  if (msg.type === RPC.MIC_MUTED && msg.playerId === player?.playerId) {
-    setOwnMicMuted(true);
-    log("Host muted your mic.");
+  if (
+    !player?.isHost &&
+    msg.playerId === player?.playerId &&
+    (msg.type === RPC.MIC_MUTED || msg.type === RPC.MIC_UNMUTED)
+  ) {
+    setOwnMicMuted(msg.type === RPC.MIC_MUTED || !!msg.muted);
+    log(
+      msg.type === RPC.MIC_MUTED
+        ? "Host muted your mic."
+        : "Host unmuted your mic.",
+    );
   }
-  if (msg.type === RPC.MIC_ENABLED && player?.isHost) {
-    const target = room.players.find((p) => p.playerId === msg.playerId);
+  if (player?.isHost && msg.type === RPC.MIC_ENABLED) {
+    const target = updateRoomMicState(remotePeerId, msg.playerId, {
+      enabled: true,
+      publishing: true,
+      muted: !!msg.muted,
+    });
     if (target) {
-      target.micState = { ...target.micState, enabled: true, publishing: true };
-      persist();
-      renderHost($("#main"));
-      log(`#${target.playerNumber} ${target.displayName} enabled mic.`);
+      publishMicStateChange(target);
+      log(
+        `#${target.playerNumber} ${target.displayName} enabled mic${target.micState?.muted ? " muted" : " live"}.`,
+      );
+    }
+  }
+  if (player?.isHost && msg.type === RPC.MIC_MUTED) {
+    const target = updateRoomMicState(remotePeerId, msg.playerId, {
+      enabled: true,
+      publishing: true,
+      muted: true,
+    });
+    if (target) {
+      publishMicStateChange(target);
+      log(`#${target.playerNumber} ${target.displayName} muted mic.`);
+    }
+  }
+  if (player?.isHost && msg.type === RPC.MIC_UNMUTED) {
+    const target = updateRoomMicState(remotePeerId, msg.playerId, {
+      enabled: true,
+      publishing: true,
+      muted: false,
+    });
+    if (target) {
+      publishMicStateChange(target);
+      log(`#${target.playerNumber} ${target.displayName} unmuted mic.`);
     }
   }
 }
@@ -1115,6 +1213,7 @@ function renderPlayer(main) {
         peerNode.broadcast({
           type: RPC.MIC_ENABLED,
           playerId: player.playerId,
+          muted: pushToSing,
         });
       $("#micStatus").textContent = pushToSing
         ? "Mic ready. Hold to sing."
