@@ -114,7 +114,7 @@ try {
   );
   await receiver.waitForFunction(
     () =>
-      /Playing all forwarded singer mics|Playing \d+ unmuted live mic|Mic track connected, but singer is muted\.|Tap receiver once to start all live mic audio/.test(
+      /Playing all forwarded singer mics|Playing \d+ unmuted live mic|Mic track connected, but singer is muted\.|Tap receiver once to start|Press 'Start receiver audio'/.test(
         document.body.textContent || "",
       ),
     null,
@@ -122,7 +122,7 @@ try {
   );
   await receiver.waitForFunction(
     () =>
-      /Playing \d+ unmuted live mic|Mic track connected, but singer is muted\.|No live mic tracks connected\./.test(
+      /Playing \d+ unmuted live mic|Playing all forwarded singer mics|Mic track connected, but singer is muted\.|No live mic tracks connected\./.test(
         document.body.textContent || "",
       ),
     null,

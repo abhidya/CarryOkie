@@ -687,10 +687,20 @@ export function receiverApp(root: HTMLElement): void {
   const liveMicStream = new MediaStream();
   const liveMicTrackIds = new Set<string>();
   let liveMicAudio: HTMLAudioElement | null = null;
+  function liveMicSummaryHtml(): string {
+    const status = state.liveMicStatus || (liveMicTrackIds.size ? liveMicStatus() : "");
+    return status
+      ? `<p class="subtle">${escapeHtml(status)}</p>`
+      : '<p class="subtle">Playing all forwarded singer mics.</p>';
+  }
   function ensureLiveMicAudio(): HTMLAudioElement {
-    if (liveMicAudio) return liveMicAudio;
+    if (liveMicAudio) {
+      const subtitle = liveMics.querySelector("p.subtle");
+      if (subtitle) subtitle.outerHTML = liveMicSummaryHtml();
+      return liveMicAudio;
+    }
     liveMics.innerHTML =
-      '<h2>Live mics</h2><p class="subtle">Playing all forwarded singer mics.</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>';
+      `<h2>Live mics</h2>${liveMicSummaryHtml()}<button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>`;
     liveMics.querySelector("#startReceiverAudio")?.addEventListener("click", () => {
       state.audioOutputUnlocked = true;
       void tryPlayLiveMics();
@@ -720,6 +730,8 @@ export function receiverApp(root: HTMLElement): void {
     const audio = ensureLiveMicAudio();
     try {
       await audio.play();
+      state.liveMicStatus = liveMicStatus();
+      render();
     } catch {
       state.liveMicStatus = "Tap receiver once or press Start / retry live mics.";
       render();
