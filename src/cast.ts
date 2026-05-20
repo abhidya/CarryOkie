@@ -443,8 +443,9 @@ export function receiverApp(root: HTMLElement): void {
   const liveMics = root.querySelector<HTMLElement>("#liveMics")!;
   const retryLiveMicsButton =
     root.querySelector<HTMLButtonElement>("#retryLiveMics")!;
-  const startReceiverAudioButton =
-    root.querySelector<HTMLButtonElement>("#startReceiverAudio")!;
+  const startReceiverAudioButton = root.querySelector<HTMLButtonElement>(
+    "#startReceiverAudio",
+  )!;
   const receiverId = crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
   let loadedSongId = "";
   let mediaReady = false;
@@ -595,7 +596,8 @@ export function receiverApp(root: HTMLElement): void {
             pendingPlay = false;
             media.play().catch(() => {
               if (!liveMicTrackIds.size)
-                state.status = "Tap receiver once to start backing track/audio.";
+                state.status =
+                  "Tap receiver once to start backing track/audio.";
               render();
             });
           }
@@ -713,7 +715,8 @@ export function receiverApp(root: HTMLElement): void {
     }`;
   }
   function liveMicSummaryHtml(): string {
-    const status = state.liveMicStatus || (liveMicTrackIds.size ? liveMicStatus() : "");
+    const status =
+      state.liveMicStatus || (liveMicTrackIds.size ? liveMicStatus() : "");
     return status
       ? `<p class="subtle">${escapeHtml(status)}</p>`
       : '<p class="subtle">Playing all forwarded singer mics.</p>';
@@ -724,12 +727,13 @@ export function receiverApp(root: HTMLElement): void {
       if (subtitle) subtitle.outerHTML = liveMicSummaryHtml();
       return liveMicAudio;
     }
-    liveMics.innerHTML =
-      `<h2>Live mics</h2>${liveMicSummaryHtml()}<button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>`;
-    liveMics.querySelector("#startReceiverAudio")?.addEventListener("click", () => {
-      state.audioOutputUnlocked = true;
-      void tryPlayLiveMics();
-    });
+    liveMics.innerHTML = `<h2>Live mics</h2>${liveMicSummaryHtml()}<button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>`;
+    liveMics
+      .querySelector("#startReceiverAudio")
+      ?.addEventListener("click", () => {
+        state.audioOutputUnlocked = true;
+        void tryPlayLiveMics();
+      });
     liveMics.querySelector("#retryLiveMics")?.addEventListener("click", () => {
       void tryPlayLiveMics();
     });
@@ -762,7 +766,8 @@ export function receiverApp(root: HTMLElement): void {
       return;
     }
     if (!liveMicSource) {
-      liveMicSource = liveMicAudioContext.createMediaStreamSource(liveMicStream);
+      liveMicSource =
+        liveMicAudioContext.createMediaStreamSource(liveMicStream);
       liveMicGain = liveMicAudioContext.createGain();
       liveMicGain.gain.value = 1;
       liveMicSource.connect(liveMicGain);
@@ -791,7 +796,8 @@ export function receiverApp(root: HTMLElement): void {
       render();
     } catch (error) {
       liveMicLastPlayError = (error as Error).message;
-      state.liveMicStatus = "Tap receiver once or press Start / retry live mics.";
+      state.liveMicStatus =
+        "Tap receiver once or press Start / retry live mics.";
       render();
     }
   }

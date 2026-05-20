@@ -259,7 +259,9 @@ checks.push([
 ]);
 checks.push([
   "receiver audio diagnostics include singer mic summary",
-  fs.readFileSync("src/cast.ts", "utf8").includes("Mic track connected, but singer is muted.") &&
+  fs
+    .readFileSync("src/cast.ts", "utf8")
+    .includes("Mic track connected, but singer is muted.") &&
     fs.readFileSync("src/cast.ts", "utf8").includes("Publishing singers:") &&
     fs.readFileSync("src/cast.ts", "utf8").includes("liveMicStatus()"),
 ]);
@@ -316,11 +318,16 @@ checks.push([
 ]);
 checks.push([
   "host publishes RECEIVER_AUDIO_STATUS over BroadcastChannel",
-  app.includes("RECEIVER_AUDIO_STATUS") && app.includes("publishAudioPipelineStatus") && app.includes("audioPipeline"),
+  app.includes("RECEIVER_AUDIO_STATUS") &&
+    app.includes("publishAudioPipelineStatus") &&
+    app.includes("audioPipeline"),
 ]);
 checks.push([
   "receiver handles RECEIVER_AUDIO_STATUS and renders audio diagnostics",
-  cast.includes("RECEIVER_AUDIO_STATUS") && cast.includes("audioDiagnostics") && cast.includes("audioOutputUnlocked") && cast.includes("startReceiverAudio"),
+  cast.includes("RECEIVER_AUDIO_STATUS") &&
+    cast.includes("audioDiagnostics") &&
+    cast.includes("audioOutputUnlocked") &&
+    cast.includes("startReceiverAudio"),
 ]);
 checks.push([
   "receiver renders join QR lyrics singers and tab-cast live mics",
@@ -361,10 +368,10 @@ checks.push(["push-to-sing support", audio.includes("pushToSing")]);
 checks.push([
   "noise gate never connects to ctx.destination",
   !audio.includes("processor.connect(this.ctx.destination)") &&
-  !audio.includes("processor.connect(ctx.destination)") &&
-  audio.includes("ScriptProcessor") &&
-  audio.includes("gateThreshold") &&
-  audio.includes("setGateEnabled"),
+    !audio.includes("processor.connect(ctx.destination)") &&
+    audio.includes("ScriptProcessor") &&
+    audio.includes("gateThreshold") &&
+    audio.includes("setGateEnabled"),
 ]);
 checks.push([
   "noise gate implemented",

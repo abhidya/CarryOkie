@@ -167,7 +167,9 @@ function setupPeer(localPeerId) {
     if (player?.isHost) {
       sinkHostRemoteAudio(remoteStream);
       peerNode.relayRemoteStream(e.detail.remotePeerId, remoteStream);
-      audioPipeline.hostRemoteAudioTracks = (peerNode.relayedStreams || []).reduce(
+      audioPipeline.hostRemoteAudioTracks = (
+        peerNode.relayedStreams || []
+      ).reduce(
         (sum, r) => sum + (r.stream?.getAudioTracks?.()?.length || 0),
         0,
       );
@@ -350,7 +352,9 @@ async function negotiateReceiverAudio() {
     for (const sender of senders) {
       if (sender.track?.readyState === "ended") {
         receiverTrackKeys.delete(mediaTrackKey(sender.track));
-        try { receiverPc.removeTrack(sender); } catch {}
+        try {
+          receiverPc.removeTrack(sender);
+        } catch {}
       }
     }
     const receiverStreams = [
@@ -392,8 +396,7 @@ async function negotiateReceiverAudio() {
         try {
           if (receiverPc?.signalingState === "have-local-offer")
             await receiverPc.setLocalDescription({ type: "rollback" });
-        } catch {
-        }
+        } catch {}
         if (receiverPendingRenegotiate || receiverAudioDirty)
           negotiateReceiverAudio().catch((e) => log(e.message));
       }
@@ -441,8 +444,7 @@ function setupReceiverBridge() {
           try {
             if (receiverPc?.signalingState === "have-local-offer")
               await receiverPc.setLocalDescription({ type: "rollback" });
-          } catch {
-          }
+          } catch {}
           receiverNegotiating = false;
         });
       clearTimeout(receiverNegotiationTimer ?? undefined);

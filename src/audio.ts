@@ -194,7 +194,9 @@ export class PhoneAudio {
         compressor.connect(gateNode);
         gateNode.connect(output);
         this.gateProcessor = gateNode;
-        this.log(`Noise gate enabled in mic filter chain (threshold: ${this.gateThreshold}).`);
+        this.log(
+          `Noise gate enabled in mic filter chain (threshold: ${this.gateThreshold}).`,
+        );
       } else {
         compressor.connect(output);
         this.gateProcessor = null;
@@ -400,8 +402,7 @@ export class PhoneAudio {
       this.wakeLockVideo = null;
     }
   }
-  applyGate(): void {
-  }
+  applyGate(): void {}
   setGateEnabled(enabled: boolean, threshold?: number): void {
     this.gateEnabled = enabled;
     if (threshold !== undefined) this.gateThreshold = threshold;

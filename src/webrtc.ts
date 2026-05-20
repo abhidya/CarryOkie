@@ -447,31 +447,21 @@ export class PeerNode extends EventTarget {
     }
   }
   relayRemoteStream(sourcePeerId: string, stream: MediaStream): void {
-    const tracks = streamTracks(stream);
-    const newTracks = tracks.filter(
-      (track) =>
+    const keys = streamTrackKeys(stream);
+    const newKeys = keys.filter(
+      (key) =>
         !this.relayedStreams.some(
           (stream) =>
             stream.sourcePeerId === sourcePeerId &&
-            stream.trackKeys.includes(mediaTrackKey(track)),
+            stream.trackKeys.includes(key),
         ),
     );
-    const newKeys = newTracks.map(mediaTrackKey);
-    const relayStream = new MediaStream(
-      newTracks.map((track) =>
-        typeof track.clone === "function" ? track.clone() : track,
-      ),
-    );
     if (newKeys.length)
-      this.relayedStreams.push({
-        sourcePeerId,
-        stream: relayStream,
-        trackKeys: newKeys,
-      });
+      this.relayedStreams.push({ sourcePeerId, stream, trackKeys: newKeys });
     if (!newKeys.length) return;
     for (const edge of this.peers.values()) {
       if (edge.remotePeerId === sourcePeerId) continue;
-      if (this.addStreamToEdge(edge, relayStream)) this.requestNegotiation(edge);
+      if (this.addStreamToEdge(edge, stream)) this.requestNegotiation(edge);
     }
   }
   emit(type: string, detail: object): void {

@@ -4,11 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright";
 
-const baseUrl =
-  process.env.E2E_BASE_URL || "http://127.0.0.1:4180/";
+const baseUrl = process.env.E2E_BASE_URL || "http://127.0.0.1:4180/";
 const headed = process.env.HEADLESS !== "1";
-const keepBrowserOpen =
-  process.env.KEEP_BROWSER_OPEN === "1";
+const keepBrowserOpen = process.env.KEEP_BROWSER_OPEN === "1";
+const useDeterministicFakeMic =
+  process.env.E2E_FAKE_MIC === "1" ||
+  (!headed && process.env.E2E_REAL_MIC !== "1");
 function makeSineWaveWav({
   seconds = 60,
   sampleRate = 48000,
@@ -41,14 +42,18 @@ function makeSineWaveWav({
   writeFileSync(wavPath, buffer);
   return wavPath;
 }
-const fakeMicAudioPath = makeSineWaveWav();
+const fakeMicAudioPath = useDeterministicFakeMic ? makeSineWaveWav() : null;
 const browser = await chromium.launch({
   headless: !headed,
   slowMo: headed ? 150 : 0,
   args: [
     "--use-fake-ui-for-media-stream",
-    "--use-fake-device-for-media-stream",
-    `--use-file-for-fake-audio-capture=${fakeMicAudioPath}`,
+    ...(useDeterministicFakeMic
+      ? [
+          "--use-fake-device-for-media-stream",
+          `--use-file-for-fake-audio-capture=${fakeMicAudioPath}`,
+        ]
+      : []),
   ],
 });
 const context = await browser.newContext();
@@ -263,8 +268,7 @@ try {
   await player.waitForSelector("text=Mic live.", { timeout: 5000 });
   await host.waitForSelector("text=MIC_UNMUTED", { timeout: 10000 });
   await receiver.waitForFunction(
-    () =>
-      /Playing \d+ unmuted live mic/.test(document.body.textContent || ""),
+    () => /Playing \d+ unmuted live mic/.test(document.body.textContent || ""),
     null,
     { timeout: 20000 },
   );
@@ -343,7 +347,9 @@ try {
   console.log(`PASS player-host DataChannel opened`);
   console.log(`PASS queue request accepted and started`);
   console.log(`PASS autotune preset, gain controls, mute/unmute exercised`);
-  console.log(`PASS mic enabled and receiver live-mic bridge routed audio track`);
+  console.log(
+    `PASS mic enabled and receiver live-mic bridge routed audio track`,
+  );
 } catch (error) {
   console.error("Host log:\n" + (await pageLog(host)));
   console.error("Player log:\n" + (await pageLog(player)));
