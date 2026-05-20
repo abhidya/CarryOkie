@@ -78,6 +78,7 @@ const audioPipeline = {
   receiverOfferSentAt: null,
   receiverAnswerReceivedAt: null,
   receiverLastError: null,
+  micLatencyStats: null,
 };
 function renderAudioPipelineStatus() {
   const el = $("#audioPipelineStatus");
@@ -89,6 +90,68 @@ function publishAudioPipelineStatus() {
     type: "RECEIVER_AUDIO_STATUS",
     payload: { ...audioPipeline },
   });
+}
+function summarizeInboundAudioStats(report) {
+  const inbound = [];
+  report?.forEach?.((stat) => {
+    if (
+      stat.type === "inbound-rtp" &&
+      (stat.kind === "audio" || stat.mediaType === "audio")
+    )
+      inbound.push(stat);
+  });
+  if (!inbound.length) return null;
+  const stats = inbound[inbound.length - 1];
+  const jitterBufferMs =
+    stats.jitterBufferDelay && stats.jitterBufferEmittedCount
+      ? (stats.jitterBufferDelay / stats.jitterBufferEmittedCount) * 1000
+      : null;
+  return {
+    jitterMs:
+      typeof stats.jitter === "number" ? Math.round(stats.jitter * 1000) : null,
+    jitterBufferMs:
+      typeof jitterBufferMs === "number" ? Math.round(jitterBufferMs) : null,
+    packetsLost:
+      typeof stats.packetsLost === "number" ? stats.packetsLost : null,
+    packetsReceived:
+      typeof stats.packetsReceived === "number"
+        ? stats.packetsReceived
+        : null,
+    audioLevel:
+      typeof stats.audioLevel === "number" ? stats.audioLevel : null,
+    totalAudioEnergy:
+      typeof stats.totalAudioEnergy === "number"
+        ? stats.totalAudioEnergy
+        : null,
+  };
+}
+async function updateHostMicLatencyStats() {
+  if (!player?.isHost || !peerNode?.peers?.size) return;
+  for (const [remotePeerId, edge] of peerNode.peers) {
+    const summary = summarizeInboundAudioStats(await edge.pc.getStats?.());
+    if (!summary) continue;
+    const halfRttMs =
+      typeof peerNode.clockRttMs === "number"
+        ? Math.round(peerNode.clockRttMs / 2)
+        : null;
+    audioPipeline.micLatencyStats = {
+      sourcePeerId: remotePeerId,
+      playerHostRttMs: peerNode.clockRttMs,
+      playerHostClockOffsetMs: Math.round(peerNode.clockOffsetMs || 0),
+      hostInboundJitterMs: summary.jitterMs,
+      hostInboundJitterBufferMs: summary.jitterBufferMs,
+      hostInboundPacketsLost: summary.packetsLost,
+      hostInboundPacketsReceived: summary.packetsReceived,
+      hostInboundAudioLevel: summary.audioLevel,
+      estimatedPlayerToHostMs:
+        halfRttMs == null && summary.jitterBufferMs == null
+          ? null
+          : (halfRttMs || 0) + (summary.jitterBufferMs || 0),
+      updatedAt: Date.now(),
+    };
+    publishAudioPipelineStatus();
+    return;
+  }
 }
 const peerCloseTimers = new Map<string, ReturnType<typeof setTimeout>>();
 function persist() {
@@ -180,6 +243,11 @@ function setupPeer(localPeerId) {
     }
   });
   setInterval(() => peerNode?.pingAll(), 5000);
+  setInterval(() => {
+    updateHostMicLatencyStats().catch((error) =>
+      log(error?.message || "Mic latency stats unavailable."),
+    );
+  }, 2000);
   setInterval(() => {
     if (
       player?.isHost &&

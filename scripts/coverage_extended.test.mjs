@@ -113,6 +113,9 @@ test("phone mic input requests echo-cancelled audio and mute toggles tracks", as
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
+        channelCount: { ideal: 1 },
+        sampleRate: { ideal: 48000 },
+        latency: { ideal: 0.01, max: 0.05 },
       },
       video: false,
     });

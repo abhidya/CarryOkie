@@ -425,6 +425,7 @@ export function receiverApp(root: HTMLElement): void {
     playbackState: Record<string, unknown> | null;
     audioOutputUnlocked: boolean;
     audioDiagnostics: Record<string, unknown> | null;
+    receiverMicLatencyStats: Record<string, unknown> | null;
   } = {
     roomCode: initialRoomCode,
     song: null,
@@ -437,6 +438,7 @@ export function receiverApp(root: HTMLElement): void {
     playbackState: null,
     audioOutputUnlocked: false,
     audioDiagnostics: null,
+    receiverMicLatencyStats: null,
   };
   root.innerHTML = `<main class="tv"><section class="tv-info"><p class="eyebrow">CarryOkie receiver</p><h1>CarryOkie</h1><div class="stage-art receiver-stage" aria-hidden="true"><div class="stage-orb"></div><div class="stage-mic"></div><div class="soundwave"><span></span><span></span><span></span><span></span><span></span></div></div><div class="room" id="room">${escapeHtml(initialRoomCode)}</div><div id="joinQr"></div><p>Scan/open /player. Tab-cast receiver mirrors host room, queue, singers, backing track, and live singer mics.</p><section id="singers"></section><section id="receiverStatus"></section><section id="audioDiagnostics"></section><section id="liveMics"><h2>Live mics</h2><p>Waiting for host tab audio…</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button></section></section><section class="tv-stage"><video id="media" class="castMediaElement" controls playsinline></video><section id="lyrics" class="lyrics big"></section><section id="queue"></section></section></main>`;
   const media = root.querySelector<HTMLVideoElement>("#media")!;
@@ -487,11 +489,32 @@ export function receiverApp(root: HTMLElement): void {
     if (!diagEl) return;
     const d = state.audioDiagnostics;
     const { audible, muted, publishing } = singerMicSummary();
+    const hostLatency = d?.micLatencyStats as Record<string, unknown> | null;
+    const receiverLatency = state.receiverMicLatencyStats;
+    const receiverBufferMs =
+      typeof receiverLatency?.receiverInboundJitterBufferMs === "number"
+        ? (receiverLatency.receiverInboundJitterBufferMs as number)
+        : 0;
+    const outputLatencyMs =
+      typeof receiverLatency?.receiverOutputLatencyMs === "number"
+        ? (receiverLatency.receiverOutputLatencyMs as number)
+        : 0;
+    const estimatedTotalMs =
+      typeof hostLatency?.estimatedPlayerToHostMs === "number"
+        ? Math.round(
+            (hostLatency.estimatedPlayerToHostMs as number) +
+              receiverBufferMs +
+              outputLatencyMs,
+          )
+        : null;
+    const latencyOutput = `<p>Estimated live mic latency: ${
+      estimatedTotalMs == null ? "collecting…" : `~${estimatedTotalMs} ms`
+    }</p><p>Player→host: RTT ${hostLatency?.playerHostRttMs ?? "?"} ms · host jitter buffer ${hostLatency?.hostInboundJitterBufferMs ?? "?"} ms · host jitter ${hostLatency?.hostInboundJitterMs ?? "?"} ms</p><p>Host→receiver: jitter buffer ${receiverLatency?.receiverInboundJitterBufferMs ?? "?"} ms · jitter ${receiverLatency?.receiverInboundJitterMs ?? "?"} ms · lost ${receiverLatency?.receiverInboundPacketsLost ?? "?"} · level ${receiverLatency?.receiverInboundAudioLevel ?? "?"}</p><p>Receiver AudioContext: base ${receiverLatency?.receiverBaseLatencyMs ?? "?"} ms · output ${receiverLatency?.receiverOutputLatencyMs ?? "?"} ms</p>`;
     const liveOutput = `<p>${escapeHtml(liveMicPlaybackDiagnostics())}</p>`;
     if (d) {
-      diagEl.innerHTML = `<h2>Audio pipeline</h2><p>Host remote tracks: ${d.hostRemoteAudioTracks ?? "?"} · Relayed streams: ${d.hostRelayedStreams ?? "?"} · Receiver ready: ${d.receiverReady ? "yes" : "no"}</p><p>Receiver PC: ${d.receiverPcConnectionState ?? "?"} · ICE: ${d.receiverPcIceState ?? "?"} · Tracks added: ${d.receiverTracksAdded ?? 0}</p>${d.receiverOfferSentAt ? `<p>Offer sent: ${new Date(d.receiverOfferSentAt as number).toLocaleTimeString()}</p>` : ""}${d.receiverAnswerReceivedAt ? `<p>Answer received: ${new Date(d.receiverAnswerReceivedAt as number).toLocaleTimeString()}</p>` : ""}${d.receiverLastError ? `<p class="warn">Error: ${escapeHtml(String(d.receiverLastError))}</p>` : ""}<p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p><p>Publishing singers: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p>${liveOutput}`;
+      diagEl.innerHTML = `<h2>Audio pipeline</h2><p>Host remote tracks: ${d.hostRemoteAudioTracks ?? "?"} · Relayed streams: ${d.hostRelayedStreams ?? "?"} · Receiver ready: ${d.receiverReady ? "yes" : "no"}</p><p>Receiver PC: ${d.receiverPcConnectionState ?? "?"} · ICE: ${d.receiverPcIceState ?? "?"} · Tracks added: ${d.receiverTracksAdded ?? 0}</p>${d.receiverOfferSentAt ? `<p>Offer sent: ${new Date(d.receiverOfferSentAt as number).toLocaleTimeString()}</p>` : ""}${d.receiverAnswerReceivedAt ? `<p>Answer received: ${new Date(d.receiverAnswerReceivedAt as number).toLocaleTimeString()}</p>` : ""}${d.receiverLastError ? `<p class="warn">Error: ${escapeHtml(String(d.receiverLastError))}</p>` : ""}<p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p><p>Publishing singers: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p>${latencyOutput}${liveOutput}`;
     } else {
-      diagEl.innerHTML = `<h2>Audio pipeline</h2><p>No diagnostics received yet. Waiting for host tab…</p><p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p><p>Publishing singers: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p>${liveOutput}`;
+      diagEl.innerHTML = `<h2>Audio pipeline</h2><p>No diagnostics received yet. Waiting for host tab…</p><p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p><p>Publishing singers: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p>${latencyOutput}${liveOutput}`;
     }
   }
   function render(): void {
@@ -837,6 +860,50 @@ export function receiverApp(root: HTMLElement): void {
       ? { type: description.type, sdp: description.sdp }
       : null;
   }
+  async function updateReceiverMicLatencyStats(
+    pc: RTCPeerConnection | null,
+  ): Promise<void> {
+    if (!pc?.getStats) return;
+    const inbound: RTCStats[] = [];
+    (await pc.getStats()).forEach((stat) => {
+      if (
+        stat.type === "inbound-rtp" &&
+        ((stat as Record<string, unknown>).kind === "audio" ||
+          (stat as Record<string, unknown>).mediaType === "audio")
+      )
+        inbound.push(stat);
+    });
+    if (!inbound.length) return;
+    const stats = inbound[inbound.length - 1] as Record<string, number>;
+    const jitterBufferMs =
+      stats.jitterBufferDelay && stats.jitterBufferEmittedCount
+        ? (stats.jitterBufferDelay / stats.jitterBufferEmittedCount) * 1000
+        : null;
+    state.receiverMicLatencyStats = {
+      receiverInboundJitterMs:
+        typeof stats.jitter === "number"
+          ? Math.round(stats.jitter * 1000)
+          : null,
+      receiverInboundJitterBufferMs:
+        typeof jitterBufferMs === "number" ? Math.round(jitterBufferMs) : null,
+      receiverInboundPacketsLost:
+        typeof stats.packetsLost === "number" ? stats.packetsLost : null,
+      receiverInboundPacketsReceived:
+        typeof stats.packetsReceived === "number"
+          ? stats.packetsReceived
+          : null,
+      receiverInboundAudioLevel:
+        typeof stats.audioLevel === "number" ? stats.audioLevel : null,
+      receiverBaseLatencyMs: liveMicAudioContext?.baseLatency
+        ? Math.round(liveMicAudioContext.baseLatency * 1000)
+        : null,
+      receiverOutputLatencyMs: liveMicAudioContext?.outputLatency
+        ? Math.round(liveMicAudioContext.outputLatency * 1000)
+        : 0,
+      updatedAt: Date.now(),
+    };
+    renderAudioDiagnostics();
+  }
   if (typeof BroadcastChannel !== "undefined") {
     const channel = new BroadcastChannel("carryokie.receiver");
     let pc: RTCPeerConnection | null = null;
@@ -885,6 +952,9 @@ export function receiverApp(root: HTMLElement): void {
         }
       }
     };
+    setInterval(() => {
+      updateReceiverMicLatencyStats(pc).catch(() => {});
+    }, 2000);
     channel.postMessage({
       type: "RECEIVER_READY",
       receiverId,

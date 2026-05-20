@@ -86,6 +86,7 @@ export class PeerNode extends EventTarget {
   localPeerId: string;
   peers: Map<string, PeerEdge>;
   clockOffsetMs: number;
+  clockRttMs: number | null;
   localStreams: MediaStream[];
   relayedStreams: RelayedStream[];
 
@@ -94,6 +95,7 @@ export class PeerNode extends EventTarget {
     this.localPeerId = localPeerId;
     this.peers = new Map();
     this.clockOffsetMs = 0;
+    this.clockRttMs = null;
     this.localStreams = [];
     this.relayedStreams = [];
   }
@@ -204,9 +206,13 @@ export class PeerNode extends EventTarget {
       });
     if (msg.type === RPC.LATENCY_PONG) {
       const t2 = Date.now();
+      this.clockRttMs = t2 - (msg.t0 as number);
       this.clockOffsetMs =
-        (msg.h1 as number) + (t2 - (msg.t0 as number)) / 2 - t2;
-      this.emit("clock", { offsetMs: this.clockOffsetMs });
+        (msg.h1 as number) + this.clockRttMs / 2 - t2;
+      this.emit("clock", {
+        offsetMs: this.clockOffsetMs,
+        rttMs: this.clockRttMs,
+      });
     }
     if (
       [
