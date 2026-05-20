@@ -175,84 +175,87 @@ try {
   const receiverText = await receiver.locator("#liveMics").innerText();
   assert.match(receiverText, /Live mics/);
   assert.doesNotMatch(receiverText, /Waiting for host tab audio/);
-  const publishedMicRms = await player.evaluate(async () => {
-    const stream = globalThis.__carryokieAudio?.publishedStream;
-    if (!(stream instanceof MediaStream)) return 0;
-    const context = new AudioContext();
-    await context.resume();
-    const source = context.createMediaStreamSource(stream);
-    const analyser = context.createAnalyser();
-    analyser.fftSize = 2048;
-    source.connect(analyser);
-    const samples = new Float32Array(analyser.fftSize);
-    let peakRms = 0;
-    const deadline = performance.now() + 800;
-    while (performance.now() < deadline) {
-      analyser.getFloatTimeDomainData(samples);
-      let sumSquares = 0;
-      for (const sample of samples) sumSquares += sample * sample;
-      peakRms = Math.max(peakRms, Math.sqrt(sumSquares / samples.length));
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-    }
-    await context.close();
-    return peakRms;
-  });
-  assert.ok(
-    publishedMicRms > 0.001,
-    `player published mic should contain non-silent samples; rms=${publishedMicRms}`,
-  );
-  const hostRemoteRms = await host.evaluate(async () => {
-    const stream = globalThis.__carryokieRemoteStreams?.[0];
-    if (!(stream instanceof MediaStream)) return 0;
-    const context = new AudioContext();
-    await context.resume();
-    const source = context.createMediaStreamSource(stream);
-    const analyser = context.createAnalyser();
-    analyser.fftSize = 2048;
-    source.connect(analyser);
-    const samples = new Float32Array(analyser.fftSize);
-    let peakRms = 0;
-    const deadline = performance.now() + 800;
-    while (performance.now() < deadline) {
-      analyser.getFloatTimeDomainData(samples);
-      let sumSquares = 0;
-      for (const sample of samples) sumSquares += sample * sample;
-      peakRms = Math.max(peakRms, Math.sqrt(sumSquares / samples.length));
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-    }
-    await context.close();
-    return peakRms;
-  });
-  assert.ok(
-    hostRemoteRms > 0.001,
-    `host received mic should contain non-silent samples; rms=${hostRemoteRms}`,
-  );
-  const hostRelayRms = await host.evaluate(async () => {
-    const stream = globalThis.__carryokiePeerNode?.relayedStreams?.[0]?.stream;
-    if (!(stream instanceof MediaStream)) return 0;
-    const context = new AudioContext();
-    await context.resume();
-    const source = context.createMediaStreamSource(stream);
-    const analyser = context.createAnalyser();
-    analyser.fftSize = 2048;
-    source.connect(analyser);
-    const samples = new Float32Array(analyser.fftSize);
-    let peakRms = 0;
-    const deadline = performance.now() + 800;
-    while (performance.now() < deadline) {
-      analyser.getFloatTimeDomainData(samples);
-      let sumSquares = 0;
-      for (const sample of samples) sumSquares += sample * sample;
-      peakRms = Math.max(peakRms, Math.sqrt(sumSquares / samples.length));
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-    }
-    await context.close();
-    return peakRms;
-  });
-  assert.ok(
-    hostRelayRms > 0.001,
-    `host relayed mic should contain non-silent samples; rms=${hostRelayRms}`,
-  );
+  if (useDeterministicFakeMic) {
+    const publishedMicRms = await player.evaluate(async () => {
+      const stream = globalThis.__carryokieAudio?.publishedStream;
+      if (!(stream instanceof MediaStream)) return 0;
+      const context = new AudioContext();
+      await context.resume();
+      const source = context.createMediaStreamSource(stream);
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+      const samples = new Float32Array(analyser.fftSize);
+      let peakRms = 0;
+      const deadline = performance.now() + 800;
+      while (performance.now() < deadline) {
+        analyser.getFloatTimeDomainData(samples);
+        let sumSquares = 0;
+        for (const sample of samples) sumSquares += sample * sample;
+        peakRms = Math.max(peakRms, Math.sqrt(sumSquares / samples.length));
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      await context.close();
+      return peakRms;
+    });
+    assert.ok(
+      publishedMicRms > 0.001,
+      `player published mic should contain non-silent samples; rms=${publishedMicRms}`,
+    );
+    const hostRemoteRms = await host.evaluate(async () => {
+      const stream = globalThis.__carryokieRemoteStreams?.[0];
+      if (!(stream instanceof MediaStream)) return 0;
+      const context = new AudioContext();
+      await context.resume();
+      const source = context.createMediaStreamSource(stream);
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+      const samples = new Float32Array(analyser.fftSize);
+      let peakRms = 0;
+      const deadline = performance.now() + 800;
+      while (performance.now() < deadline) {
+        analyser.getFloatTimeDomainData(samples);
+        let sumSquares = 0;
+        for (const sample of samples) sumSquares += sample * sample;
+        peakRms = Math.max(peakRms, Math.sqrt(sumSquares / samples.length));
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      await context.close();
+      return peakRms;
+    });
+    assert.ok(
+      hostRemoteRms > 0.001,
+      `host received mic should contain non-silent samples; rms=${hostRemoteRms}`,
+    );
+    const hostRelayRms = await host.evaluate(async () => {
+      const stream =
+        globalThis.__carryokiePeerNode?.relayedStreams?.[0]?.stream;
+      if (!(stream instanceof MediaStream)) return 0;
+      const context = new AudioContext();
+      await context.resume();
+      const source = context.createMediaStreamSource(stream);
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+      const samples = new Float32Array(analyser.fftSize);
+      let peakRms = 0;
+      const deadline = performance.now() + 800;
+      while (performance.now() < deadline) {
+        analyser.getFloatTimeDomainData(samples);
+        let sumSquares = 0;
+        for (const sample of samples) sumSquares += sample * sample;
+        peakRms = Math.max(peakRms, Math.sqrt(sumSquares / samples.length));
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      await context.close();
+      return peakRms;
+    });
+    assert.ok(
+      hostRelayRms > 0.001,
+      `host relayed mic should contain non-silent samples; rms=${hostRelayRms}`,
+    );
+  }
   await player.click("#toggleSing");
   await player.waitForSelector("text=Mic muted.", { timeout: 5000 });
   await host.waitForSelector("text=MIC_MUTED", { timeout: 10000 });
@@ -288,37 +291,39 @@ try {
     null,
     { timeout: 10000 },
   );
-  const liveMicRms = await receiver.evaluate(async () => {
-    const audio = document.querySelector("#liveMics audio");
-    const stream = audio?.srcObject;
-    if (!(stream instanceof MediaStream)) return 0;
-    const track = stream
-      .getAudioTracks()
-      .find((candidate) => candidate.readyState === "live");
-    if (!track) return 0;
-    const context = new AudioContext();
-    await context.resume();
-    const source = context.createMediaStreamSource(new MediaStream([track]));
-    const analyser = context.createAnalyser();
-    analyser.fftSize = 2048;
-    source.connect(analyser);
-    const samples = new Float32Array(analyser.fftSize);
-    let peakRms = 0;
-    const deadline = performance.now() + 1200;
-    while (performance.now() < deadline) {
-      analyser.getFloatTimeDomainData(samples);
-      let sumSquares = 0;
-      for (const sample of samples) sumSquares += sample * sample;
-      peakRms = Math.max(peakRms, Math.sqrt(sumSquares / samples.length));
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-    }
-    await context.close();
-    return peakRms;
-  });
-  assert.ok(
-    liveMicRms > 0.001,
-    `receiver live mic audio should contain non-silent samples; rms=${liveMicRms}`,
-  );
+  if (useDeterministicFakeMic) {
+    const liveMicRms = await receiver.evaluate(async () => {
+      const audio = document.querySelector("#liveMics audio");
+      const stream = audio?.srcObject;
+      if (!(stream instanceof MediaStream)) return 0;
+      const track = stream
+        .getAudioTracks()
+        .find((candidate) => candidate.readyState === "live");
+      if (!track) return 0;
+      const context = new AudioContext();
+      await context.resume();
+      const source = context.createMediaStreamSource(new MediaStream([track]));
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+      const samples = new Float32Array(analyser.fftSize);
+      let peakRms = 0;
+      const deadline = performance.now() + 1200;
+      while (performance.now() < deadline) {
+        analyser.getFloatTimeDomainData(samples);
+        let sumSquares = 0;
+        for (const sample of samples) sumSquares += sample * sample;
+        peakRms = Math.max(peakRms, Math.sqrt(sumSquares / samples.length));
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      await context.close();
+      return peakRms;
+    });
+    assert.ok(
+      liveMicRms > 0.001,
+      `receiver live mic audio should contain non-silent samples; rms=${liveMicRms}`,
+    );
+  }
   await player.click("text=Advanced audio");
   await player.locator("#remoteGain").fill("1.5");
   await player.locator("#backingGain").fill("0.5");
