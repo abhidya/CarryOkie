@@ -1814,6 +1814,7 @@ function receiverApp(root) {
 		mediaTimeMs: 0,
 		lines: [],
 		status: "Waiting for host tab…",
+		liveMicStatus: "",
 		playbackState: null,
 		audioOutputUnlocked: false,
 		audioDiagnostics: null
@@ -1830,6 +1831,30 @@ function receiverApp(root) {
 		const t = state.mediaTimeMs;
 		return state.lines.findLast?.((l) => t >= l.startMs) || state.lines.filter((l) => t >= l.startMs).pop() || state.lines[0];
 	}
+	function singerMicSummary() {
+		const singers = Array.isArray(state.singers) ? state.singers : [];
+		return {
+			singers,
+			publishing: singers.filter((s) => s.micState?.publishing),
+			audible: singers.filter((s) => s.micState?.publishing && !s.micState?.muted),
+			muted: singers.filter((s) => s.micState?.publishing && s.micState?.muted)
+		};
+	}
+	function liveMicStatus() {
+		const { audible, muted, publishing } = singerMicSummary();
+		if (liveMicTrackIds.size && audible.length) return `Playing ${audible.length} unmuted live mic${audible.length === 1 ? "" : "s"}.`;
+		if (liveMicTrackIds.size && muted.length) return "Mic track connected, but singer is muted.";
+		if (liveMicTrackIds.size && !publishing.length) return "Mic track connected, but room mic state is stale.";
+		return "No live mic tracks connected.";
+	}
+	function renderAudioDiagnostics() {
+		const diagEl = root.querySelector("#audioDiagnostics");
+		if (!diagEl) return;
+		const d = state.audioDiagnostics;
+		const { audible, muted, publishing } = singerMicSummary();
+		if (d) diagEl.innerHTML = `<h2>Audio pipeline</h2><p>Host remote tracks: ${d.hostRemoteAudioTracks ?? "?"} · Relayed streams: ${d.hostRelayedStreams ?? "?"} · Receiver ready: ${d.receiverReady ? "yes" : "no"}</p><p>Receiver PC: ${d.receiverPcConnectionState ?? "?"} · ICE: ${d.receiverPcIceState ?? "?"} · Tracks added: ${d.receiverTracksAdded ?? 0}</p>${d.receiverOfferSentAt ? `<p>Offer sent: ${new Date(d.receiverOfferSentAt).toLocaleTimeString()}</p>` : ""}${d.receiverAnswerReceivedAt ? `<p>Answer received: ${new Date(d.receiverAnswerReceivedAt).toLocaleTimeString()}</p>` : ""}${d.receiverLastError ? `<p class="warn">Error: ${escapeHtml$1(String(d.receiverLastError))}</p>` : ""}<p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p><p>Publishing singers: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p>`;
+		else diagEl.innerHTML = `<h2>Audio pipeline</h2><p>No diagnostics received yet. Waiting for host tab…</p><p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p><p>Publishing singers: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p>`;
+	}
 	function render() {
 		root.querySelector("#room").textContent = state.roomCode;
 		const playerUrl = new URL(`../player/?room=${encodeURIComponent(state.roomCode)}`, location.href).toString();
@@ -1840,12 +1865,9 @@ function receiverApp(root) {
 		const queueSingerLabel = (queueItem) => (queueItem.singerNames?.length ? queueItem.singerNames : (queueItem.singerNumbers || []).map((singerNumber) => `#${singerNumber}`)).join(", ");
 		root.querySelector("#queue").innerHTML = "<h2>Queue</h2><ol>" + state.queue.map((q) => `<li>${escapeHtml$1(q.title || q.songId)} singers ${escapeHtml$1(queueSingerLabel(q))}</li>`).join("") + "</ol>";
 		root.querySelector("#singers").innerHTML = "<h2>Singers</h2>" + ((state.singers || []).map((p) => `<p>#${escapeHtml$1(p.playerNumber)} ${escapeHtml$1(p.displayName)}</p>`).join("") || "<p>No active singers</p>");
-		root.querySelector("#receiverStatus").innerHTML = `<p class="status-pill">${escapeHtml$1(state.status)}</p>`;
-		const diagEl = root.querySelector("#audioDiagnostics");
-		if (diagEl && state.audioDiagnostics) {
-			const d = state.audioDiagnostics;
-			diagEl.innerHTML = `<h2>Audio pipeline</h2><p>Host remote tracks: ${d.hostRemoteAudioTracks ?? "?"} · Relayed streams: ${d.hostRelayedStreams ?? "?"} · Receiver ready: ${d.receiverReady ? "yes" : "no"}</p><p>Receiver PC: ${d.receiverPcConnectionState ?? "?"} · ICE: ${d.receiverPcIceState ?? "?"} · Tracks added: ${d.receiverTracksAdded ?? 0}</p>${d.receiverOfferSentAt ? `<p>Offer sent: ${new Date(d.receiverOfferSentAt).toLocaleTimeString()}</p>` : ""}${d.receiverAnswerReceivedAt ? `<p>Answer received: ${new Date(d.receiverAnswerReceivedAt).toLocaleTimeString()}</p>` : ""}${d.receiverLastError ? `<p class="warn">Error: ${escapeHtml$1(String(d.receiverLastError))}</p>` : ""}<p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p>`;
-		} else if (diagEl) diagEl.innerHTML = `<h2>Audio pipeline</h2><p>No diagnostics received yet. Waiting for host tab…</p><p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p>`;
+		const resolvedLiveMicStatus = state.liveMicStatus || (liveMicTrackIds.size ? liveMicStatus() : "");
+		root.querySelector("#receiverStatus").innerHTML = `<p class="status-pill">${escapeHtml$1(state.status)}</p>` + (resolvedLiveMicStatus ? `<p class="status-pill live-status">${escapeHtml$1(resolvedLiveMicStatus)}</p>` : "");
+		renderAudioDiagnostics();
 		const active = activeLine();
 		root.querySelector("#lyrics").innerHTML = state.lines.length ? state.lines.map((l) => `<p class="${l === active ? "active" : ""}">${escapeHtml$1(l.text)}</p>`).join("") : "<p>Waiting for lyrics…</p>";
 	}
@@ -1873,10 +1895,10 @@ function receiverApp(root) {
 			return;
 		}
 		loadedSongId = song.songId;
-		state.status = "Loading backing track…";
+		if (!liveMicTrackIds.size) state.status = "Loading backing track…";
 		resolvePlayableMediaUrl(song).then((url) => {
 			if (!url) {
-				state.status = "No playable media for receiver tab.";
+				if (!liveMicTrackIds.size) state.status = "No playable media for receiver tab.";
 				render();
 				return;
 			}
@@ -1885,22 +1907,22 @@ function receiverApp(root) {
 				if (pendingPlay) {
 					pendingPlay = false;
 					media.play().catch(() => {
-						state.status = "Tap receiver once to start backing track/audio.";
+						if (!liveMicTrackIds.size) state.status = "Tap receiver once to start backing track/audio.";
 						render();
 					});
 				}
 			};
 			media.play().then(() => {
-				state.status = "Backing track playing.";
+				if (!liveMicTrackIds.size) state.status = "Backing track playing.";
 				attemptPlay();
 				render();
 			}).catch(() => {
 				attemptPlay();
-				state.status = "Tap receiver once to start backing track/audio.";
+				if (!liveMicTrackIds.size) state.status = "Tap receiver once to start backing track/audio.";
 				render();
 			});
 		}).catch((error) => {
-			state.status = error?.message || "Failed to load backing track.";
+			if (!liveMicTrackIds.size) state.status = error?.message || "Failed to load backing track.";
 			render();
 		});
 		loadLyrics(song);
@@ -1924,7 +1946,10 @@ function receiverApp(root) {
 		}
 		if (msg.type === "CAST_PAUSE" && media.src) media.pause();
 		if (msg.type === "CAST_SEEK" && payload) media.currentTime = payload.seconds;
-		if (msg.type === "CAST_SET_SINGERS" && payload) state.singers = payload.players || payload.singers;
+		if (msg.type === "CAST_SET_SINGERS" && payload) {
+			state.singers = payload.players || payload.singers;
+			if (liveMicTrackIds.size) tryPlayLiveMics();
+		}
 		if ((msg.type === "CAST_SYNC_PLAYBACK_STATE" || msg.type === "RECEIVER_PLAYBACK_SYNC") && payload) {
 			state.playbackState = payload;
 			state.mediaTimeMs = deriveTvMediaPositionMs(payload).positionMs;
@@ -1940,15 +1965,24 @@ function receiverApp(root) {
 				state.mediaTimeMs = deriveTvMediaPositionMs(payload.playbackState).positionMs;
 			}
 			loadSong(payload.song, payload.roomCode);
+			if (liveMicTrackIds.size) tryPlayLiveMics();
 		}
 		render();
 	}
 	const liveMicStream = new MediaStream();
 	const liveMicTrackIds = /* @__PURE__ */ new Set();
 	let liveMicAudio = null;
+	function liveMicSummaryHtml() {
+		const status = state.liveMicStatus || (liveMicTrackIds.size ? liveMicStatus() : "");
+		return status ? `<p class="subtle">${escapeHtml$1(status)}</p>` : "<p class=\"subtle\">Playing all forwarded singer mics.</p>";
+	}
 	function ensureLiveMicAudio() {
-		if (liveMicAudio) return liveMicAudio;
-		liveMics.innerHTML = "<h2>Live mics</h2><p class=\"subtle\">Playing all forwarded singer mics.</p><button id=\"startReceiverAudio\">Start receiver audio</button><button id=\"retryLiveMics\">Start / retry live mics</button>";
+		if (liveMicAudio) {
+			const subtitle = liveMics.querySelector("p.subtle");
+			if (subtitle) subtitle.outerHTML = liveMicSummaryHtml();
+			return liveMicAudio;
+		}
+		liveMics.innerHTML = `<h2>Live mics</h2>${liveMicSummaryHtml()}<button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>`;
 		liveMics.querySelector("#startReceiverAudio")?.addEventListener("click", () => {
 			state.audioOutputUnlocked = true;
 			tryPlayLiveMics();
@@ -1968,18 +2002,21 @@ function receiverApp(root) {
 	}
 	async function tryPlayLiveMics() {
 		if (!state.audioOutputUnlocked) {
-			state.status = "Press 'Start receiver audio' to enable live mic audio.";
+			state.liveMicStatus = "Press 'Start receiver audio' to enable live mic audio.";
 			render();
 			return;
 		}
+		state.liveMicStatus = liveMicStatus();
+		render();
 		const audio = ensureLiveMicAudio();
 		try {
 			await audio.play();
-			state.status = `Playing ${liveMicTrackIds.size} live mic${liveMicTrackIds.size === 1 ? "" : "s"}.`;
+			state.liveMicStatus = liveMicStatus();
+			render();
 		} catch {
-			state.status = "Tap receiver once or press Start / retry live mics.";
+			state.liveMicStatus = "Tap receiver once or press Start / retry live mics.";
+			render();
 		}
-		render();
 	}
 	function addLiveMic(stream) {
 		const audioTracks = stream.getAudioTracks?.() || stream.getTracks().filter((track) => track.kind === "audio");
@@ -2012,11 +2049,8 @@ function receiverApp(root) {
 			if (msg.type === "RECEIVER_STATE") handle(msg);
 			if (msg.type === "RECEIVER_AUDIO_STATUS" && msg.payload) {
 				state.audioDiagnostics = msg.payload;
-				const diagEl = root.querySelector("#audioDiagnostics");
-				if (diagEl) {
-					const d = msg.payload;
-					diagEl.innerHTML = `<h2>Audio pipeline</h2><p>Host remote tracks: ${d.hostRemoteAudioTracks ?? "?"} · Relayed streams: ${d.hostRelayedStreams ?? "?"} · Receiver ready: ${d.receiverReady ? "yes" : "no"}</p><p>Receiver PC: ${d.receiverPcConnectionState ?? "?"} · ICE: ${d.receiverPcIceState ?? "?"} · Tracks added: ${d.receiverTracksAdded ?? 0}</p>${d.receiverOfferSentAt ? `<p>Offer sent: ${new Date(d.receiverOfferSentAt).toLocaleTimeString()}</p>` : ""}${d.receiverAnswerReceivedAt ? `<p>Answer received: ${new Date(d.receiverAnswerReceivedAt).toLocaleTimeString()}</p>` : ""}${d.receiverLastError ? `<p class="warn">Error: ${escapeHtml$1(String(d.receiverLastError))}</p>` : ""}<p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p>`;
-				}
+				renderAudioDiagnostics();
+				if (liveMicTrackIds.size) tryPlayLiveMics();
 			}
 			if (msg.type === "RECEIVER_OFFER" && (!msg.receiverId || msg.receiverId === receiverId)) try {
 				if (!pc || pc.signalingState === "closed") {
@@ -2245,7 +2279,12 @@ var audioPipeline = {
 	receiverAnswerReceivedAt: null,
 	receiverLastError: null
 };
+function renderAudioPipelineStatus() {
+	const el = $("#audioPipelineStatus");
+	if (el) el.textContent = JSON.stringify(audioPipeline, null, 2);
+}
 function publishAudioPipelineStatus() {
+	renderAudioPipelineStatus();
 	receiverChannel?.postMessage?.({
 		type: "RECEIVER_AUDIO_STATUS",
 		payload: { ...audioPipeline }
@@ -2402,6 +2441,31 @@ function sendCastRoomUpdate(type, payload = {}) {
 	castController?.sendSafe?.(type, payload);
 	publishReceiverState();
 }
+function findRoomPlayerByMessage(remotePeerId, playerId) {
+	if (!room?.players?.length) return null;
+	return room.players.find((p) => p.playerId === playerId) || room.players.find((p) => p.peerId === remotePeerId) || null;
+}
+function updateRoomMicState(remotePeerId, playerId, patch) {
+	const target = findRoomPlayerByMessage(remotePeerId, playerId);
+	if (!target) return null;
+	target.micState = {
+		...target.micState,
+		...patch
+	};
+	target.lastSeenAt = Date.now();
+	if (player?.playerId === target.playerId) player = {
+		...player,
+		micState: target.micState
+	};
+	persist();
+	return target;
+}
+function publishMicStateChange(target) {
+	if (!target) return;
+	broadcastRoom(RPC.ROOM_STATE_SNAPSHOT);
+	publishReceiverState();
+	renderHost($("#main"));
+}
 function plainRtcDescription(description) {
 	return description ? {
 		type: description.type,
@@ -2443,7 +2507,11 @@ async function negotiateReceiverAudio() {
 				receiverPc.removeTrack(sender);
 			} catch {}
 		}
-		for (const { stream } of peerNode.relayedStreams || []) stream.getTracks().filter((track) => !receiverTrackKeys.has(mediaTrackKey(track))).forEach((track) => {
+		const receiverStreams = [...(peerNode.localStreams || []).map((stream) => ({
+			sourcePeerId: peerNode.localPeerId,
+			stream
+		})), ...peerNode.relayedStreams || []].filter(({ stream }) => stream?.getAudioTracks?.().length);
+		for (const { stream } of receiverStreams) stream.getAudioTracks().filter((track) => !receiverTrackKeys.has(mediaTrackKey(track))).forEach((track) => {
 			receiverTrackKeys.add(mediaTrackKey(track));
 			audioPipeline.receiverTracksAdded++;
 			receiverPc.addTrack(track, stream);
@@ -2568,18 +2636,31 @@ function attachCastListeners(cast) {
 }
 function setOwnMicMuted(muted) {
 	audio?.setMicMuted(muted);
-	if (player?.micState) {
-		player.micState = {
-			...player.micState,
-			muted
-		};
-		persist();
+	if (player?.micState) player.micState = {
+		...player.micState,
+		enabled: true,
+		publishing: true,
+		muted
+	};
+	if (room?.players?.length && player?.playerId) {
+		const target = findRoomPlayerByMessage(player.peerId, player.playerId);
+		if (target) {
+			target.micState = {
+				...target.micState,
+				enabled: true,
+				publishing: true,
+				muted
+			};
+			target.lastSeenAt = Date.now();
+		}
 	}
+	persist();
 	const status = $("#micStatus");
 	if (status) status.textContent = muted ? "Mic muted." : "Mic live.";
 	peerNode?.broadcast({
 		type: muted ? RPC.MIC_MUTED : RPC.MIC_UNMUTED,
-		playerId: player?.playerId
+		playerId: player?.playerId,
+		muted
 	});
 }
 function registerRemotePlayer(remotePeerId, remotePlayer) {
@@ -2816,21 +2897,41 @@ function handleRpc(remotePeerId, msg) {
 		persist();
 		renderPlayer($("#main"));
 	}
-	if (msg.type === RPC.MIC_MUTED && msg.playerId === player?.playerId) {
-		setOwnMicMuted(true);
-		log("Host muted your mic.");
+	if (!player?.isHost && msg.playerId === player?.playerId && (msg.type === RPC.MIC_MUTED || msg.type === RPC.MIC_UNMUTED)) {
+		setOwnMicMuted(msg.type === RPC.MIC_MUTED || !!msg.muted);
+		log(msg.type === RPC.MIC_MUTED ? "Host muted your mic." : "Host unmuted your mic.");
 	}
-	if (msg.type === RPC.MIC_ENABLED && player?.isHost) {
-		const target = room.players.find((p) => p.playerId === msg.playerId);
+	if (player?.isHost && msg.type === RPC.MIC_ENABLED) {
+		const target = updateRoomMicState(remotePeerId, msg.playerId, {
+			enabled: true,
+			publishing: true,
+			muted: !!msg.muted
+		});
 		if (target) {
-			target.micState = {
-				...target.micState,
-				enabled: true,
-				publishing: true
-			};
-			persist();
-			renderHost($("#main"));
-			log(`#${target.playerNumber} ${target.displayName} enabled mic.`);
+			publishMicStateChange(target);
+			log(`#${target.playerNumber} ${target.displayName} enabled mic${target.micState?.muted ? " muted" : " live"}.`);
+		}
+	}
+	if (player?.isHost && msg.type === RPC.MIC_MUTED) {
+		const target = updateRoomMicState(remotePeerId, msg.playerId, {
+			enabled: true,
+			publishing: true,
+			muted: true
+		});
+		if (target) {
+			publishMicStateChange(target);
+			log(`#${target.playerNumber} ${target.displayName} muted mic.`);
+		}
+	}
+	if (player?.isHost && msg.type === RPC.MIC_UNMUTED) {
+		const target = updateRoomMicState(remotePeerId, msg.playerId, {
+			enabled: true,
+			publishing: true,
+			muted: false
+		});
+		if (target) {
+			publishMicStateChange(target);
+			log(`#${target.playerNumber} ${target.displayName} unmuted mic.`);
 		}
 	}
 }
@@ -3149,7 +3250,8 @@ function renderPlayer(main) {
 			persist();
 			if (isNewMicStream || !alreadyPublishing) peerNode.broadcast({
 				type: RPC.MIC_ENABLED,
-				playerId: player.playerId
+				playerId: player.playerId,
+				muted: pushToSing
 			});
 			$("#micStatus").textContent = pushToSing ? "Mic ready. Hold to sing." : "Mic live.";
 			log(isNewMicStream ? "Mic publishing. Own mic not locally monitored." : "Mic already publishing. Own mic not locally monitored.");
