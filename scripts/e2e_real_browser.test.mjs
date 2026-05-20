@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { chromium } from "playwright";
 
 const baseUrl =
@@ -6,12 +9,46 @@ const baseUrl =
 const headed = process.env.HEADLESS !== "1";
 const keepBrowserOpen =
   process.env.KEEP_BROWSER_OPEN === "1";
+function makeSineWaveWav({
+  seconds = 60,
+  sampleRate = 48000,
+  frequency = 440,
+} = {}) {
+  const sampleCount = seconds * sampleRate;
+  const dataBytes = sampleCount * 2;
+  const buffer = Buffer.alloc(44 + dataBytes);
+  buffer.write("RIFF", 0);
+  buffer.writeUInt32LE(36 + dataBytes, 4);
+  buffer.write("WAVE", 8);
+  buffer.write("fmt ", 12);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(1, 22);
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(sampleRate * 2, 28);
+  buffer.writeUInt16LE(2, 32);
+  buffer.writeUInt16LE(16, 34);
+  buffer.write("data", 36);
+  buffer.writeUInt32LE(dataBytes, 40);
+  for (let i = 0; i < sampleCount; i++) {
+    const sample = Math.round(
+      Math.sin((2 * Math.PI * frequency * i) / sampleRate) * 0x3fff,
+    );
+    buffer.writeInt16LE(sample, 44 + i * 2);
+  }
+  const dir = mkdtempSync(join(tmpdir(), "carryokie-e2e-audio-"));
+  const wavPath = join(dir, "mic-tone.wav");
+  writeFileSync(wavPath, buffer);
+  return wavPath;
+}
+const fakeMicAudioPath = makeSineWaveWav();
 const browser = await chromium.launch({
   headless: !headed,
   slowMo: headed ? 150 : 0,
   args: [
     "--use-fake-ui-for-media-stream",
     "--use-fake-device-for-media-stream",
+    `--use-file-for-fake-audio-capture=${fakeMicAudioPath}`,
   ],
 });
 const context = await browser.newContext();
@@ -133,6 +170,84 @@ try {
   const receiverText = await receiver.locator("#liveMics").innerText();
   assert.match(receiverText, /Live mics/);
   assert.doesNotMatch(receiverText, /Waiting for host tab audio/);
+  const publishedMicRms = await player.evaluate(async () => {
+    const stream = globalThis.__carryokieAudio?.publishedStream;
+    if (!(stream instanceof MediaStream)) return 0;
+    const context = new AudioContext();
+    await context.resume();
+    const source = context.createMediaStreamSource(stream);
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 2048;
+    source.connect(analyser);
+    const samples = new Float32Array(analyser.fftSize);
+    let peakRms = 0;
+    const deadline = performance.now() + 800;
+    while (performance.now() < deadline) {
+      analyser.getFloatTimeDomainData(samples);
+      let sumSquares = 0;
+      for (const sample of samples) sumSquares += sample * sample;
+      peakRms = Math.max(peakRms, Math.sqrt(sumSquares / samples.length));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+    await context.close();
+    return peakRms;
+  });
+  assert.ok(
+    publishedMicRms > 0.001,
+    `player published mic should contain non-silent samples; rms=${publishedMicRms}`,
+  );
+  const hostRemoteRms = await host.evaluate(async () => {
+    const stream = globalThis.__carryokieRemoteStreams?.[0];
+    if (!(stream instanceof MediaStream)) return 0;
+    const context = new AudioContext();
+    await context.resume();
+    const source = context.createMediaStreamSource(stream);
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 2048;
+    source.connect(analyser);
+    const samples = new Float32Array(analyser.fftSize);
+    let peakRms = 0;
+    const deadline = performance.now() + 800;
+    while (performance.now() < deadline) {
+      analyser.getFloatTimeDomainData(samples);
+      let sumSquares = 0;
+      for (const sample of samples) sumSquares += sample * sample;
+      peakRms = Math.max(peakRms, Math.sqrt(sumSquares / samples.length));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+    await context.close();
+    return peakRms;
+  });
+  assert.ok(
+    hostRemoteRms > 0.001,
+    `host received mic should contain non-silent samples; rms=${hostRemoteRms}`,
+  );
+  const hostRelayRms = await host.evaluate(async () => {
+    const stream = globalThis.__carryokiePeerNode?.relayedStreams?.[0]?.stream;
+    if (!(stream instanceof MediaStream)) return 0;
+    const context = new AudioContext();
+    await context.resume();
+    const source = context.createMediaStreamSource(stream);
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 2048;
+    source.connect(analyser);
+    const samples = new Float32Array(analyser.fftSize);
+    let peakRms = 0;
+    const deadline = performance.now() + 800;
+    while (performance.now() < deadline) {
+      analyser.getFloatTimeDomainData(samples);
+      let sumSquares = 0;
+      for (const sample of samples) sumSquares += sample * sample;
+      peakRms = Math.max(peakRms, Math.sqrt(sumSquares / samples.length));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+    await context.close();
+    return peakRms;
+  });
+  assert.ok(
+    hostRelayRms > 0.001,
+    `host relayed mic should contain non-silent samples; rms=${hostRelayRms}`,
+  );
   await player.click("#toggleSing");
   await player.waitForSelector("text=Mic muted.", { timeout: 5000 });
   await host.waitForSelector("text=MIC_MUTED", { timeout: 10000 });
@@ -153,18 +268,82 @@ try {
     null,
     { timeout: 20000 },
   );
+  await receiver.waitForFunction(
+    () => {
+      const audio = document.querySelector("#liveMics audio");
+      const stream = audio?.srcObject;
+      return (
+        audio &&
+        audio.muted === false &&
+        audio.volume > 0 &&
+        stream instanceof MediaStream &&
+        stream.getAudioTracks().some((track) => track.readyState === "live") &&
+        /Unmuted: 1 · Muted: 0/.test(document.body.textContent || "")
+      );
+    },
+    null,
+    { timeout: 10000 },
+  );
+  const liveMicRms = await receiver.evaluate(async () => {
+    const audio = document.querySelector("#liveMics audio");
+    const stream = audio?.srcObject;
+    if (!(stream instanceof MediaStream)) return 0;
+    const track = stream
+      .getAudioTracks()
+      .find((candidate) => candidate.readyState === "live");
+    if (!track) return 0;
+    const context = new AudioContext();
+    await context.resume();
+    const source = context.createMediaStreamSource(new MediaStream([track]));
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 2048;
+    source.connect(analyser);
+    const samples = new Float32Array(analyser.fftSize);
+    let peakRms = 0;
+    const deadline = performance.now() + 1200;
+    while (performance.now() < deadline) {
+      analyser.getFloatTimeDomainData(samples);
+      let sumSquares = 0;
+      for (const sample of samples) sumSquares += sample * sample;
+      peakRms = Math.max(peakRms, Math.sqrt(sumSquares / samples.length));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+    await context.close();
+    return peakRms;
+  });
+  assert.ok(
+    liveMicRms > 0.001,
+    `receiver live mic audio should contain non-silent samples; rms=${liveMicRms}`,
+  );
   await player.click("text=Advanced audio");
   await player.locator("#remoteGain").fill("1.5");
   await player.locator("#backingGain").fill("0.5");
   await player.locator("#masterGain").fill("1.2");
   await player.click("#muteMic");
   await player.waitForSelector("text=Mic muted.", { timeout: 5000 });
+  await receiver.waitForFunction(
+    () =>
+      /Mic track connected, but singer is muted\./.test(
+        document.body.textContent || "",
+      ) && /Unmuted: 0 · Muted: 1/.test(document.body.textContent || ""),
+    null,
+    { timeout: 20000 },
+  );
+  await player.click("#enableMic");
+  await player.waitForSelector("text=Mic live.", { timeout: 5000 });
+  await receiver.waitForFunction(
+    () =>
+      /Playing \d+ unmuted live mic/.test(document.body.textContent || "") &&
+      /Unmuted: 1 · Muted: 0/.test(document.body.textContent || ""),
+    null,
+    { timeout: 20000 },
+  );
 
   console.log(`PASS real-browser E2E room ${roomCode}`);
   console.log(`PASS player-host DataChannel opened`);
   console.log(`PASS queue request accepted and started`);
   console.log(`PASS autotune preset, gain controls, mute/unmute exercised`);
-  console.log(`PASS mic enabled and receiver live-mic bridge reached receiver`);
+  console.log(`PASS mic enabled and receiver live-mic bridge routed audio track`);
 } catch (error) {
   console.error("Host log:\n" + (await pageLog(host)));
   console.error("Player log:\n" + (await pageLog(player)));

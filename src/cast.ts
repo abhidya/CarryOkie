@@ -486,10 +486,11 @@ export function receiverApp(root: HTMLElement): void {
     if (!diagEl) return;
     const d = state.audioDiagnostics;
     const { audible, muted, publishing } = singerMicSummary();
+    const liveOutput = `<p>${escapeHtml(liveMicPlaybackDiagnostics())}</p>`;
     if (d) {
-      diagEl.innerHTML = `<h2>Audio pipeline</h2><p>Host remote tracks: ${d.hostRemoteAudioTracks ?? "?"} · Relayed streams: ${d.hostRelayedStreams ?? "?"} · Receiver ready: ${d.receiverReady ? "yes" : "no"}</p><p>Receiver PC: ${d.receiverPcConnectionState ?? "?"} · ICE: ${d.receiverPcIceState ?? "?"} · Tracks added: ${d.receiverTracksAdded ?? 0}</p>${d.receiverOfferSentAt ? `<p>Offer sent: ${new Date(d.receiverOfferSentAt as number).toLocaleTimeString()}</p>` : ""}${d.receiverAnswerReceivedAt ? `<p>Answer received: ${new Date(d.receiverAnswerReceivedAt as number).toLocaleTimeString()}</p>` : ""}${d.receiverLastError ? `<p class="warn">Error: ${escapeHtml(String(d.receiverLastError))}</p>` : ""}<p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p><p>Publishing singers: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p>`;
+      diagEl.innerHTML = `<h2>Audio pipeline</h2><p>Host remote tracks: ${d.hostRemoteAudioTracks ?? "?"} · Relayed streams: ${d.hostRelayedStreams ?? "?"} · Receiver ready: ${d.receiverReady ? "yes" : "no"}</p><p>Receiver PC: ${d.receiverPcConnectionState ?? "?"} · ICE: ${d.receiverPcIceState ?? "?"} · Tracks added: ${d.receiverTracksAdded ?? 0}</p>${d.receiverOfferSentAt ? `<p>Offer sent: ${new Date(d.receiverOfferSentAt as number).toLocaleTimeString()}</p>` : ""}${d.receiverAnswerReceivedAt ? `<p>Answer received: ${new Date(d.receiverAnswerReceivedAt as number).toLocaleTimeString()}</p>` : ""}${d.receiverLastError ? `<p class="warn">Error: ${escapeHtml(String(d.receiverLastError))}</p>` : ""}<p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p><p>Publishing singers: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p>${liveOutput}`;
     } else {
-      diagEl.innerHTML = `<h2>Audio pipeline</h2><p>No diagnostics received yet. Waiting for host tab…</p><p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p><p>Publishing singers: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p>`;
+      diagEl.innerHTML = `<h2>Audio pipeline</h2><p>No diagnostics received yet. Waiting for host tab…</p><p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p><p>Publishing singers: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p>${liveOutput}`;
     }
   }
   function render(): void {
@@ -687,6 +688,30 @@ export function receiverApp(root: HTMLElement): void {
   const liveMicStream = new MediaStream();
   const liveMicTrackIds = new Set<string>();
   let liveMicAudio: HTMLAudioElement | null = null;
+  let liveMicAudioContext: AudioContext | null = null;
+  let liveMicSource: MediaStreamAudioSourceNode | null = null;
+  let liveMicGain: GainNode | null = null;
+  let liveMicOutputStatus = "not started";
+  let liveMicLastPlayError = "";
+  function liveMicPlaybackDiagnostics(): string {
+    const elementState = liveMicAudio
+      ? `${liveMicAudio.paused ? "paused" : "playing"} · ready ${liveMicAudio.readyState}`
+      : "not created";
+    const graphState = liveMicAudioContext
+      ? liveMicAudioContext.state
+      : "not created";
+    const trackState =
+      liveMicStream
+        .getAudioTracks()
+        .map(
+          (track) =>
+            `${track.readyState}${track.enabled === false ? " disabled" : ""}${track.muted ? " muted" : ""}`,
+        )
+        .join(", ") || "none";
+    return `Live mic output: element ${elementState} · graph ${graphState} (${liveMicOutputStatus}) · tracks ${trackState}${
+      liveMicLastPlayError ? ` · last error ${liveMicLastPlayError}` : ""
+    }`;
+  }
   function liveMicSummaryHtml(): string {
     const status = state.liveMicStatus || (liveMicTrackIds.size ? liveMicStatus() : "");
     return status
@@ -718,6 +743,36 @@ export function receiverApp(root: HTMLElement): void {
     liveMics.appendChild(liveMicAudio);
     return liveMicAudio;
   }
+  async function ensureLiveMicOutputGraph(): Promise<void> {
+    const AudioContextCtor =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!AudioContextCtor) {
+      liveMicOutputStatus = "WebAudio unavailable; using media element";
+      return;
+    }
+    if (!liveMicAudioContext) liveMicAudioContext = new AudioContextCtor();
+    if (liveMicAudioContext.state === "suspended")
+      await liveMicAudioContext.resume().catch((error: Error) => {
+        liveMicLastPlayError = error.message;
+      });
+    if (!liveMicStream.getAudioTracks().length) {
+      liveMicOutputStatus = "waiting for live mic track";
+      return;
+    }
+    if (!liveMicSource) {
+      liveMicSource = liveMicAudioContext.createMediaStreamSource(liveMicStream);
+      liveMicGain = liveMicAudioContext.createGain();
+      liveMicGain.gain.value = 1;
+      liveMicSource.connect(liveMicGain);
+      liveMicGain.connect(liveMicAudioContext.destination);
+    }
+    liveMicOutputStatus =
+      liveMicAudioContext.state === "running"
+        ? "connected to receiver speakers"
+        : "audio context not running";
+  }
   async function tryPlayLiveMics(): Promise<void> {
     if (!state.audioOutputUnlocked) {
       state.liveMicStatus =
@@ -728,11 +783,14 @@ export function receiverApp(root: HTMLElement): void {
     state.liveMicStatus = liveMicStatus();
     render();
     const audio = ensureLiveMicAudio();
+    await ensureLiveMicOutputGraph();
     try {
       await audio.play();
+      liveMicLastPlayError = "";
       state.liveMicStatus = liveMicStatus();
       render();
-    } catch {
+    } catch (error) {
+      liveMicLastPlayError = (error as Error).message;
       state.liveMicStatus = "Tap receiver once or press Start / retry live mics.";
       render();
     }
@@ -747,6 +805,7 @@ export function receiverApp(root: HTMLElement): void {
       liveMicStream.addTrack(track);
     }
     if (!audioTracks.length) return;
+    if (state.audioOutputUnlocked) void ensureLiveMicOutputGraph();
     void tryPlayLiveMics();
   }
   function removeStaleLiveMicTracks(): void {

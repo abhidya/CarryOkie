@@ -67,6 +67,7 @@ let receiverNegotiating = false;
 let receiverPendingRenegotiate = false;
 let receiverNegotiationTimer: ReturnType<typeof setTimeout> | null = null;
 const receiverTrackKeys = new Set<string>();
+const hostRemoteAudioSinks = new WeakMap<MediaStream, HTMLAudioElement>();
 const audioPipeline = {
   hostRemoteAudioTracks: 0,
   hostRelayedStreams: 0,
@@ -97,6 +98,20 @@ function persist() {
 function log(msg) {
   logToPage(msg);
 }
+function sinkHostRemoteAudio(stream: MediaStream) {
+  if (hostRemoteAudioSinks.has(stream)) return;
+  const sink = document.createElement("audio");
+  sink.autoplay = true;
+  sink.muted = true;
+  sink.playsInline = true;
+  sink.srcObject = stream;
+  sink.style.display = "none";
+  document.body.appendChild(sink);
+  hostRemoteAudioSinks.set(stream, sink);
+  sink.play().catch(() => {
+    log("Host remote mic sink is waiting for the next user gesture.");
+  });
+}
 function currentMicStatusText() {
   if (!player?.micState?.enabled) return "Mic muted until enabled.";
   if (player.micState.muted) return "Mic muted.";
@@ -112,6 +127,7 @@ function unlockPhoneAudio() {
 }
 function setupPeer(localPeerId) {
   peerNode = new PeerNode(localPeerId);
+  globalThis.__carryokiePeerNode = peerNode;
   peerNode.addEventListener("open", (e) => {
     clearPeerCloseTimer(e.detail.remotePeerId);
     log(`DataChannel open: ${e.detail.remotePeerId}`);
@@ -146,8 +162,10 @@ function setupPeer(localPeerId) {
       e.detail.stream ||
       (e.detail.track ? new MediaStream([e.detail.track]) : null);
     if (!remoteStream) return;
+    (globalThis.__carryokieRemoteStreams ||= []).push(remoteStream);
     audio?.addRemoteStream(remoteStream, e.detail.remotePeerId);
     if (player?.isHost) {
+      sinkHostRemoteAudio(remoteStream);
       peerNode.relayRemoteStream(e.detail.remotePeerId, remoteStream);
       audioPipeline.hostRemoteAudioTracks = (peerNode.relayedStreams || []).reduce(
         (sum, r) => sum + (r.stream?.getAudioTracks?.()?.length || 0),
@@ -1037,6 +1055,7 @@ export async function playerPage(root) {
   persist();
   setupPeer(player.peerId);
   audio = new PhoneAudio(log);
+  globalThis.__carryokieAudio = audio;
   commonChrome(root, "Player Phone");
   renderPlayer($("#main"));
 }
@@ -1205,6 +1224,7 @@ function renderPlayer(main) {
             status;
       const stream = await audio.requestMic({ pushToSing });
       const alreadyPublishing = !!player.micState?.publishing;
+      const previousMuted = !!player.micState?.muted;
       const isNewMicStream = !peerNode.localStreams?.includes(stream);
       if (isNewMicStream) peerNode.addLocalStream(stream);
       player.micState = {
@@ -1214,12 +1234,19 @@ function renderPlayer(main) {
         muted: pushToSing,
       };
       persist();
-      if (isNewMicStream || !alreadyPublishing)
+      if (isNewMicStream || !alreadyPublishing) {
         peerNode.broadcast({
           type: RPC.MIC_ENABLED,
           playerId: player.playerId,
           muted: pushToSing,
         });
+      } else if (previousMuted !== pushToSing) {
+        peerNode.broadcast({
+          type: pushToSing ? RPC.MIC_MUTED : RPC.MIC_UNMUTED,
+          playerId: player.playerId,
+          muted: pushToSing,
+        });
+      }
       $("#micStatus").textContent = pushToSing
         ? "Mic ready. Hold to sing."
         : "Mic live.";

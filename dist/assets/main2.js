@@ -1077,15 +1077,18 @@ var PeerNode = class extends EventTarget {
 		for (const edge of this.peers.values()) if (this.addStreamToEdge(edge, stream)) this.requestNegotiation(edge);
 	}
 	relayRemoteStream(sourcePeerId, stream) {
-		const newKeys = streamTrackKeys(stream).filter((key) => !this.relayedStreams.some((stream) => stream.sourcePeerId === sourcePeerId && stream.trackKeys.includes(key)));
+		const newTracks = streamTracks(stream).filter((track) => !this.relayedStreams.some((stream) => stream.sourcePeerId === sourcePeerId && stream.trackKeys.includes(mediaTrackKey(track))));
+		const newKeys = newTracks.map(mediaTrackKey);
+		const relayStream = new MediaStream(newTracks.map((track) => typeof track.clone === "function" ? track.clone() : track));
 		if (newKeys.length) this.relayedStreams.push({
 			sourcePeerId,
-			stream,
+			stream: relayStream,
 			trackKeys: newKeys
 		});
+		if (!newKeys.length) return;
 		for (const edge of this.peers.values()) {
 			if (edge.remotePeerId === sourcePeerId) continue;
-			if (this.addStreamToEdge(edge, stream)) this.requestNegotiation(edge);
+			if (this.addStreamToEdge(edge, relayStream)) this.requestNegotiation(edge);
 		}
 	}
 	emit(type, detail) {
@@ -1208,7 +1211,8 @@ var PhoneAudio = class {
 			video: false
 		});
 		this.applyGate();
-		this.publishedStream = this.buildMicFilterStream(this.localStream);
+		this.buildMicFilterStream(this.localStream);
+		this.publishedStream = this.localStream;
 		this.setMicMuted(pushToSing);
 		return this.publishedStream;
 	}
@@ -1220,10 +1224,17 @@ var PhoneAudio = class {
 		return (typeof stream.getAudioTracks === "function" ? stream.getAudioTracks() : typeof stream.getTracks === "function" ? stream.getTracks().filter((track) => track.kind === "audio") : []).some((track) => track.readyState !== "ended");
 	}
 	setMicMuted(muted) {
+		if (this.micFilters.muteGate && this.publishedStream !== this.localStream) {
+			this.micFilters.muteGate.gain.value = muted ? 0 : 1;
+			this.localStream?.getAudioTracks().forEach((t) => {
+				t.enabled = true;
+			});
+			this.publishedStream?.getAudioTracks().forEach((t) => {
+				t.enabled = true;
+			});
+			return;
+		}
 		this.localStream?.getAudioTracks().forEach((t) => {
-			t.enabled = !muted;
-		});
-		this.publishedStream?.getAudioTracks().forEach((t) => {
 			t.enabled = !muted;
 		});
 	}
@@ -1238,6 +1249,10 @@ var PhoneAudio = class {
 			const presence = this.ctx.createBiquadFilter();
 			const compressor = this.ctx.createDynamicsCompressor();
 			const output = this.ctx.createGain();
+			const muteGate = this.ctx.createGain();
+			const silentMonitor = this.ctx.createGain();
+			muteGate.gain.value = 1;
+			silentMonitor.gain.value = 0;
 			highpass.type = "highpass";
 			tone.type = "lowshelf";
 			presence.type = "peaking";
@@ -1264,13 +1279,18 @@ var PhoneAudio = class {
 				compressor.connect(output);
 				this.gateProcessor = null;
 			}
-			output.connect(this.micDestination);
+			output.connect(muteGate);
+			muteGate.connect(this.micDestination);
+			muteGate.connect(silentMonitor);
+			silentMonitor.connect(this.ctx.destination);
 			this.micFilters = {
 				highpass,
 				tone,
 				presence,
 				compressor,
-				output
+				output,
+				muteGate,
+				silentMonitor
 			};
 			this.applyVoicePreset();
 			return this.micDestination.stream;
@@ -1852,8 +1872,9 @@ function receiverApp(root) {
 		if (!diagEl) return;
 		const d = state.audioDiagnostics;
 		const { audible, muted, publishing } = singerMicSummary();
-		if (d) diagEl.innerHTML = `<h2>Audio pipeline</h2><p>Host remote tracks: ${d.hostRemoteAudioTracks ?? "?"} · Relayed streams: ${d.hostRelayedStreams ?? "?"} · Receiver ready: ${d.receiverReady ? "yes" : "no"}</p><p>Receiver PC: ${d.receiverPcConnectionState ?? "?"} · ICE: ${d.receiverPcIceState ?? "?"} · Tracks added: ${d.receiverTracksAdded ?? 0}</p>${d.receiverOfferSentAt ? `<p>Offer sent: ${new Date(d.receiverOfferSentAt).toLocaleTimeString()}</p>` : ""}${d.receiverAnswerReceivedAt ? `<p>Answer received: ${new Date(d.receiverAnswerReceivedAt).toLocaleTimeString()}</p>` : ""}${d.receiverLastError ? `<p class="warn">Error: ${escapeHtml$1(String(d.receiverLastError))}</p>` : ""}<p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p><p>Publishing singers: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p>`;
-		else diagEl.innerHTML = `<h2>Audio pipeline</h2><p>No diagnostics received yet. Waiting for host tab…</p><p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p><p>Publishing singers: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p>`;
+		const liveOutput = `<p>${escapeHtml$1(liveMicPlaybackDiagnostics())}</p>`;
+		if (d) diagEl.innerHTML = `<h2>Audio pipeline</h2><p>Host remote tracks: ${d.hostRemoteAudioTracks ?? "?"} · Relayed streams: ${d.hostRelayedStreams ?? "?"} · Receiver ready: ${d.receiverReady ? "yes" : "no"}</p><p>Receiver PC: ${d.receiverPcConnectionState ?? "?"} · ICE: ${d.receiverPcIceState ?? "?"} · Tracks added: ${d.receiverTracksAdded ?? 0}</p>${d.receiverOfferSentAt ? `<p>Offer sent: ${new Date(d.receiverOfferSentAt).toLocaleTimeString()}</p>` : ""}${d.receiverAnswerReceivedAt ? `<p>Answer received: ${new Date(d.receiverAnswerReceivedAt).toLocaleTimeString()}</p>` : ""}${d.receiverLastError ? `<p class="warn">Error: ${escapeHtml$1(String(d.receiverLastError))}</p>` : ""}<p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p><p>Publishing singers: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p>${liveOutput}`;
+		else diagEl.innerHTML = `<h2>Audio pipeline</h2><p>No diagnostics received yet. Waiting for host tab…</p><p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p><p>Publishing singers: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p>${liveOutput}`;
 	}
 	function render() {
 		root.querySelector("#room").textContent = state.roomCode;
@@ -1972,6 +1993,17 @@ function receiverApp(root) {
 	const liveMicStream = new MediaStream();
 	const liveMicTrackIds = /* @__PURE__ */ new Set();
 	let liveMicAudio = null;
+	let liveMicAudioContext = null;
+	let liveMicSource = null;
+	let liveMicGain = null;
+	let liveMicOutputStatus = "not started";
+	let liveMicLastPlayError = "";
+	function liveMicPlaybackDiagnostics() {
+		const elementState = liveMicAudio ? `${liveMicAudio.paused ? "paused" : "playing"} · ready ${liveMicAudio.readyState}` : "not created";
+		const graphState = liveMicAudioContext ? liveMicAudioContext.state : "not created";
+		const trackState = liveMicStream.getAudioTracks().map((track) => `${track.readyState}${track.enabled === false ? " disabled" : ""}${track.muted ? " muted" : ""}`).join(", ") || "none";
+		return `Live mic output: element ${elementState} · graph ${graphState} (${liveMicOutputStatus}) · tracks ${trackState}${liveMicLastPlayError ? ` · last error ${liveMicLastPlayError}` : ""}`;
+	}
 	function liveMicSummaryHtml() {
 		const status = state.liveMicStatus || (liveMicTrackIds.size ? liveMicStatus() : "");
 		return status ? `<p class="subtle">${escapeHtml$1(status)}</p>` : "<p class=\"subtle\">Playing all forwarded singer mics.</p>";
@@ -2000,6 +2032,29 @@ function receiverApp(root) {
 		liveMics.appendChild(liveMicAudio);
 		return liveMicAudio;
 	}
+	async function ensureLiveMicOutputGraph() {
+		const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+		if (!AudioContextCtor) {
+			liveMicOutputStatus = "WebAudio unavailable; using media element";
+			return;
+		}
+		if (!liveMicAudioContext) liveMicAudioContext = new AudioContextCtor();
+		if (liveMicAudioContext.state === "suspended") await liveMicAudioContext.resume().catch((error) => {
+			liveMicLastPlayError = error.message;
+		});
+		if (!liveMicStream.getAudioTracks().length) {
+			liveMicOutputStatus = "waiting for live mic track";
+			return;
+		}
+		if (!liveMicSource) {
+			liveMicSource = liveMicAudioContext.createMediaStreamSource(liveMicStream);
+			liveMicGain = liveMicAudioContext.createGain();
+			liveMicGain.gain.value = 1;
+			liveMicSource.connect(liveMicGain);
+			liveMicGain.connect(liveMicAudioContext.destination);
+		}
+		liveMicOutputStatus = liveMicAudioContext.state === "running" ? "connected to receiver speakers" : "audio context not running";
+	}
 	async function tryPlayLiveMics() {
 		if (!state.audioOutputUnlocked) {
 			state.liveMicStatus = "Press 'Start receiver audio' to enable live mic audio.";
@@ -2009,11 +2064,14 @@ function receiverApp(root) {
 		state.liveMicStatus = liveMicStatus();
 		render();
 		const audio = ensureLiveMicAudio();
+		await ensureLiveMicOutputGraph();
 		try {
 			await audio.play();
+			liveMicLastPlayError = "";
 			state.liveMicStatus = liveMicStatus();
 			render();
-		} catch {
+		} catch (error) {
+			liveMicLastPlayError = error.message;
 			state.liveMicStatus = "Tap receiver once or press Start / retry live mics.";
 			render();
 		}
@@ -2026,6 +2084,7 @@ function receiverApp(root) {
 			liveMicStream.addTrack(track);
 		}
 		if (!audioTracks.length) return;
+		if (state.audioOutputUnlocked) ensureLiveMicOutputGraph();
 		tryPlayLiveMics();
 	}
 	function removeStaleLiveMicTracks() {
@@ -2268,6 +2327,7 @@ var receiverNegotiating = false;
 var receiverPendingRenegotiate = false;
 var receiverNegotiationTimer = null;
 var receiverTrackKeys = /* @__PURE__ */ new Set();
+var hostRemoteAudioSinks = /* @__PURE__ */ new WeakMap();
 var audioPipeline = {
 	hostRemoteAudioTracks: 0,
 	hostRelayedStreams: 0,
@@ -2298,6 +2358,20 @@ function persist() {
 function log(msg) {
 	logToPage(msg);
 }
+function sinkHostRemoteAudio(stream) {
+	if (hostRemoteAudioSinks.has(stream)) return;
+	const sink = document.createElement("audio");
+	sink.autoplay = true;
+	sink.muted = true;
+	sink.playsInline = true;
+	sink.srcObject = stream;
+	sink.style.display = "none";
+	document.body.appendChild(sink);
+	hostRemoteAudioSinks.set(stream, sink);
+	sink.play().catch(() => {
+		log("Host remote mic sink is waiting for the next user gesture.");
+	});
+}
 function currentMicStatusText() {
 	if (!player?.micState?.enabled) return "Mic muted until enabled.";
 	if (player.micState.muted) return "Mic muted.";
@@ -2313,6 +2387,7 @@ function unlockPhoneAudio() {
 }
 function setupPeer(localPeerId) {
 	peerNode = new PeerNode(localPeerId);
+	globalThis.__carryokiePeerNode = peerNode;
 	peerNode.addEventListener("open", (e) => {
 		clearPeerCloseTimer(e.detail.remotePeerId);
 		log(`DataChannel open: ${e.detail.remotePeerId}`);
@@ -2337,8 +2412,10 @@ function setupPeer(localPeerId) {
 	peerNode.addEventListener("track", (e) => {
 		const remoteStream = e.detail.stream || (e.detail.track ? new MediaStream([e.detail.track]) : null);
 		if (!remoteStream) return;
+		(globalThis.__carryokieRemoteStreams ||= []).push(remoteStream);
 		audio?.addRemoteStream(remoteStream, e.detail.remotePeerId);
 		if (player?.isHost) {
+			sinkHostRemoteAudio(remoteStream);
 			peerNode.relayRemoteStream(e.detail.remotePeerId, remoteStream);
 			audioPipeline.hostRemoteAudioTracks = (peerNode.relayedStreams || []).reduce((sum, r) => sum + (r.stream?.getAudioTracks?.()?.length || 0), 0);
 			audioPipeline.hostRelayedStreams = (peerNode.relayedStreams || []).length;
@@ -3108,6 +3185,7 @@ async function playerPage(root) {
 	persist();
 	setupPeer(player.peerId);
 	audio = new PhoneAudio(log);
+	globalThis.__carryokieAudio = audio;
 	commonChrome(root, "Player Phone");
 	renderPlayer($("#main"));
 }
@@ -3244,6 +3322,7 @@ function renderPlayer(main) {
 			$("#wake").textContent = status === "active" ? "Wake lock active" : "Keep this phone unlocked and tab open during song. Wake lock: " + status;
 			const stream = await audio.requestMic({ pushToSing });
 			const alreadyPublishing = !!player.micState?.publishing;
+			const previousMuted = !!player.micState?.muted;
 			const isNewMicStream = !peerNode.localStreams?.includes(stream);
 			if (isNewMicStream) peerNode.addLocalStream(stream);
 			player.micState = {
@@ -3255,6 +3334,11 @@ function renderPlayer(main) {
 			persist();
 			if (isNewMicStream || !alreadyPublishing) peerNode.broadcast({
 				type: RPC.MIC_ENABLED,
+				playerId: player.playerId,
+				muted: pushToSing
+			});
+			else if (previousMuted !== pushToSing) peerNode.broadcast({
+				type: pushToSing ? RPC.MIC_MUTED : RPC.MIC_UNMUTED,
 				playerId: player.playerId,
 				muted: pushToSing
 			});

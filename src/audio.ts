@@ -15,6 +15,8 @@ export class PhoneAudio {
     presence?: BiquadFilterNode;
     compressor?: DynamicsCompressorNode;
     output?: GainNode;
+    muteGate?: GainNode;
+    silentMonitor?: GainNode;
   };
   voicePreset: string;
   localMonitorGain: number;
@@ -109,7 +111,8 @@ export class PhoneAudio {
       video: false,
     });
     this.applyGate();
-    this.publishedStream = this.buildMicFilterStream(this.localStream);
+    this.buildMicFilterStream(this.localStream);
+    this.publishedStream = this.localStream;
     this.setMicMuted(pushToSing);
     return this.publishedStream;
   }
@@ -130,10 +133,17 @@ export class PhoneAudio {
     return tracks.some((track) => track.readyState !== "ended");
   }
   setMicMuted(muted: boolean): void {
+    if (this.micFilters.muteGate && this.publishedStream !== this.localStream) {
+      this.micFilters.muteGate.gain.value = muted ? 0 : 1;
+      this.localStream?.getAudioTracks().forEach((t) => {
+        t.enabled = true;
+      });
+      this.publishedStream?.getAudioTracks().forEach((t) => {
+        t.enabled = true;
+      });
+      return;
+    }
     this.localStream?.getAudioTracks().forEach((t) => {
-      t.enabled = !muted;
-    });
-    this.publishedStream?.getAudioTracks().forEach((t) => {
       t.enabled = !muted;
     });
   }
@@ -153,6 +163,10 @@ export class PhoneAudio {
       const presence = this.ctx.createBiquadFilter();
       const compressor = this.ctx.createDynamicsCompressor();
       const output = this.ctx.createGain();
+      const muteGate = this.ctx.createGain();
+      const silentMonitor = this.ctx.createGain();
+      muteGate.gain.value = 1;
+      silentMonitor.gain.value = 0;
       highpass.type = "highpass";
       tone.type = "lowshelf";
       presence.type = "peaking";
@@ -185,8 +199,23 @@ export class PhoneAudio {
         compressor.connect(output);
         this.gateProcessor = null;
       }
-      output.connect(this.micDestination);
-      this.micFilters = { highpass, tone, presence, compressor, output };
+      output.connect(muteGate);
+      muteGate.connect(this.micDestination);
+      /* Keep Chromium pulling the WebAudio graph so the
+         MediaStreamDestination track carries samples to WebRTC. The gain is
+         zero, so this does not locally monitor the singer mic or create TV
+         bleed/feedback. */
+      muteGate.connect(silentMonitor);
+      silentMonitor.connect(this.ctx.destination);
+      this.micFilters = {
+        highpass,
+        tone,
+        presence,
+        compressor,
+        output,
+        muteGate,
+        silentMonitor,
+      };
       this.applyVoicePreset();
       return this.micDestination.stream;
     } catch (err: unknown) {
