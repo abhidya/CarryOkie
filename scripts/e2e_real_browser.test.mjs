@@ -281,7 +281,7 @@ try {
       const stream = audio?.srcObject;
       return (
         audio &&
-        audio.muted === false &&
+        audio.muted === true &&
         audio.volume > 0 &&
         stream instanceof MediaStream &&
         stream.getAudioTracks().some((track) => track.readyState === "live") &&

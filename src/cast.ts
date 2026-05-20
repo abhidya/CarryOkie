@@ -741,7 +741,11 @@ export function receiverApp(root: HTMLElement): void {
     liveMicAudio.autoplay = true;
     liveMicAudio.controls = true;
     liveMicAudio.playsInline = true;
-    liveMicAudio.muted = false;
+    /* The audible path is the WebAudio graph below, which has lower latency
+       than relying on HTMLMediaElement buffering. Keep the element muted so
+       it can expose/debug the MediaStream without double-playing with an
+       offset. */
+    liveMicAudio.muted = true;
     liveMicAudio.volume = 1;
     liveMicAudio.srcObject = liveMicStream;
     liveMics.appendChild(liveMicAudio);
@@ -756,7 +760,10 @@ export function receiverApp(root: HTMLElement): void {
       liveMicOutputStatus = "WebAudio unavailable; using media element";
       return;
     }
-    if (!liveMicAudioContext) liveMicAudioContext = new AudioContextCtor();
+    if (!liveMicAudioContext)
+      liveMicAudioContext = new AudioContextCtor({
+        latencyHint: "interactive",
+      });
     if (liveMicAudioContext.state === "suspended")
       await liveMicAudioContext.resume().catch((error: Error) => {
         liveMicLastPlayError = error.message;

@@ -1166,7 +1166,7 @@ var PhoneAudio = class {
 		this.remoteStreams = /* @__PURE__ */ new Set();
 	}
 	async init() {
-		this.ctx = this.ctx || new AudioContext();
+		this.ctx = this.ctx || new AudioContext({ latencyHint: "interactive" });
 		if (!this.master || !this.remoteGain || !this.backingGain) {
 			this.master = this.ctx.createGain();
 			this.remoteGain = this.ctx.createGain();
@@ -1204,7 +1204,13 @@ var PhoneAudio = class {
 			audio: {
 				echoCancellation: true,
 				noiseSuppression: true,
-				autoGainControl: true
+				autoGainControl: true,
+				channelCount: { ideal: 1 },
+				sampleRate: { ideal: 48e3 },
+				latency: {
+					ideal: .01,
+					max: .05
+				}
 			},
 			video: false
 		});
@@ -2024,7 +2030,7 @@ function receiverApp(root) {
 		liveMicAudio.autoplay = true;
 		liveMicAudio.controls = true;
 		liveMicAudio.playsInline = true;
-		liveMicAudio.muted = false;
+		liveMicAudio.muted = true;
 		liveMicAudio.volume = 1;
 		liveMicAudio.srcObject = liveMicStream;
 		liveMics.appendChild(liveMicAudio);
@@ -2036,7 +2042,7 @@ function receiverApp(root) {
 			liveMicOutputStatus = "WebAudio unavailable; using media element";
 			return;
 		}
-		if (!liveMicAudioContext) liveMicAudioContext = new AudioContextCtor();
+		if (!liveMicAudioContext) liveMicAudioContext = new AudioContextCtor({ latencyHint: "interactive" });
 		if (liveMicAudioContext.state === "suspended") await liveMicAudioContext.resume().catch((error) => {
 			liveMicLastPlayError = error.message;
 		});

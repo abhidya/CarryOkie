@@ -54,7 +54,7 @@ export class PhoneAudio {
     this.remoteStreams = new Set();
   }
   async init(): Promise<void> {
-    this.ctx = this.ctx || new AudioContext();
+    this.ctx = this.ctx || new AudioContext({ latencyHint: "interactive" });
     if (!this.master || !this.remoteGain || !this.backingGain) {
       this.master = this.ctx.createGain();
       this.remoteGain = this.ctx.createGain();
@@ -107,6 +107,9 @@ export class PhoneAudio {
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
+        channelCount: { ideal: 1 },
+        sampleRate: { ideal: 48000 },
+        latency: { ideal: 0.01, max: 0.05 },
       },
       video: false,
     });
