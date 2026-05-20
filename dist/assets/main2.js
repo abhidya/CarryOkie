@@ -2298,6 +2298,11 @@ function persist() {
 function log(msg) {
 	logToPage(msg);
 }
+function currentMicStatusText() {
+	if (!player?.micState?.enabled) return "Mic muted until enabled.";
+	if (player.micState.muted) return "Mic muted.";
+	return "Mic live.";
+}
 async function loadCatalog() {
 	catalog = await loadSongCatalog(import.meta.url);
 }
@@ -3190,7 +3195,7 @@ function renderPlayer(main) {
 		attachJoinHandlers();
 		return;
 	}
-	main.innerHTML = `<section class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie phone</p><h2>${currentTitle}</h2><p class="subtle">${escapeHtml(player.displayName || "Player")} · Room ${escapeHtml(roomCode || "joined")} · Player #${escapeHtml(player.playerNumber || "?")}</p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p id="micStatus" class="status-pill live-status">Mic muted until enabled.</p><div class="primary-actions"><button id="enableMic" class="primary">Enable my mic</button><button id="holdSing" class="hold-button">Hold to sing</button><button id="toggleSing">Live / mute</button><button id="muteMic" class="danger">Mute mic</button></div></div>
+	main.innerHTML = `<section class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie phone</p><h2>${currentTitle}</h2><p class="subtle">${escapeHtml(player.displayName || "Player")} · Room ${escapeHtml(roomCode || "joined")} · Player #${escapeHtml(player.playerNumber || "?")}</p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p id="micStatus" class="status-pill live-status">${escapeHtml(currentMicStatusText())}</p><div class="primary-actions"><button id="enableMic" class="primary">Enable my mic</button><button id="holdSing" class="hold-button">Hold to sing</button><button id="toggleSing">Live / mute</button><button id="muteMic" class="danger">Mute mic</button></div></div>
 <details class="card" open><summary>1. Queue this phone</summary><label>Your name<input id="displayName" value="${escapeHtml(player.displayName || "Player")}" placeholder="Your name"></label><label>Song<select id="song">${catalog.map((s) => `<option value="${s.songId}">${escapeHtml(s.title)} — ${escapeHtml(s.artist)}</option>`).join("")}</select></label><label>Singers<input id="singers" value="${player.playerNumber || 2}" placeholder="Singer numbers comma separated"></label><p class="subtle">Default singer is you. Add more numbers only for duets/groups.</p><div class="button-row"><button id="requestSong" class="primary">Queue selected song</button><button id="requestSinger">Singer only</button></div><div class="queue-list">${queueHtml(room, "phone")}</div></details>
 <details class="card" open><summary>2. Sing</summary><p class="warn compact">${escapeHtml(singerWarning)}</p><label class="check"><input type="checkbox" id="pushToSing"> Push-to-sing</label><label>Mic filter<select id="voicePreset"><option value="clean">Clean</option><option value="alto">Alto warm</option><option value="bravo">Bravo bright</option><option value="bass">Bass low</option><option value="radio">Radio</option><option value="autotune">Autotune-style polish</option></select></label><p id="wake" class="subtle"></p></details>
 <details class="card"><summary>Advanced audio</summary><div class="button-row"><button id="startBacking">Start backing monitor</button><button id="pauseBacking">Pause backing monitor</button></div><label>Remote gain <input id="remoteGain" type="range" min="0" max="2" value="1" step=".05"></label><label>Backing monitor gain <input id="backingGain" type="range" min="0" max="1" value="0.35" step=".05"></label><label>Master gain <input id="masterGain" type="range" min="0" max="2" value="1" step=".05"></label></details>
