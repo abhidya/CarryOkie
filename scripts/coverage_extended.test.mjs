@@ -261,7 +261,7 @@ test("concurrent phone mic enables share one pending capture stream", async () =
   }
 });
 
-test("phone mic publishes filtered WebAudio stream and PeerNode routes filtered track", async () => {
+test("phone mic publishes routable raw stream while maintaining filter graph", async () => {
   const oldAudioContext = globalThis.AudioContext;
   const oldNavigator = globalThis.navigator;
   const oldRtc = globalThis.RTCPeerConnection;
@@ -362,8 +362,8 @@ test("phone mic publishes filtered WebAudio stream and PeerNode routes filtered 
     const published = await audio.requestMic({ headphonesConfirmed: true });
     assert.equal(
       published,
-      filteredStream,
-      "requestMic should return filtered publish stream when WebAudio routing is available",
+      rawStream,
+      "requestMic should publish the raw mic stream because generated WebAudio destination tracks are not reliably routable across browser WebRTC relays",
     );
     assert.deepEqual(
       links.map(([from, to]) => `${from}->${to}`),
@@ -376,7 +376,10 @@ test("phone mic publishes filtered WebAudio stream and PeerNode routes filtered 
         "filter->filter",
         "filter->compressor",
         "compressor->gain",
+        "gain->gain",
         "gain->filteredDestination",
+        "gain->gain",
+        "gain->speakers",
       ],
     );
     audio.setVoicePreset("autotune");
@@ -384,13 +387,13 @@ test("phone mic publishes filtered WebAudio stream and PeerNode routes filtered 
     assert.equal(created.filters[2].gain.value, 3);
     audio.setMicMuted(true);
     assert.equal(rawTrack.enabled, false);
-    assert.equal(filteredTrack.enabled, false);
+    assert.equal(filteredTrack.enabled, true);
 
     const peer = new PeerNode("singer");
     const edge = peer.makeConnection("host", { initiator: true });
     peer.addLocalStream(published);
-    assert.equal(edge.pc.addedTracks[0].track, filteredTrack);
-    assert.equal(edge.pc.addedTracks[0].stream, filteredStream);
+    assert.equal(edge.pc.addedTracks[0].track, rawTrack);
+    assert.equal(edge.pc.addedTracks[0].stream, rawStream);
   } finally {
     globalThis.AudioContext = oldAudioContext;
     globalThis.RTCPeerConnection = oldRtc;
