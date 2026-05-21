@@ -75,6 +75,19 @@ npm run preview
 # http://localhost:5173/debug/
 ```
 
+## User flow
+
+1. **Host** opens `/host/` → "CarryOkie Show Control" appears with room code.
+2. **Host** clicks **Open TV Stage** → browser tab opens `/receiver/?room=CODE`.
+3. **TV Stage** shows room code, QR code, and join link.
+4. **Singers** scan the QR (or click the join link) → opens `/player/` with room code pre-filled.
+5. **Singer** enters their name and clicks **Join Room** → auto-joins via PeerJS.
+6. **Singer** queues a song → host approves and starts it.
+7. **Singer** enables mic → live audio routes through host to TV Stage.
+8. **TV Stage** plays backing track and outputs live singer mic audio.
+
+Manual pairing remains available as fallback: expand "Manual Pairing Fallback" on host and player.
+
 ## Build
 
 ```bash
@@ -90,14 +103,25 @@ npm run build
 npm test
 npm run build
 npm run test:e2e
+npm run test:e2e:ux
+npm run test:e2e:peerjs
 ```
 
 The test suite includes static route checks, state/use-case tests, Cast UI tests with a fake SDK, WebRTC/sync tests with fakes, protected-media tests, design coverage checks, and import-media E2E checks.
 
 `npm run test:e2e` builds, starts a local Vite preview on `127.0.0.1:4180` by default, runs the host/player/receiver browser flow headless, then closes the browser and server. Override with `E2E_PORT=4174` when needed. For manual debugging, run `KEEP_BROWSER_OPEN=1 npm run test:e2e:headed`.
 
+`npm run test:e2e:ux` verifies the new UX contract: host Show Control layout, player Singer Remote layout, receiver TV Stage layout, collapsed diagnostics/manual panels, and no raw SDP/ICE visible in normal flow.
+
+`npm run test:e2e:peerjs` gates the PeerJS QR auto-join happy path: host creates room → player scans QR → auto-joins via PeerJS → DataChannel opens → ROOM_HELLO received.
+
 ## MVP caveats
 
+- **PeerJS Cloud** is an external signaling service used for QR auto-join. If PeerJS Cloud is unavailable, manual pairing fallback still works.
+- **Public STUN-only** connectivity can fail on some networks (symmetric NATs, restrictive Wi-Fi). The UI shows clear network-incompatible errors when ICE fails.
+- **Real Chromecast** hardware still needs a supported Chrome/Android browser, a real Chromecast/Google TV target, and same-network discovery.
+- **Real multi-device audio** still needs hardware validation with physical phones, headphones, and speakers.
+- **Headphones / push-to-sing** recommended to avoid TV backing-track bleed into singer mics.
 - Real Cast behavior still needs a supported Chrome/Android browser, a real Chromecast/Google TV target, and same-network discovery.
 - Real live mic listening still needs physical devices/headphones/speakers to validate latency and feedback behavior.
 - Strict mode uses manual QR/link/copy-paste signaling and public STUN only; networks that require TURN may fail.

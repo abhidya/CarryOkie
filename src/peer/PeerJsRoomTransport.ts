@@ -17,6 +17,14 @@ export type ConnectionState =
   | "disconnected"
   | "failed";
 
+// Auto-join message types exchanged over PeerJS DataChannel
+export const AUTO_JOIN_HELLO = "AUTO_JOIN_HELLO";
+export const AUTO_JOIN_HOST_READY = "AUTO_JOIN_HOST_READY";
+export const AUTO_JOIN_WEBRTC_OFFER = "AUTO_JOIN_WEBRTC_OFFER";
+export const AUTO_JOIN_WEBRTC_ANSWER = "AUTO_JOIN_WEBRTC_ANSWER";
+export const AUTO_JOIN_FAILED = "AUTO_JOIN_FAILED";
+export const AUTO_JOIN_STATUS = "AUTO_JOIN_STATUS";
+
 export interface RoomMessage {
   type: string;
   [key: string]: unknown;
@@ -28,6 +36,8 @@ export interface TransportHandlers {
   onPeerConnected: (peerId: string, metadata?: Record<string, unknown>) => void;
   onPeerDisconnected: (peerId: string) => void;
   onError: (error: Error) => void;
+  onAutoJoinOffer?: (peerId: string, offerText: string) => void;
+  onAutoJoinAnswer?: (peerId: string, answerText: string) => void;
 }
 
 const STUN_SERVER = { urls: "stun:stun.l.google.com:19302" };
@@ -177,6 +187,12 @@ export class PeerJsRoomTransport {
     });
   }
 
+  private _autoJoinAnswerResolvers: Map<string, {
+    resolve: (answerText: string) => void;
+    reject: (error: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }> = new Map();
+
   private attachConnection(conn: DataConnection): void {
     conn.on("open", () => {
       this.connections.set(conn.peer, conn);
@@ -194,6 +210,41 @@ export class PeerJsRoomTransport {
         const msg = (
           typeof data === "string" ? JSON.parse(data) : data
         ) as RoomMessage;
+        if (!msg?.type) return;
+
+        // Auto-join signaling messages
+        if (msg.type === AUTO_JOIN_WEBRTC_OFFER && this._isHost) {
+          const offerText = (msg.offer as string) || "";
+          if (offerText && this.handlers.onAutoJoinOffer) {
+            this.handlers.onAutoJoinOffer(conn.peer, offerText);
+          }
+          return;
+        }
+
+        if (msg.type === AUTO_JOIN_WEBRTC_ANSWER && !this._isHost) {
+          const answerText = (msg.answer as string) || "";
+          const resolver = this._autoJoinAnswerResolvers.get(conn.peer);
+          if (resolver) {
+            clearTimeout(resolver.timer);
+            this._autoJoinAnswerResolvers.delete(conn.peer);
+            resolver.resolve(answerText);
+          }
+          if (this.handlers.onAutoJoinAnswer) {
+            this.handlers.onAutoJoinAnswer(conn.peer, answerText);
+          }
+          return;
+        }
+
+        if (msg.type === AUTO_JOIN_FAILED && !this._isHost) {
+          const resolver = this._autoJoinAnswerResolvers.get(conn.peer);
+          if (resolver) {
+            clearTimeout(resolver.timer);
+            this._autoJoinAnswerResolvers.delete(conn.peer);
+            resolver.reject(new Error(String(msg.reason || "Auto-join failed")));
+          }
+          return;
+        }
+
         if (msg?.type) this.handlers.onMessage(conn.peer, msg);
       } catch {
         // ignore malformed
@@ -202,6 +253,12 @@ export class PeerJsRoomTransport {
 
     conn.on("close", () => {
       this.connections.delete(conn.peer);
+      const resolver = this._autoJoinAnswerResolvers.get(conn.peer);
+      if (resolver) {
+        clearTimeout(resolver.timer);
+        this._autoJoinAnswerResolvers.delete(conn.peer);
+        resolver.reject(new Error("Connection closed during auto-join"));
+      }
       this.handlers.onPeerDisconnected(conn.peer);
     });
 
@@ -210,23 +267,56 @@ export class PeerJsRoomTransport {
     });
   }
 
-  sendTo(peerId: string, msg: RoomMessage): void {
-    const conn = this.connections.get(peerId);
-    if (conn && conn.open) conn.send(msg);
-  }
-
-  broadcast(msg: RoomMessage): void {
-    for (const conn of this.connections.values()) {
-      if (conn.open) conn.send(msg);
-    }
+  /**
+   * Host: accept a PeerNode offer from a player and send back the answer.
+   * Call this after processing the offer through PeerNode.acceptManualOffer().
+   */
+  sendAutoJoinAnswer(peerId: string, answerText: string): void {
+    this.sendTo(peerId, {
+      type: AUTO_JOIN_WEBRTC_ANSWER,
+      answer: answerText,
+    });
   }
 
   /**
-   * Host: add a media stream to relay to a specific peer (for mic audio).
-   * This requires getting the underlying RTCPeerConnection from PeerJS.
-   * PeerJS doesn't expose this directly for DataConnections — media uses peer.call().
-   * For now, mic relay still uses the existing PeerNode/WebRTC path alongside this transport.
+   * Host: notify a player that their auto-join failed.
    */
+  sendAutoJoinFailed(peerId: string, reason: string): void {
+    this.sendTo(peerId, {
+      type: AUTO_JOIN_FAILED,
+      reason,
+    });
+  }
+
+  /**
+   * Player: send a PeerNode offer to the host over PeerJS.
+   */
+  sendAutoJoinOffer(offerText: string): void {
+    if (!this._roomCode) throw new Error("Not in a room");
+    this.sendTo(this._roomCode, {
+      type: AUTO_JOIN_WEBRTC_OFFER,
+      offer: offerText,
+    });
+  }
+
+  /**
+   * Player: wait for the host's answer after sending an offer.
+   */
+  waitForAutoJoinAnswer(timeoutMs = 30000): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this._autoJoinAnswerResolvers.delete(this._roomCode || "unknown");
+        reject(new Error("Auto-join answer timeout"));
+      }, timeoutMs);
+
+      this._autoJoinAnswerResolvers.set(this._roomCode || "unknown", {
+        resolve,
+        reject,
+        timer,
+      });
+    });
+  }
+
   disconnectPeer(peerId: string): void {
     const conn = this.connections.get(peerId);
     if (conn) {

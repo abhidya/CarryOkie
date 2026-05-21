@@ -332,10 +332,10 @@ checks.push([
 checks.push([
   "receiver renders join QR lyrics singers and tab-cast live mics",
   cast.includes("import { qrSvg }") &&
-    cast.includes('id="joinQr"') &&
-    cast.includes('id="liveMics"') &&
+    cast.includes('id="receiverJoinQr"') &&
+    cast.includes('id="receiverLiveMicStatus"') &&
     cast.includes('id="retryLiveMics"') &&
-    cast.includes('id="receiverStatus"') &&
+    cast.includes('id="receiverStageStatus"') &&
     cast.includes("receiverId") &&
     cast.includes("RECEIVER_OFFER") &&
     cast.includes("RECEIVER_PLAYBACK_SYNC") &&

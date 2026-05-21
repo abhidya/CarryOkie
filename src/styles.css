@@ -898,3 +898,200 @@ a:active,
     display: none;
   }
 }
+
+#receiverTvStage {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #110b2d, #062537);
+  color: white;
+  padding: 32px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+#receiverTvStage .page-hero {
+  margin-bottom: 8px;
+}
+#receiverTvStage .page-hero h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+#receiverTvStage .page-hero .eyebrow {
+  margin: 0 0 4px;
+  opacity: 0.7;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+#receiverRoomCode.room {
+  font-size: 10vw;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-align: center;
+  margin: 8px 0;
+}
+#receiverJoinQr {
+  text-align: center;
+}
+#receiverJoinLink {
+  display: block;
+  text-align: center;
+  color: #66d9ff;
+  text-decoration: none;
+  font-size: 1.1rem;
+  margin: 8px 0;
+}
+#receiverJoinLink:hover {
+  text-decoration: underline;
+}
+#receiverStageStatus .status-pill {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: #1a2744;
+  border: 1px solid #2a3f6a;
+  font-size: 0.95rem;
+}
+#receiverStageStatus .live-status {
+  margin-left: 8px;
+  background: #0a3a2a;
+  border-color: #1a6a4a;
+}
+#receiverActiveSingers,
+#receiverNowPlaying,
+#receiverQueuePreview,
+#receiverLiveMicStatus {
+  background: #0a1525;
+  border: 1px solid #1a2a4a;
+  border-radius: 16px;
+  padding: 16px 20px;
+}
+#receiverActiveSingers h2,
+#receiverNowPlaying h2,
+#receiverQueuePreview h2,
+#receiverLiveMicStatus h2 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+#receiverActiveSingers p,
+#receiverNowPlaying p {
+  margin: 4px 0;
+  font-size: 1.1rem;
+}
+#receiverQueuePreview ol {
+  margin: 0;
+  padding-left: 20px;
+}
+#receiverQueuePreview li {
+  padding: 6px 0;
+  border-bottom: 1px solid #1a2a4a;
+}
+#receiverQueuePreview li:last-child {
+  border-bottom: none;
+}
+#receiverMediaRegion {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin: 12px 0;
+}
+#receiverMediaRegion .castMediaElement {
+  width: 100%;
+  border-radius: 18px;
+  background: #000;
+  box-shadow: 0 30px 90px #000b, 0 0 0 1px #66d9ff33;
+}
+#receiverLyricsRegion.lyrics.big {
+  min-height: 120px;
+  padding: 16px;
+  background: #0a1020;
+  border-radius: 14px;
+  border: 1px solid #1a2a4a;
+}
+#receiverLyricsRegion p {
+  font-size: 2.5vw;
+  margin: 8px 0;
+  opacity: 0.6;
+  transition: opacity 200ms, transform 200ms;
+}
+#receiverLyricsRegion p.active {
+  opacity: 1;
+  text-shadow: 0 0 22px #7cf3b288;
+  animation: lyricLift 800ms ease both;
+}
+#receiverLiveMicStatus .subtle {
+  opacity: 0.7;
+  font-size: 0.9rem;
+  margin: 6px 0;
+}
+#receiverLiveMicStatus button {
+  margin: 8px 8px 0 0;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid #2a3f6a;
+  background: #1a2744;
+  color: white;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+#receiverLiveMicStatus button:hover {
+  background: #2a3f6a;
+}
+.diagnostics,
+#receiverDiagnosticsToggle {
+  margin-top: 16px;
+  border: 1px solid #1a2a4a;
+  border-radius: 12px;
+  background: #0a1020;
+}
+.diagnostics summary,
+#receiverDiagnosticsToggle summary {
+  padding: 10px 16px;
+  cursor: pointer;
+  opacity: 0.7;
+  font-size: 0.9rem;
+}
+.diagnostics summary:hover,
+#receiverDiagnosticsToggle summary:hover {
+  opacity: 1;
+}
+#receiverDiagnostics,
+#receiverDiagnosticsPanel {
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+#receiverDiagnostics p,
+#receiverDiagnosticsPanel p {
+  margin: 4px 0;
+}
+#receiverDiagnostics .warn,
+#receiverDiagnosticsPanel .warn {
+  color: #ff9a8b;
+}
+
+@media (max-width: 760px) {
+  #receiverTvStage {
+    padding: 20px 16px;
+    overflow-x: hidden;
+  }
+  #receiverRoomCode.room {
+    font-size: 14vw;
+    word-break: break-all;
+    max-width: 100%;
+  }
+  #receiverLyricsRegion p {
+    font-size: 5vw;
+  }
+  #receiverMediaRegion {
+    grid-template-columns: 1fr;
+  }
+  #receiverJoinQr {
+    max-width: 100%;
+  }
+  #receiverJoinQr .qr {
+    max-width: min(200px, 100%);
+  }
+}

@@ -1,4 +1,6 @@
 import { qrSvg } from "./qr.ts";
+import { PeerJsRoomTransport } from "./peer/PeerJsRoomTransport.ts";
+import { receiverShell } from "./app/dom.ts";
 import {
   type ProtectedSong,
   resolvePlayableMediaUrl,
@@ -440,14 +442,12 @@ export function receiverApp(root: HTMLElement): void {
     audioDiagnostics: null,
     receiverMicLatencyStats: null,
   };
-  root.innerHTML = `<main class="tv"><section class="tv-info"><p class="eyebrow">CarryOkie receiver</p><h1>CarryOkie</h1><div class="stage-art receiver-stage" aria-hidden="true"><div class="stage-orb"></div><div class="stage-mic"></div><div class="soundwave"><span></span><span></span><span></span><span></span><span></span></div></div><div class="room" id="room">${escapeHtml(initialRoomCode)}</div><div id="joinQr"></div><p>Scan/open /player. Tab-cast receiver mirrors host room, queue, singers, backing track, and live singer mics.</p><section id="singers"></section><section id="receiverStatus"></section><section id="audioDiagnostics"></section><section id="liveMics"><h2>Live mics</h2><p>Waiting for host tab audio…</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button></section></section><section class="tv-stage"><video id="media" class="castMediaElement" controls playsinline></video><section id="lyrics" class="lyrics big"></section><section id="queue"></section></section></main>`;
-  const media = root.querySelector<HTMLVideoElement>("#media")!;
-  const liveMics = root.querySelector<HTMLElement>("#liveMics")!;
-  const retryLiveMicsButton =
-    root.querySelector<HTMLButtonElement>("#retryLiveMics")!;
-  const startReceiverAudioButton = root.querySelector<HTMLButtonElement>(
-    "#startReceiverAudio",
-  )!;
+  receiverShell(root);
+  const main = root.querySelector<HTMLElement>("#main")!;
+  main.innerHTML = `<div id="receiverRoomCode" class="room">${escapeHtml(initialRoomCode)}</div><div id="receiverJoinQr"></div><a id="receiverJoinLink" href="#">Scan to Join Room</a><div id="receiverStageStatus"><p class="status-pill">${escapeHtml("Waiting for host tab…")}</p></div><section id="receiverActiveSingers"><h2>Singers</h2><p>No active singers</p></section><section id="receiverNowPlaying"><h2>Now Playing</h2><p>Waiting for song…</p></section><section id="receiverMediaRegion"><video id="media" class="castMediaElement" controls playsinline></video><section id="receiverLyricsRegion" class="lyrics big"></section></section><section id="receiverQueuePreview"><h2>Queue</h2><ol></ol></section><section id="receiverLiveMicStatus"><h2>Live Mics</h2><p>Waiting for singer mic…</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button></section>`;
+  const media = main.querySelector<HTMLVideoElement>("#media")!;
+  const retryLiveMicsButton = main.querySelector<HTMLButtonElement>("#retryLiveMics")!;
+  const startReceiverAudioButton = main.querySelector<HTMLButtonElement>("#startReceiverAudio")!;
   const receiverId = crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
   let loadedSongId = "";
   let mediaReady = false;
@@ -485,7 +485,7 @@ export function receiverApp(root: HTMLElement): void {
     return "No live mic tracks connected.";
   }
   function renderAudioDiagnostics(): void {
-    const diagEl = root.querySelector("#audioDiagnostics");
+    const diagEl = root.querySelector("#receiverDiagnosticsPanel");
     if (!diagEl) return;
     const d = state.audioDiagnostics;
     const { audible, muted, publishing } = singerMicSummary();
@@ -518,58 +518,43 @@ export function receiverApp(root: HTMLElement): void {
     }
   }
   function render(): void {
-    root.querySelector("#room")!.textContent = state.roomCode;
-    const playerUrl = new URL(
-      `../player/?room=${encodeURIComponent(state.roomCode)}`,
-      location.href,
-    ).toString();
-    root.querySelector("#joinQr")!.innerHTML =
-      state.roomCode === "------"
-        ? ""
-        : qrSvg(playerUrl, { scale: 3, title: "Join CarryOkie room" });
-    const queueSingerLabel = (
-      queueItem: (typeof state.queue)[number],
-    ): string =>
-      (queueItem.singerNames?.length
-        ? queueItem.singerNames
-        : (queueItem.singerNumbers || []).map(
-            (singerNumber) => `#${singerNumber}`,
-          )
-      ).join(", ");
-    root.querySelector("#queue")!.innerHTML =
-      "<h2>Queue</h2><ol>" +
-      state.queue
-        .map(
-          (q) =>
-            `<li>${escapeHtml(q.title || q.songId)} singers ${escapeHtml(queueSingerLabel(q))}</li>`,
-        )
-        .join("") +
-      "</ol>";
-    root.querySelector("#singers")!.innerHTML =
-      "<h2>Singers</h2>" +
-      ((state.singers || [])
-        .map(
-          (p) =>
-            `<p>#${escapeHtml(p.playerNumber)} ${escapeHtml(p.displayName)}</p>`,
-        )
-        .join("") || "<p>No active singers</p>");
-    const resolvedLiveMicStatus =
-      state.liveMicStatus || (liveMicTrackIds.size ? liveMicStatus() : "");
-    root.querySelector("#receiverStatus")!.innerHTML =
-      `<p class="status-pill">${escapeHtml(state.status)}</p>` +
-      (resolvedLiveMicStatus
-        ? `<p class="status-pill live-status">${escapeHtml(resolvedLiveMicStatus)}</p>`
-        : "");
-    renderAudioDiagnostics();
+    const roomEl = main.querySelector("#receiverRoomCode");
+    if (roomEl) roomEl.textContent = state.roomCode;
+
+    const playerUrl = PeerJsRoomTransport
+      ? PeerJsRoomTransport.playerJoinUrl(state.roomCode)
+      : new URL(`../player/?room=${encodeURIComponent(state.roomCode)}`, location.href).toString();
+    const joinLink = main.querySelector<HTMLAnchorElement>("#receiverJoinLink");
+    if (joinLink) { joinLink.href = playerUrl; joinLink.textContent = "Scan to Join Room"; }
+    const joinQr = main.querySelector("#receiverJoinQr");
+    if (joinQr) joinQr.innerHTML = state.roomCode === "------" ? "" : qrSvg(playerUrl, { scale: 4, title: "Join CarryOkie room" });
+
+    const queueSingerLabel = (queueItem: (typeof state.queue)[number]): string =>
+      (queueItem.singerNames?.length ? queueItem.singerNames : (queueItem.singerNumbers || []).map(singerNumber => `#${singerNumber}`)).join(", ");
+    const queuePreview = main.querySelector("#receiverQueuePreview");
+    if (queuePreview) queuePreview.innerHTML = `<h2>Queue</h2><ol>` + state.queue.map(q => `<li>${escapeHtml(q.title || q.songId)} singers ${escapeHtml(queueSingerLabel(q))}</li>`).join("") + `</ol>`;
+
+    const singers = main.querySelector("#receiverActiveSingers");
+    if (singers) singers.innerHTML = "<h2>Singers</h2>" + ((state.singers || []).map(p => `<p>#${escapeHtml(p.playerNumber)} ${escapeHtml(p.displayName)}</p>`).join("") || "<p>No active singers</p>");
+
+    const nowPlaying = main.querySelector("#receiverNowPlaying");
+    if (nowPlaying) nowPlaying.innerHTML = `<h2>Now Playing</h2><p>${state.song ? `${escapeHtml(state.song.title)} — ${escapeHtml(state.song.artist)}` : "Waiting for song…"}</p>`;
+
+    const resolvedLiveMicStatus = state.liveMicStatus || (liveMicTrackIds.size ? liveMicStatus() : "");
+    const stageStatus = main.querySelector("#receiverStageStatus");
+    if (stageStatus) stageStatus.innerHTML = `<p class="status-pill">${escapeHtml(state.status)}</p>` + (resolvedLiveMicStatus ? `<p class="status-pill live-status">${escapeHtml(resolvedLiveMicStatus)}</p>` : "");
+
+    const liveMicStatus = main.querySelector("#receiverLiveMicStatus");
+    if (liveMicStatus) {
+      const { audible, muted, publishing } = singerMicSummary();
+      liveMicStatus.innerHTML = `<h2>Live Mics</h2><p class="subtle">${audible.length ? `Playing ${audible.length} unmuted live mic${audible.length === 1 ? "" : "s"}.` : muted.length ? "Mic connected, but singer is muted." : "Waiting for singer mic…"}</p><p class="subtle">Publishing: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>`;
+      liveMicStatus.querySelector("#startReceiverAudio")?.addEventListener("click", () => { state.audioOutputUnlocked = true; void tryPlayLiveMics(); });
+      liveMicStatus.querySelector("#retryLiveMics")?.addEventListener("click", () => { void tryPlayLiveMics(); });
+    }
+
     const active = activeLine();
-    root.querySelector("#lyrics")!.innerHTML = state.lines.length
-      ? state.lines
-          .map(
-            (l) =>
-              `<p class="${l === active ? "active" : ""}">${escapeHtml(l.text)}</p>`,
-          )
-          .join("")
-      : "<p>Waiting for lyrics…</p>";
+    const lyricsRegion = main.querySelector("#receiverLyricsRegion");
+    if (lyricsRegion) lyricsRegion.innerHTML = state.lines.length ? state.lines.map(l => `<p class="${l === active ? "active" : ""}">${escapeHtml(l.text)}</p>`).join("") : "<p>Waiting for lyrics…</p>";
   }
   async function loadLyrics(song: Song | null): Promise<void> {
     if (isProtectedMedia(song as Parameters<typeof isProtectedMedia>[0])) {
@@ -746,20 +731,26 @@ export function receiverApp(root: HTMLElement): void {
   }
   function ensureLiveMicAudio(): HTMLAudioElement {
     if (liveMicAudio) {
-      const subtitle = liveMics.querySelector("p.subtle");
-      if (subtitle) subtitle.outerHTML = liveMicSummaryHtml();
+      const liveMicSection = main.querySelector<HTMLElement>("#receiverLiveMicStatus");
+      if (liveMicSection) {
+        const subtitle = liveMicSection.querySelector("p.subtle");
+        if (subtitle) subtitle.outerHTML = liveMicSummaryHtml();
+      }
       return liveMicAudio;
     }
-    liveMics.innerHTML = `<h2>Live mics</h2>${liveMicSummaryHtml()}<button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>`;
-    liveMics
-      .querySelector("#startReceiverAudio")
-      ?.addEventListener("click", () => {
-        state.audioOutputUnlocked = true;
+    const liveMicSection = main.querySelector<HTMLElement>("#receiverLiveMicStatus");
+    if (liveMicSection) {
+      liveMicSection.innerHTML = `<h2>Live Mics</h2>${liveMicSummaryHtml()}<button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>`;
+      liveMicSection
+        .querySelector("#startReceiverAudio")
+        ?.addEventListener("click", () => {
+          state.audioOutputUnlocked = true;
+          void tryPlayLiveMics();
+        });
+      liveMicSection.querySelector("#retryLiveMics")?.addEventListener("click", () => {
         void tryPlayLiveMics();
       });
-    liveMics.querySelector("#retryLiveMics")?.addEventListener("click", () => {
-      void tryPlayLiveMics();
-    });
+    }
     liveMicAudio = document.createElement("audio");
     liveMicAudio.autoplay = true;
     liveMicAudio.controls = true;
@@ -771,7 +762,8 @@ export function receiverApp(root: HTMLElement): void {
     liveMicAudio.muted = true;
     liveMicAudio.volume = 1;
     liveMicAudio.srcObject = liveMicStream;
-    liveMics.appendChild(liveMicAudio);
+    const targetSection = main.querySelector<HTMLElement>("#receiverLiveMicStatus");
+    if (targetSection) targetSection.appendChild(liveMicAudio);
     return liveMicAudio;
   }
   async function ensureLiveMicOutputGraph(): Promise<void> {

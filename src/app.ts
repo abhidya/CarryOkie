@@ -37,7 +37,7 @@ import { PhoneAudio, singerWarning } from "./audio.ts";
 import { CastController, receiverApp } from "./cast.ts";
 import { deriveTvMediaPositionMs } from "./sync.ts";
 import { resolvePlayableMediaUrl, isProtectedMedia } from "./protectedMedia.ts";
-import { $, commonChrome, escapeHtml, logToPage } from "./app/dom.ts";
+import { $, commonChrome, hostShell, playerShell, escapeHtml, logToPage } from "./app/dom.ts";
 import { formatSongTitle, loadSongCatalog } from "./app/catalog.ts";
 import { lyricView } from "./app/lyricsView.ts";
 import {
@@ -49,6 +49,8 @@ import { queueHtml as renderQueueHtml } from "./app/queueView.ts";
 import {
   PeerJsRoomTransport,
   type RoomMessage,
+  AUTO_JOIN_WEBRTC_OFFER,
+  AUTO_JOIN_WEBRTC_ANSWER,
 } from "./peer/PeerJsRoomTransport.ts";
 let room = loadRoom();
 let player = JSON.parse(localStorage.getItem("carryokie.player") || "null");
@@ -154,6 +156,65 @@ async function updateHostMicLatencyStats() {
   }
 }
 const peerCloseTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function deriveMicLabel(p) {
+  if (!p?.isSingerForCurrentSong) return "Mic muted until enabled.";
+  if (!audio?.localStream) return "Needs microphone permission.";
+  if (p.micState?.muted) return "Ready, muted.";
+  if (!audioPipeline.hostRemoteAudioTracks) return "Sending to host.";
+  if (!audioPipeline.receiverReady) return "Host receiving.";
+  if (!audioPipeline.receiverAnswerReceivedAt) return "Host receiving.";
+  const receiverTracks = audioPipeline.receiverTracksAdded || 0;
+  if (receiverTracks > 0) return "Live on TV.";
+  return "Sending to host.";
+}
+
+function deriveShowReadiness() {
+  const qrJoinState = peerJsTransport
+    ? peerJsTransport.state === "ready" ? "ready"
+    : peerJsTransport.state === "starting" ? "starting"
+    : peerJsTransport.state === "failed" ? "failed"
+    : "manual_only"
+    : "manual_only";
+  const tvState = audioPipeline.receiverReady
+    ? audioPipeline.receiverPcConnectionState === "connected" ? "ready"
+    : audioPipeline.receiverPcConnectionState === "connecting" ? "connecting"
+    : audioPipeline.receiverPcConnectionState === "failed" ? "failed"
+    : "needs_tap"
+    : "not_open";
+  const activeItem = room?.queue?.find(q => q.status === "active");
+  return {
+    room: room ? "ready" : "missing",
+    qrJoin: qrJoinState,
+    tv: tvState,
+    queue: {
+      requested: room?.queue?.filter(q => q.status === "requested").length || 0,
+      queued: room?.queue?.filter(q => q.status === "queued").length || 0,
+      activeTitle: activeItem ? songTitle(activeItem.songId) : undefined,
+    },
+    players: (room?.players || []).map(p => ({
+      playerId: p.playerId,
+      peerId: p.peerId,
+      number: p.playerNumber,
+      name: p.displayName,
+      connection: p.connectionState === "connected" ? "connected"
+        : p.connectionState === "disconnected" ? "lost" : "joining",
+      singerForCurrentSong: !!p.isSingerForCurrentSong,
+      mic: deriveMicLabelForPlayer(p),
+    })),
+  };
+}
+
+function deriveMicLabelForPlayer(p) {
+  if (!p.isSingerForCurrentSong) return "off";
+  const playerInRoom = room?.players?.find(rp => rp.playerId === p.playerId);
+  if (!playerInRoom?.micState?.enabled) return "permission_needed";
+  if (playerInRoom.micState.muted) return "muted";
+  if (!audioPipeline.hostRemoteAudioTracks) return "sending";
+  if (!audioPipeline.receiverReady || !audioPipeline.receiverAnswerReceivedAt) return "host_receiving";
+  if (audioPipeline.receiverTracksAdded > 0) return "live_on_tv";
+  return "sending";
+}
 function persist() {
   if (room) saveRoom(room);
   if (player) localStorage.setItem("carryokie.player", JSON.stringify(player));
@@ -311,7 +372,7 @@ function handlePlayerLeft(remotePeerId) {
   peerNode.broadcast({ type: RPC.PLAYER_LEFT, peerId: remotePeerId, room });
   log(`Player #${target.playerNumber} ${target.displayName} disconnected.`);
   persist();
-  renderHost($("#main"));
+  renderHost(document.body);
 }
 function broadcastRoom(type = RPC.ROOM_STATE_SNAPSHOT) {
   peerNode?.broadcast({ type, room });
@@ -382,7 +443,7 @@ function publishMicStateChange(target) {
   if (!target) return;
   broadcastRoom(RPC.ROOM_STATE_SNAPSHOT);
   publishReceiverState();
-  renderHost($("#main"));
+  renderHost(document.body);
 }
 function plainRtcDescription(description: RTCSessionDescription | null) {
   return description ? { type: description.type, sdp: description.sdp } : null;
@@ -778,7 +839,7 @@ function handleRpc(remotePeerId, msg) {
     if (changed) {
       broadcastRoom();
       persist();
-      renderHost($("#main"));
+      renderHost(document.body);
     }
   }
   if (msg.type === RPC.ROOM_STATE_SNAPSHOT && !player?.isHost) {
@@ -794,7 +855,7 @@ function handleRpc(remotePeerId, msg) {
     try {
       handleQueueAddRequest(remotePeerId, msg);
       publishQueueUpdate();
-      renderHost($("#main"));
+      renderHost(document.body);
     } catch (e) {
       peerNode.send(remotePeerId, {
         type: RPC.ERROR_NOTICE,
@@ -807,7 +868,7 @@ function handleRpc(remotePeerId, msg) {
     try {
       applyPhoneQueueUpdate(remotePeerId, msg);
       publishQueueUpdate();
-      renderHost($("#main"));
+      renderHost(document.body);
     } catch (e) {
       peerNode.send(remotePeerId, {
         type: RPC.ERROR_NOTICE,
@@ -848,7 +909,7 @@ function handleRpc(remotePeerId, msg) {
         players: room.players.filter((p) => p.isSingerForCurrentSong),
       });
       persist();
-      renderHost($("#main"));
+      renderHost(document.body);
     } else
       peerNode.send(remotePeerId, {
         type: RPC.ERROR_NOTICE,
@@ -934,138 +995,152 @@ export async function hostPage(root) {
   }
   setupPeer(player.peerId);
   setupReceiverBridge();
-  commonChrome(root, "Host Controller");
-  renderHost($("#main"));
+  hostShell(root);
+  await initPeerJsHost();
+  renderHost(root);
+}
+
+async function initPeerJsHost() {
+  if (!room?.roomCode) return;
+  peerJsTransport = new PeerJsRoomTransport({
+    onStateChange: (state) => {
+      const el = $("#hostQrJoinStatus");
+      if (el) {
+        el.textContent = state === "ready" ? "QR Join Ready"
+          : state === "starting" ? "QR Join starting..."
+          : state === "failed" ? "Automatic join unavailable — manual fallback ready."
+          : state;
+      }
+      renderHost(document.body);
+    },
+    onMessage: () => {},
+    onPeerConnected: (peerId) => {
+      log(`PeerJS player connected: ${peerId}`);
+    },
+    onPeerDisconnected: (peerId) => {
+      log(`PeerJS player disconnected: ${peerId}`);
+    },
+    onError: (err) => {
+      log(`PeerJS error: ${err.message}`);
+    },
+    onAutoJoinOffer: async (peerId, offerText) => {
+      try {
+        const answerText = await peerNode.acceptManualOffer(offerText);
+        peerJsTransport.sendAutoJoinAnswer(peerId, answerText);
+        log(`Auto-join: answered ${peerId}`);
+      } catch (e) {
+        log(`Auto-join failed for ${peerId}: ${e.message}`);
+        peerJsTransport.sendAutoJoinFailed(peerId, e.message);
+      }
+    },
+  });
+  globalThis.__carryokiePeerJsTransport = peerJsTransport;
+  try {
+    await peerJsTransport.startHost(room.roomCode);
+    log(`PeerJS host ready: room ${room.roomCode}`);
+  } catch (e) {
+    log(`PeerJS host failed: ${e.message}`);
+  }
+  renderHost(document.body);
 }
 function renderHost(main) {
-  const setupComplete = room.players.length > 1 && room.queue.length > 0;
-  const tvBleedWarn = room.players.some((p) => p.isSingerForCurrentSong)
-    ? '<p class="warn">TV bleed risk: singers should use headphones. Lyrics/video on TV only.</p>'
-    : "";
-  const activeSingers = room.players.filter(
-    (p) => p.isSingerForCurrentSong,
-  ).length;
-  main.innerHTML = `<section class="host-dashboard"><div class="room-spotlight card"><div><p class="eyebrow">Host room</p><h2>Room ${escapeHtml(room.roomCode)}</h2><p class="subtle">${room.players.length}/5 players · ${activeSingers} active singer(s) · ${room.queue.length} queue item(s)</p><ol class="quickstart"><li><strong>Share room:</strong> singers open the player join link.</li><li><strong>Pair one phone:</strong> player makes a code, host answers once.</li><li><strong>Start room:</strong> approve queue, connect TV, pick singer.</li></ol></div><div class="stage-art compact" aria-hidden="true"><div class="stage-orb"></div><div class="soundwave"><span></span><span></span><span></span><span></span><span></span></div></div></div><section class="grid"><details class="card" open><summary>1. Share this room</summary><p><a href="../player/?room=${escapeHtml(room.roomCode)}">Open player join link</a></p><p><a href="${escapeHtml(receiverUrl())}" target="_blank" rel="noreferrer">Open TV receiver tab</a></p><p class="hint">Chrome tab cast path: open the receiver tab first, then cast that tab.</p><button id="newRoom">Start over with a new room</button>${tvBleedWarn}</details><details class="card"${setupComplete ? "" : " open"}><summary>2. Pair a phone</summary><p>Player creates a join code. Paste or scan it here, then send back the host answer.</p><textarea id="offer" placeholder="Paste player offer/link/chunks"></textarea><div class="button-row"><button id="scanOfferQr">Scan player QR</button><button id="answerOffer" class="primary">Create host answer</button></div><div id="answerOut"></div></details><div class="card queue-card"><h2>3. Run the room</h2><div class="button-row"><button id="acceptAll">Approve waiting songs</button><button id="startNext" class="primary">Start next song</button><button id="pauseSong">Pause song</button><button id="resumeSong">Resume song</button></div>${queueHtml(room, "host")}</div><details class="card"><summary>TV controls</summary><p id="castStatus" class="status-pill live-status">Click to connect to Chromecast</p><button id="castBtn" class="primary">Connect TV / cast current song</button><button id="castLoadBtn" style="display:none">Reload current song on TV</button><div class="button-row"><button id="castPlayBtn" style="display:none">Play</button><button id="castPause" style="display:none">Pause</button></div><label>Seek seconds <input id="castSeekSeconds" type="number" min="0" value="0"></label><button id="castSeek" style="display:none">Seek</button><label>Cast media origin <input id="castOrigin" value="${escapeHtml(castOrigin())}" placeholder="http://192.168.x.x:4174"></label><p class="hint">Default Chromecast receiver plays media only. For room UI and live mics, cast the receiver tab link above.</p><pre id="castState"></pre></details><details class="card singer-card"><summary>Singers / mic control</summary><p class="subtle">Check who should be live on this song.</p>${room.players.map((p) => `<div class="inline-choice"><label><input type="checkbox" class="singer" value="${escapeHtml(p.playerId)}" ${p.isSingerForCurrentSong ? "checked" : ""}> #${p.playerNumber} ${escapeHtml(p.displayName)}</label><button class="mutePlayer" data-player-id="${escapeHtml(p.playerId)}">Mute #${p.playerNumber}</button></div>`).join("")}<button id="setSingers" class="primary">Save singer list</button></details><details class="card"><summary>Audio pipeline</summary><pre id="audioPipelineStatus">${escapeHtml(JSON.stringify(audioPipeline, null, 2))}</pre></details></section></section>`;
-  $("#newRoom").onclick = () => {
-    player = makePlayer("host", "Host");
-    player.playerNumber = 1;
-    room = makeRoom(player);
-    persist();
-    location.reload();
-  };
-  $("#scanOfferQr").onclick = async () => {
-    try {
-      await scanQrInto($("#offer") as HTMLTextAreaElement, log);
-    } catch (e) {
-      log(e.message);
-    }
-  };
-  $("#answerOffer").onclick = async () => {
-    try {
-      const encoded = await peerNode.acceptManualOffer($("#offer").value);
-      renderPayloadCard($("#answerOut") as HTMLElement, encoded, "Host answer");
-    } catch (e) {
-      log(e.message);
-    }
-  };
-  $("#acceptAll").onclick = () => {
-    room.queue
-      .filter((q) => q.status === "requested")
-      .forEach((q) => acceptQueue(room, q.queueItemId));
-    publishQueueUpdate();
-    renderHost(main);
-  };
-  $("#startNext").onclick = () => {
-    startQueueItem(nextQueuedItem(room));
-    renderHost(main);
-  };
-  $("#pauseSong").onclick = () => {
-    publishReceiverCommand("CAST_PAUSE");
-    castController?.pause?.();
-    pauseCurrentPlayback();
-    renderHost(main);
-  };
-  $("#resumeSong").onclick = () => {
-    publishReceiverCommand("CAST_PLAY");
-    castController?.play?.().catch((e) => log(e.message));
-    resumeCurrentPlayback();
-    renderHost(main);
-  };
-  $("#setSingers").onclick = () => {
-    assignSingers(
-      room,
-      [...document.querySelectorAll(".singer:checked")].map((i) => i.value),
-    );
-    broadcastRoom(RPC.SINGER_ASSIGNED);
-    sendCastRoomUpdate("CAST_SET_SINGERS", {
-      players: room.players.filter((p) => p.isSingerForCurrentSong),
-    });
-    persist();
-    renderHost(main);
-  };
-  document.querySelectorAll(".acceptItem").forEach(
-    (b) =>
-      (b.onclick = () => {
-        acceptQueue(room, b.dataset.queueId);
-        publishQueueUpdate();
-        renderHost(main);
-      }),
-  );
-  document.querySelectorAll(".startItem").forEach(
-    (b) =>
-      (b.onclick = () => {
-        startQueueItem(
-          room.queue.find((q) => q.queueItemId === b.dataset.queueId),
-        );
-        renderHost(main);
-      }),
-  );
-  document.querySelectorAll(".rejectItem").forEach(
-    (b) =>
-      (b.onclick = () => {
-        rejectQueue(room, b.dataset.queueId);
-        publishQueueUpdate();
-        renderHost(main);
-      }),
-  );
-  document.querySelectorAll(".removeItem").forEach(
-    (b) =>
-      (b.onclick = () => {
-        removeQueueItem(room, b.dataset.queueId);
-        publishQueueUpdate();
-        renderHost(main);
-      }),
-  );
-  document.querySelectorAll(".moveUpItem").forEach(
-    (b) =>
-      (b.onclick = () => {
-        moveQueueItem(room, b.dataset.queueId, -1);
-        publishQueueUpdate();
-        renderHost(main);
-      }),
-  );
-  document.querySelectorAll(".moveDownItem").forEach(
-    (b) =>
-      (b.onclick = () => {
-        moveQueueItem(room, b.dataset.queueId, 1);
-        publishQueueUpdate();
-        renderHost(main);
-      }),
-  );
-  document.querySelectorAll(".mutePlayer").forEach(
-    (b) =>
-      (b.onclick = () => {
-        const playerId = b.dataset.playerId;
-        const target = room.players.find((p) => p.playerId === playerId);
-        if (target)
-          peerNode.send(target.peerId, { type: RPC.MIC_MUTED, playerId });
-        log(`Mute sent to #${target?.playerNumber || "?"}`);
-      }),
-  );
+  if (!main || !room) return;
+  const activeSingers = room.players.filter(p => p.isSingerForCurrentSong).length;
+  const liveMicCount = room.players.filter(p => p.isSingerForCurrentSong && p.micState?.enabled && !p.micState?.muted).length;
+  const qrStatus = peerJsTransport
+    ? peerJsTransport.state === "ready" ? "QR Join Ready"
+    : peerJsTransport.state === "starting" ? "Starting..."
+    : peerJsTransport.state === "failed" ? "Unavailable — manual fallback ready"
+    : "Manual only"
+    : "Manual only";
+  const tvStatus = audioPipeline.receiverReady
+    ? audioPipeline.receiverPcConnectionState === "connected" ? "TV Connected"
+    : audioPipeline.receiverPcConnectionState === "failed" ? "TV Failed"
+    : "TV Tab Open"
+    : "TV Not Open";
+
+  const topStatus = $("#hostTopStatus");
+  if (topStatus) {
+    topStatus.innerHTML = `<div class="host-status-grid">
+      <div class="status-item"><span class="status-label">Room</span><span id="hostRoomCode" class="status-value">${escapeHtml(room.roomCode)}</span></div>
+      <div class="status-item"><span class="status-label">TV</span><span id="hostTvStatus" class="status-value">${tvStatus}</span></div>
+      <div class="status-item"><span class="status-label">QR Join</span><span id="hostQrJoinStatus" class="status-value">${qrStatus}</span></div>
+      <div class="status-item"><span class="status-label">Singers</span><span id="hostSingerCount" class="status-value">${room.players.length}/5</span></div>
+      <div class="status-item"><span class="status-label">Live Mics</span><span id="hostLiveMicCount" class="status-value">${liveMicCount}</span></div>
+      <div class="status-item"><span class="status-label">Queue</span><span id="hostQueueCount" class="status-value">${room.queue.length}</span></div>
+    </div>`;
+  }
+
+  const actions = $("#hostActions");
+  if (actions) {
+    actions.innerHTML = `<button id="copySingerLink" class="primary">Copy Singer Link</button><button id="openTvStage">Open TV Stage</button><button id="showJoinQr">Show QR</button><button id="newRoom">Start Over</button>`;
+    $("#copySingerLink").onclick = async () => {
+      const link = new URL(`../player/?room=${encodeURIComponent(room.roomCode)}`, location.href).toString();
+      try { await navigator.clipboard.writeText(link); } catch {}
+      log("Singer link copied.");
+    };
+    $("#openTvStage").onclick = () => window.open(receiverUrl(), "_blank");
+    $("#showJoinQr").onclick = () => {
+      const panel = $("#hostPanels");
+      if (panel) {
+        const playerUrl = new URL(`../player/?room=${encodeURIComponent(room.roomCode)}`, location.href).toString();
+        const peerJsUrl = peerJsTransport ? PeerJsRoomTransport.playerJoinUrl(room.roomCode) : playerUrl;
+        panel.innerHTML = `<div class="card"><h2>Singer Join QR</h2><div id="showQrContainer"></div><p><a href="${escapeHtml(peerJsUrl)}" id="singerJoinLink">${escapeHtml(peerJsUrl)}</a></p></div>`;
+        const qrContainer = $("#showQrContainer");
+        if (qrContainer) qrContainer.innerHTML = qrSvg(peerJsUrl, { scale: 4, title: "Join CarryOkie room" });
+      }
+    };
+    $("#newRoom").onclick = () => {
+      player = makePlayer("host", "Host");
+      player.playerNumber = 1;
+      room = makeRoom(player);
+      persist();
+      location.reload();
+    };
+  }
+
+  const panels = $("#hostPanels");
+  if (panels) {
+    const setupComplete = room.players.length > 1 && room.queue.length > 0;
+    panels.innerHTML = `<div class="host-panels">
+      <details class="card" ${setupComplete ? "" : "open"}><summary>Setup</summary><p>Share the singer link or QR above. Singers scan and join automatically.</p><p class="hint">Chrome tab cast: open TV Stage first, then cast that tab.</p></details>
+      <div class="card queue-card"><h2>Run the Room</h2><div class="button-row"><button id="acceptAll">Approve Waiting</button><button id="startNext" class="primary">Start Next</button><button id="pauseSong">Pause</button><button id="resumeSong">Resume</button></div>${queueHtml(room, "host")}</div>
+      <details class="card"><summary>Singers (${activeSingers} active)</summary>${room.players.map(p => `<div class="singer-row"><label class="check"><input type="checkbox" class="singer" value="${p.playerId}" ${p.isSingerForCurrentSong ? "checked" : ""}> #${p.playerNumber || "?"} ${escapeHtml(p.displayName)} ${p.micState?.enabled ? (p.micState.muted ? "(muted)" : "(live)") : ""}</label></div>`).join("")}<div class="button-row"><button id="setSingers" class="primary">Update Singers</button></div></details>
+      <details class="card"><summary>Now Playing</summary>${room.currentQueueItemId ? `<p>${escapeHtml(songTitle(room.currentSongId || ""))}</p>` : "<p>No song active</p>"}${room.players.some(p => p.isSingerForCurrentSong) ? '<p class="warn">TV bleed risk: singers should use headphones.</p>' : ""}</details>
+    </div>`;
+    $("#acceptAll").onclick = () => {
+      room.queue.filter(q => q.status === "requested").forEach(q => acceptQueue(room, q.queueItemId));
+      publishQueueUpdate();
+      renderHost(main);
+    };
+    $("#startNext").onclick = () => { startQueueItem(nextQueuedItem(room)); renderHost(main); };
+    $("#pauseSong").onclick = () => { publishReceiverCommand("CAST_PAUSE"); castController?.pause?.(); pauseCurrentPlayback(); renderHost(main); };
+    $("#resumeSong").onclick = () => { publishReceiverCommand("CAST_PLAY"); castController?.play?.().catch(e => log(e.message)); resumeCurrentPlayback(); renderHost(main); };
+    $("#setSingers").onclick = () => {
+      assignSingers(room, [...document.querySelectorAll(".singer:checked")].map(i => i.value));
+      broadcastRoom(RPC.SINGER_ASSIGNED);
+      sendCastRoomUpdate("CAST_SET_SINGERS", { players: room.players.filter(p => p.isSingerForCurrentSong) });
+      persist();
+      renderHost(main);
+    };
+    document.querySelectorAll(".acceptItem").forEach(b => b.onclick = () => { acceptQueue(room, b.dataset.queueId); publishQueueUpdate(); renderHost(main); });
+    document.querySelectorAll(".startItem").forEach(b => b.onclick = () => { startQueueItem(room.queue.find(q => q.queueItemId === b.dataset.queueId)); renderHost(main); });
+    document.querySelectorAll(".rejectItem").forEach(b => b.onclick = () => { rejectQueue(room, b.dataset.queueId); publishQueueUpdate(); renderHost(main); });
+    document.querySelectorAll(".removeItem").forEach(b => b.onclick = () => { removeQueueItem(room, b.dataset.queueId); publishQueueUpdate(); renderHost(main); });
+    document.querySelectorAll(".moveUpItem").forEach(b => b.onclick = () => { moveQueueItem(room, b.dataset.queueId, -1); publishQueueUpdate(); renderHost(main); });
+    document.querySelectorAll(".moveDownItem").forEach(b => b.onclick = () => { moveQueueItem(room, b.dataset.queueId, 1); publishQueueUpdate(); renderHost(main); });
+    document.querySelectorAll(".mutePlayer").forEach(b => b.onclick = () => { const t = room.players.find(p => p.playerId === b.dataset.playerId); if (t) peerNode.send(t.peerId, { type: RPC.MIC_MUTED, playerId: t.playerId }); });
+  }
+
+  const manualPanel = $("#manualPairingPanel");
+  if (manualPanel) {
+    manualPanel.innerHTML = `<p>Player creates a join code. Paste or scan it here, then send back the host answer.</p><textarea id="offer" placeholder="Paste player offer/link/chunks"></textarea><div class="button-row"><button id="scanOfferQr">Scan player QR</button><button id="answerOffer" class="primary">Create host answer</button></div><div id="answerOut"></div>`;
+    $("#scanOfferQr").onclick = async () => { try { await scanQrInto($("#offer"), log); } catch (e) { log(e.message); } };
+    $("#answerOffer").onclick = async () => { try { const encoded = await peerNode.acceptManualOffer($("#offer").value); renderPayloadCard($("#answerOut"), encoded, "Host answer"); } catch (e) { log(e.message); } };
+  }
+
   $("#castStatus").textContent = "Click to connect to Chromecast";
-  const cast =
-    castController || (castController = new CastController("CC1AD845"));
-  $("#castStatus").textContent = "Click to connect to Chromecast";
+  const cast = castController || (castController = new CastController("CC1AD845"));
   attachCastListeners(cast);
   $("#castBtn").onclick = async () => {
     try {
@@ -1080,40 +1155,12 @@ function renderHost(main) {
       publishReceiverState();
       log("Cast connected");
       await loadCurrentSongOnTv();
-    } catch (e) {
-      $("#castBtn").disabled = false;
-      log(e.message);
-    }
+    } catch (e) { $("#castBtn").disabled = false; log(e.message); }
   };
-  $("#castLoadBtn").onclick = () => {
-    saveCastOrigin();
-    loadCurrentSongOnTv();
-  };
-  $("#castPlayBtn").onclick = () => {
-    publishReceiverCommand("CAST_PLAY");
-    cast.play().catch((e) => log(e.message));
-  };
-  $("#castPause").onclick = () => {
-    publishReceiverCommand("CAST_PAUSE");
-    cast.pause();
-  };
-  $("#castSeek").onclick = () => {
-    const seconds = +$("#castSeekSeconds").value || 0;
-    publishReceiverCommand("CAST_SEEK", { seconds });
-    cast.seek(seconds);
-    if (room?.playbackState) {
-      const now = Date.now();
-      room.playbackState = {
-        ...room.playbackState,
-        tvMediaTimeMs: seconds * 1000,
-        tvMediaTimeSampledAtHostMs: now,
-        seekOffsetMs: 0,
-        lastUpdatedAtHostMs: now,
-      };
-      publishReceiverPlayback(room.playbackState);
-      persist();
-    }
-  };
+  $("#castLoadBtn").onclick = () => { saveCastOrigin(); loadCurrentSongOnTv(); };
+  $("#castPlayBtn").onclick = () => { publishReceiverCommand("CAST_PLAY"); cast.play().catch(e => log(e.message)); };
+  $("#castPause").onclick = () => { publishReceiverCommand("CAST_PAUSE"); cast.pause(); };
+  $("#castSeek").onclick = () => { const seconds = +$("#castSeekSeconds").value || 0; publishReceiverCommand("CAST_SEEK", { seconds }); cast.seek(seconds); if (room?.playbackState) { const now = Date.now(); room.playbackState = { ...room.playbackState, tvMediaTimeMs: seconds * 1000, tvMediaTimeSampledAtHostMs: now, seekOffsetMs: 0, lastUpdatedAtHostMs: now }; publishReceiverPlayback(room.playbackState); persist(); } };
 }
 export async function playerPage(root) {
   await loadCatalog();
@@ -1126,7 +1173,8 @@ export async function playerPage(root) {
   setupPeer(player.peerId);
   audio = new PhoneAudio(log);
   globalThis.__carryokieAudio = audio;
-  commonChrome(root, "Player Phone");
+  playerShell(root);
+  showManualFallbackPanel();
   renderPlayer($("#main"));
 }
 function playerIsJoined() {
@@ -1139,10 +1187,8 @@ function playerIsJoined() {
   );
 }
 function joinRoomHtml(roomCode) {
-  const reconnect = room?.hostPeerId
-    ? `<div class="card"><h2>Reconnect</h2><p>Previously in room <strong>${escapeHtml(room.roomCode)}</strong>. Make a fresh join code, then ask the host for a new answer.</p><button id="forgetRoom">Forget room, start fresh</button></div>`
-    : "";
-  return `<section class="phone-screen"><div class="phone-hero card"><p class="eyebrow">Player pairing</p><h2>Join room ${escapeHtml(roomCode || "")}</h2><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p class="subtle">Two steps: make a join code, then import the host answer. After joining, queue and mic controls appear.</p></div><details class="card" open><summary>Join room</summary><label>Your name<input id="displayName" value="${escapeHtml(player?.displayName || "Player")}" placeholder="Your name"></label><p class="subtle">Room code from link: <strong>${escapeHtml(roomCode || "not set")}</strong></p><button id="makeOffer" class="primary">1. Create phone pairing code</button><div id="offerOut"></div><label>Host answer<textarea id="answer" placeholder="Paste host answer/link/chunks"></textarea></label><div class="button-row"><button id="scanAnswerQr">Scan host answer QR</button><button id="importAnswer" class="primary">2. Finish pairing</button></div></details>${reconnect}</section>`;
+  const roomCodeUpper = (roomCode || "").toUpperCase();
+  return `<section id="playerJoinCard" class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie Singer Remote</p><h2>Join Room</h2><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div></div><div class="card"><label>Room Code<p id="playerRoomCode" class="status-pill">${escapeHtml(roomCodeUpper || "—")}</p></label><label>Your Name<input id="playerDisplayName" value="${escapeHtml(player?.displayName || "")}" placeholder="Your name"></label><button id="joinRoom" class="primary">Join Room</button></div></section>`;
 }
 function updatePlayerDisplayName() {
   if (!player) return;
@@ -1160,235 +1206,151 @@ function updatePlayerDisplayName() {
     });
 }
 function attachJoinHandlers() {
-  document
-    .querySelectorAll("button")
-    .forEach((b) => b.addEventListener("click", unlockPhoneAudio));
-  $("#makeOffer").onclick = async () => {
-    const button = $("#makeOffer") as HTMLButtonElement | null;
+  document.querySelectorAll("button").forEach(b => b.addEventListener("click", unlockPhoneAudio));
+
+  $("#joinRoom").onclick = async () => {
+    const roomCode = new URLSearchParams(location.search).get("room") || room?.roomCode || "";
+    const nameInput = $("#playerDisplayName");
+    const displayName = normalizeDisplayName(nameInput?.value, "Player");
+    player.displayName = displayName;
+    persist();
+
+    const button = $("#joinRoom");
+    if (button) { button.disabled = true; button.textContent = "Joining..."; }
+
     try {
-      if (button) {
-        button.disabled = true;
-        button.textContent = "Creating code...";
+      await initPeerJsPlayer(roomCode);
+    } catch (e) {
+      log(`Auto-join failed: ${e.message}. Use manual fallback below.`);
+      if (button) { button.disabled = false; button.textContent = "Join Room"; }
+      const manualToggle = $("#playerManualFallbackToggle");
+      if (manualToggle) manualToggle.open = true;
+      showManualFallbackPanel();
+    }
+  };
+
+  $("#displayName")?.addEventListener("change", updatePlayerDisplayName);
+}
+
+async function initPeerJsPlayer(roomCode) {
+  if (!roomCode) throw new Error("No room code");
+
+  peerJsTransport = new PeerJsRoomTransport({
+    onStateChange: (state) => {
+      log(`PeerJS state: ${state}`);
+      const status = $("#playerConnectionStatus");
+      if (status) status.textContent = state;
+    },
+    onMessage: () => {},
+    onPeerConnected: () => {},
+    onPeerDisconnected: () => {},
+    onError: (err) => { log(`PeerJS error: ${err.message}`); },
+    onAutoJoinAnswer: async (peerId, answerText) => {
+      try {
+        await peerNode.acceptManualAnswer(answerText);
+        log("Auto-join: DataChannel opening...");
+      } catch (e) {
+        log(`Auto-join answer import failed: ${e.message}`);
       }
-      const offerOut = $("#offerOut");
-      if (offerOut) offerOut.textContent = "Creating phone pairing code...";
-      log("Creating phone pairing code...");
+    },
+  });
+  globalThis.__carryokiePeerJsTransport = peerJsTransport;
+
+  await peerJsTransport.joinRoom(roomCode.toUpperCase(), { displayName: player.displayName, playerId: player.playerId });
+  log(`PeerJS joined room ${roomCode}`);
+
+  const offerText = await peerNode.createManualOffer("host");
+  peerJsTransport.sendAutoJoinOffer(offerText);
+  log("Auto-join: offer sent, waiting for answer...");
+
+  const answerText = await peerJsTransport.waitForAutoJoinAnswer(30000);
+  await peerNode.acceptManualAnswer(answerText);
+  log("Auto-join: answer received, DataChannel opening...");
+}
+
+function showManualFallbackPanel() {
+  const panel = $("#playerManualFallbackPanel");
+  if (!panel) return;
+  panel.innerHTML = `<p>Player creates a join code, then imports the host answer.</p><button id="makeOffer" class="primary">Create phone pairing code</button><div id="offerOut"></div><label>Host answer<textarea id="answer" placeholder="Paste host answer/link/chunks"></textarea></label><div class="button-row"><button id="scanAnswerQr">Scan host answer QR</button><button id="importAnswer" class="primary">Finish pairing</button></div>`;
+  $("#makeOffer").onclick = async () => {
+    const button = $("#makeOffer");
+    try {
+      if (button) { button.disabled = true; button.textContent = "Creating code..."; }
       updatePlayerDisplayName();
       assertWebRtcSupported();
       const encoded = await peerNode.createManualOffer("host");
-      renderPayloadCard($("#offerOut") as HTMLElement, encoded, "Player offer");
-      log("Phone pairing code ready.");
-    } catch (e) {
-      const offerOut = $("#offerOut");
-      if (offerOut) offerOut.textContent = (e as Error).message;
-      log((e as Error).message);
-    } finally {
-      if (button) {
-        button.disabled = false;
-        button.textContent = "Create phone pairing code";
-      }
-    }
+      renderPayloadCard($("#offerOut"), encoded, "Player offer");
+    } catch (e) { log(e.message); } finally { if (button) { button.disabled = false; button.textContent = "Create phone pairing code"; } }
   };
-  $("#scanAnswerQr").onclick = async () => {
-    try {
-      await scanQrInto($("#answer") as HTMLTextAreaElement, log);
-    } catch (e) {
-      log(e.message);
-    }
-  };
-  $("#importAnswer").onclick = async () => {
-    try {
-      updatePlayerDisplayName();
-      await peerNode.acceptManualAnswer($("#answer").value);
-      log("Answer imported. Waiting for DataChannel open.");
-    } catch (e) {
-      log(e.message);
-    }
-  };
-  $("#forgetRoom")?.addEventListener("click", () => {
-    localStorage.removeItem("carryokie.room");
-    localStorage.removeItem("carryokie.player");
-    location.reload();
-  });
-  $("#displayName")?.addEventListener("change", updatePlayerDisplayName);
+  $("#scanAnswerQr").onclick = async () => { try { await scanQrInto($("#answer"), log); } catch (e) { log(e.message); } };
+  $("#importAnswer").onclick = async () => { try { updatePlayerDisplayName(); await peerNode.acceptManualAnswer($("#answer").value); log("Answer imported. Waiting for DataChannel open."); } catch (e) { log(e.message); } };
 }
 function renderPlayer(main) {
-  const song =
-    catalog.find((s) => s.songId === (room?.currentSongId || "song_002")) ||
-    catalog[0];
-  const roomCode =
-    new URLSearchParams(location.search).get("room") || room?.roomCode || "";
-  const currentTitle = song
-    ? `${escapeHtml(song.title || song.songId)}${song.artist ? " — " + escapeHtml(song.artist) : ""}`
-    : "Pick a song";
+  if (!main) return;
+  const song = catalog.find(s => s.songId === (room?.currentSongId || "song_002")) || catalog[0];
+  const roomCode = new URLSearchParams(location.search).get("room") || room?.roomCode || "";
+  const currentTitle = song ? `${escapeHtml(song.title || song.songId)}${song.artist ? " — " + escapeHtml(song.artist) : ""}` : "Pick a song";
+  const micLabel = deriveMicLabel(player);
+
   if (!playerIsJoined()) {
     main.innerHTML = joinRoomHtml(roomCode);
     attachJoinHandlers();
     return;
   }
-  main.innerHTML = `<section class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie phone</p><h2>${currentTitle}</h2><p class="subtle">${escapeHtml(player.displayName || "Player")} · Room ${escapeHtml(roomCode || "joined")} · Player #${escapeHtml(player.playerNumber || "?")}</p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p id="micStatus" class="status-pill live-status">${escapeHtml(currentMicStatusText())}</p><div class="primary-actions"><button id="enableMic" class="primary">Enable my mic</button><button id="holdSing" class="hold-button">Hold to sing</button><button id="toggleSing">Live / mute</button><button id="muteMic" class="danger">Mute mic</button></div></div>
-<details class="card" open><summary>1. Queue this phone</summary><label>Your name<input id="displayName" value="${escapeHtml(player.displayName || "Player")}" placeholder="Your name"></label><label>Song<select id="song">${catalog.map((s) => `<option value="${s.songId}">${escapeHtml(s.title)} — ${escapeHtml(s.artist)}</option>`).join("")}</select></label><label>Singers<input id="singers" value="${player.playerNumber || 2}" placeholder="Singer numbers comma separated"></label><p class="subtle">Default singer is you. Add more numbers only for duets/groups.</p><div class="button-row"><button id="requestSong" class="primary">Queue selected song</button><button id="requestSinger">Singer only</button></div><div class="queue-list">${queueHtml(room, "phone")}</div></details>
-<details class="card" open><summary>2. Sing</summary><p class="warn compact">${escapeHtml(singerWarning)}</p><label class="check"><input type="checkbox" id="pushToSing"> Push-to-sing</label><label>Mic filter<select id="voicePreset"><option value="clean">Clean</option><option value="alto">Alto warm</option><option value="bravo">Bravo bright</option><option value="bass">Bass low</option><option value="radio">Radio</option><option value="autotune">Autotune-style polish</option></select></label><p id="wake" class="subtle"></p></details>
-<details class="card"><summary>Advanced audio</summary><div class="button-row"><button id="startBacking">Start backing monitor</button><button id="pauseBacking">Pause backing monitor</button></div><label>Remote gain <input id="remoteGain" type="range" min="0" max="2" value="1" step=".05"></label><label>Backing monitor gain <input id="backingGain" type="range" min="0" max="1" value="0.35" step=".05"></label><label>Master gain <input id="masterGain" type="range" min="0" max="2" value="1" step=".05"></label></details>
-<details class="card"><summary>4. Lyrics / sync</summary><video id="phoneVideo" controls playsinline muted></video><div id="lyricsPanel"></div><div class="button-row"><button id="earlier">Lyrics earlier</button><button id="later">Lyrics later</button><button id="resetSync">Reset sync</button></div></details>
-<details class="card"><summary>Debug room state</summary><pre id="playerDebugState"></pre></details></section>`;
-  document
-    .querySelectorAll("button")
-    .forEach((b) => b.addEventListener("click", unlockPhoneAudio));
-  $("#playerDebugState").textContent = JSON.stringify(
-    room || { status: "not paired" },
-    null,
-    2,
-  );
+
+  main.innerHTML = `<section id="playerSingerRemote" class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie Singer Remote</p><h2>${currentTitle}</h2><p class="subtle"><span id="playerRoomCode">Room ${escapeHtml(roomCode)}</span> · Player #${escapeHtml(player.playerNumber || "?")} · <span id="playerConnectionStatus">connected</span></p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p id="micStatus" class="status-pill ${micLabel.includes("Live") ? "live-status" : ""}">${escapeHtml(micLabel)}</p><div class="primary-actions"><button id="enableMic" class="primary">Enable My Mic</button><button id="holdSing" class="hold-button">Hold to Sing</button><button id="toggleSing">Live / Mute</button><button id="muteMic" class="danger">Mute Mic</button></div></div>
+<details id="queueSongPanel" class="card"><summary>Queue Song</summary><label>Your Name<input id="displayName" value="${escapeHtml(player.displayName || "Player")}" placeholder="Your name"></label><label>Song<select id="song">${catalog.map(s => `<option value="${s.songId}">${escapeHtml(s.title)} — ${escapeHtml(s.artist)}</option>`).join("")}</select></label><label>Singers<input id="singers" value="${player.playerNumber || 2}" placeholder="Singer numbers comma separated"></label><p class="subtle">Default singer is you. Add more numbers only for duets/groups.</p><div class="button-row"><button id="requestSong" class="primary">Queue Selected Song</button><button id="requestSinger">Singer Only</button></div><div class="queue-list">${queueHtml(room, "phone")}</div></details>
+<details id="soundSettingsPanel" class="card"><summary>Sing</summary><p class="warn compact">${escapeHtml(singerWarning)}</p><label class="check"><input type="checkbox" id="pushToSing"> Push-to-sing</label><label>Mic Filter<select id="voicePreset"><option value="clean">Clean</option><option value="alto">Alto warm</option><option value="bravo">Bravo bright</option><option value="bass">Bass low</option><option value="radio">Radio</option><option value="autotune">Autotune-style polish</option></select></label><p id="wake" class="subtle"></p></details>
+<details class="card"><summary>Advanced Audio</summary><div class="button-row"><button id="startBacking">Start backing monitor</button><button id="pauseBacking">Pause backing monitor</button></div><label>Remote gain <input id="remoteGain" type="range" min="0" max="2" value="1" step=".05"></label><label>Backing monitor gain <input id="backingGain" type="range" min="0" max="1" value="0.35" step=".05"></label><label>Master gain <input id="masterGain" type="range" min="0" max="2" value="1" step=".05"></label></details>
+<details class="card"><summary>Lyrics / Sync</summary><video id="phoneVideo" controls playsinline muted></video><div id="lyricsPanel"></div><div class="button-row"><button id="earlier">Lyrics earlier</button><button id="later">Lyrics later</button><button id="resetSync">Reset sync</button></div></details></section>`;
+
+  document.querySelectorAll("button").forEach(b => b.addEventListener("click", unlockPhoneAudio));
   $("#displayName").addEventListener("change", updatePlayerDisplayName);
   $("#requestSong").onclick = () => {
-    const item = queueRequest(
-      $("#song").value,
-      $("#singers")
-        .value.split(",")
-        .map((s) => +s.trim())
-        .filter(Boolean),
-      player.playerId,
-      room?.queue?.length || 0,
-    );
+    const item = queueRequest($("#song").value, $("#singers").value.split(",").map(s => +s.trim()).filter(Boolean), player.playerId, room?.queue?.length || 0);
     peerNode.broadcast({ type: RPC.QUEUE_ADD_REQUEST, item });
     log("Queue request sent.");
   };
-  $("#requestSinger").onclick = () => {
-    peerNode.broadcast({
-      type: RPC.SINGER_JOIN_REQUEST,
-      playerId: player.playerId,
-    });
-    log("Singer slot requested.");
-  };
-  document.querySelectorAll(".queueSelf").forEach(
-    (b) =>
-      (b.onclick = () => {
-        peerNode.broadcast({
-          type: RPC.QUEUE_UPDATE_REQUEST,
-          action: b.dataset.action,
-          queueItemId: b.dataset.queueId,
-          playerId: player.playerId,
-        });
-        log("Queue update sent.");
-      }),
-  );
-  $("#voicePreset").onchange = (e) => {
-    const target = e.target as HTMLSelectElement;
-    audio?.setVoicePreset(target.value);
-    const status = $("#micStatus");
-    if (status)
-      status.textContent = `Mic filter: ${target.selectedOptions?.[0]?.textContent || target.value}`;
-  };
+  $("#requestSinger").onclick = () => { peerNode.broadcast({ type: RPC.SINGER_JOIN_REQUEST, playerId: player.playerId }); log("Singer slot requested."); };
+  document.querySelectorAll(".queueSelf").forEach(b => b.onclick = () => { peerNode.broadcast({ type: RPC.QUEUE_UPDATE_REQUEST, action: b.dataset.action, queueItemId: b.dataset.queueId, playerId: player.playerId }); log("Queue update sent."); });
+  $("#voicePreset").onchange = (e) => { const target = e.target; audio?.setVoicePreset(target.value); const status = $("#micStatus"); if (status) status.textContent = `Mic filter: ${target.selectedOptions?.[0]?.textContent || target.value}`; };
   $("#enableMic").onclick = async () => {
-    const enableButton = $("#enableMic") as HTMLButtonElement;
+    const enableButton = $("#enableMic");
     if (enableButton?.disabled) return;
     if (enableButton) enableButton.disabled = true;
     try {
       const pushToSing = $("#pushToSing").checked;
       const status = await audio.tryWakeLock();
-      $("#wake").textContent =
-        status === "active"
-          ? "Wake lock active"
-          : "Keep this phone unlocked and tab open during song. Wake lock: " +
-            status;
+      $("#wake").textContent = status === "active" ? "Wake lock active" : "Keep this phone unlocked and tab open during song. Wake lock: " + status;
       const stream = await audio.requestMic({ pushToSing });
       const alreadyPublishing = !!player.micState?.publishing;
       const previousMuted = !!player.micState?.muted;
       const isNewMicStream = !peerNode.localStreams?.includes(stream);
       if (isNewMicStream) peerNode.addLocalStream(stream);
-      player.micState = {
-        ...player.micState,
-        enabled: true,
-        publishing: true,
-        muted: pushToSing,
-      };
+      player.micState = { ...player.micState, enabled: true, publishing: true, muted: pushToSing };
       persist();
-      if (isNewMicStream || !alreadyPublishing) {
-        peerNode.broadcast({
-          type: RPC.MIC_ENABLED,
-          playerId: player.playerId,
-          muted: pushToSing,
-        });
-      } else if (previousMuted !== pushToSing) {
-        peerNode.broadcast({
-          type: pushToSing ? RPC.MIC_MUTED : RPC.MIC_UNMUTED,
-          playerId: player.playerId,
-          muted: pushToSing,
-        });
-      }
-      $("#micStatus").textContent = pushToSing
-        ? "Mic ready. Hold to sing."
-        : "Mic live.";
-      log(
-        isNewMicStream
-          ? "Mic publishing. Own mic not locally monitored."
-          : "Mic already publishing. Own mic not locally monitored.",
-      );
-    } catch (e) {
-      $("#micStatus").textContent = e.message;
-      log(e.message);
-    } finally {
-      if (enableButton) enableButton.disabled = false;
-    }
+      if (isNewMicStream || !alreadyPublishing) { peerNode.broadcast({ type: RPC.MIC_ENABLED, playerId: player.playerId, muted: pushToSing }); } else if (previousMuted !== pushToSing) { peerNode.broadcast({ type: pushToSing ? RPC.MIC_MUTED : RPC.MIC_UNMUTED, playerId: player.playerId, muted: pushToSing }); }
+      const label = deriveMicLabel(player);
+      $("#micStatus").textContent = label;
+      log(isNewMicStream ? "Mic publishing. Own mic not locally monitored." : "Mic already publishing. Own mic not locally monitored.");
+    } catch (e) { $("#micStatus").textContent = e.message; log(e.message); } finally { if (enableButton) enableButton.disabled = false; }
   };
   const hold = $("#holdSing");
   let holding = false;
-  hold.onpointerdown = (e) => {
-    e.preventDefault();
-    holding = true;
-    try {
-      hold.setPointerCapture?.(e.pointerId);
-    } catch (error) {
-      log(error?.message || "Pointer capture unavailable for hold-to-sing.");
-    }
-    setOwnMicMuted(false);
-  };
-  hold.onpointerup = () => {
-    holding = false;
-    setOwnMicMuted(true);
-  };
-  hold.onpointercancel = () => {
-    holding = false;
-    setOwnMicMuted(true);
-  };
-  hold.onpointerleave = () => {
-    if (holding) {
-      holding = false;
-      setOwnMicMuted(true);
-    }
-  };
+  hold.onpointerdown = (e) => { e.preventDefault(); holding = true; try { hold.setPointerCapture?.(e.pointerId); } catch (error) { log(error?.message || "Pointer capture unavailable for hold-to-sing."); } setOwnMicMuted(false); };
+  hold.onpointerup = () => { holding = false; setOwnMicMuted(true); };
+  hold.onpointercancel = () => { holding = false; setOwnMicMuted(true); };
+  hold.onpointerleave = () => { if (holding) { holding = false; setOwnMicMuted(true); } };
   $("#toggleSing").onclick = () => setOwnMicMuted(!player?.micState?.muted);
   $("#muteMic").onclick = () => setOwnMicMuted(true);
-  $("#startBacking").onclick = async () =>
-    audio
-      ?.startBackingMonitor(await resolvePlayableMediaUrl(song))
-      .catch((e) => {
-        $("#micStatus").textContent = e.message;
-        log(e.message);
-      });
+  $("#startBacking").onclick = async () => audio?.startBackingMonitor(await resolvePlayableMediaUrl(song)).catch(e => { $("#micStatus").textContent = e.message; log(e.message); });
   $("#pauseBacking").onclick = () => audio?.pauseBackingMonitor();
-  $("#remoteGain").oninput = (e) =>
-    audio?.setGain("remote", +(e.target as HTMLInputElement).value);
-  $("#backingGain").oninput = (e) =>
-    audio?.setGain("backing", +(e.target as HTMLInputElement).value);
-  $("#masterGain").oninput = (e) =>
-    audio?.setGain("master", +(e.target as HTMLInputElement).value);
-  $("#earlier").onclick = () => {
-    room.playbackState.seekOffsetMs -= 250;
-    persist();
-    renderLyricsPanel();
-  };
-  $("#later").onclick = () => {
-    room.playbackState.seekOffsetMs += 250;
-    persist();
-    renderLyricsPanel();
-  };
-  $("#resetSync").onclick = () => {
-    room.playbackState.seekOffsetMs = 0;
-    persist();
-    renderLyricsPanel();
-  };
+  $("#remoteGain").oninput = (e) => audio?.setGain("remote", +e.target.value);
+  $("#backingGain").oninput = (e) => audio?.setGain("backing", +e.target.value);
+  $("#masterGain").oninput = (e) => audio?.setGain("master", +e.target.value);
+  $("#earlier").onclick = () => { room.playbackState.seekOffsetMs -= 250; persist(); renderLyricsPanel(); };
+  $("#later").onclick = () => { room.playbackState.seekOffsetMs += 250; persist(); renderLyricsPanel(); };
+  $("#resetSync").onclick = () => { room.playbackState.seekOffsetMs = 0; persist(); renderLyricsPanel(); };
   renderLyricsPanel();
   renderPhoneVideo(song);
 }

@@ -32,6 +32,18 @@ export function commonChrome(root: Element, title: string): void {
   root.innerHTML = `<main class="shell"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>${title}</h1>${localHttpWarning()}</div><div class="mini-stage" aria-hidden="true"><span></span><span></span><span></span></div></header><section id="main"></section><section class="activity-card"><h2>Log</h2><div id="log" class="log"></div></section></main>`;
 }
 
+export function hostShell(root: Element): void {
+  root.innerHTML = `<div id="appShell"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>CarryOkie Show Control</h1></div><div class="mini-stage" aria-hidden="true"><span></span><span></span><span></span></div></header><div id="hostShowControl"><div id="hostTopStatus" class="card"></div><div id="hostActions" class="button-row"></div><div id="hostPanels"></div><details id="manualPairingToggle" class="card"><summary>Manual Pairing Fallback</summary><div id="manualPairingPanel"></div></details><details id="diagnosticsToggle" class="card"><summary>Diagnostics</summary><div id="diagnosticsPanel"><pre id="audioPipelineStatus"></pre><div id="log" class="log"></div></div></details></div></div>`;
+}
+
+export function playerShell(root: Element): void {
+  root.innerHTML = `<div id="playerSingerRemote"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>CarryOkie Singer Remote</h1></div><div class="mini-stage" aria-hidden="true"><span></span><span></span><span></span></div></header><section id="main"></section><details id="playerManualFallbackToggle" class="card"><summary>Manual Pairing Fallback</summary><div id="playerManualFallbackPanel"></div></details><details id="diagnosticsToggle" class="card"><summary>Diagnostics</summary><div id="diagnosticsPanel"><pre id="audioPipelineStatus"></pre><div id="log" class="log"></div></div></details></div>`;
+}
+
+export function receiverShell(root: Element): void {
+  root.innerHTML = `<div id="receiverTvStage"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>CarryOkie TV Stage</h1></div></header><section id="main"></section><details id="receiverDiagnosticsToggle" class="card"><summary>Diagnostics</summary><div id="receiverDiagnosticsPanel"><pre id="audioPipelineStatus"></pre><div id="log" class="log"></div></div></details></div>`;
+}
+
 export function logToPage(message: unknown): void {
   const logContainer = $("#log");
   if (!logContainer) return;
