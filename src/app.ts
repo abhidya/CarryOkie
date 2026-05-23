@@ -37,7 +37,7 @@ import { PhoneAudio, singerWarning } from "./audio.ts";
 import { CastController, receiverApp } from "./cast.ts";
 import { deriveTvMediaPositionMs } from "./sync.ts";
 import { resolvePlayableMediaUrl, isProtectedMedia } from "./protectedMedia.ts";
-import { $, commonChrome, hostShell, playerShell, escapeHtml, logToPage } from "./app/dom.ts";
+import { $, commonChrome, hostShell, playerShell, receiverShell, escapeHtml, logToPage } from "./app/dom.ts";
 import { formatSongTitle, loadSongCatalog } from "./app/catalog.ts";
 import { lyricView } from "./app/lyricsView.ts";
 import {
@@ -1242,18 +1242,10 @@ async function initPeerJsPlayer(roomCode) {
       if (status) status.textContent = state;
     },
     onMessage: () => {},
-    onPeerConnected: () => {},
-    onPeerDisconnected: () => {},
-    onError: (err) => { log(`PeerJS error: ${err.message}`); },
-    onAutoJoinAnswer: async (peerId, answerText) => {
-      try {
-        await peerNode.acceptManualAnswer(answerText);
-        log("Auto-join: DataChannel opening...");
-      } catch (e) {
-        log(`Auto-join answer import failed: ${e.message}`);
-      }
-    },
-  });
+  onPeerConnected: () => {},
+  onPeerDisconnected: () => {},
+  onError: (err) => { log(`PeerJS error: ${err.message}`); },
+});
   globalThis.__carryokiePeerJsTransport = peerJsTransport;
 
   await peerJsTransport.joinRoom(roomCode.toUpperCase(), { displayName: player.displayName, playerId: player.playerId });
@@ -1468,5 +1460,6 @@ export async function debugPage(root) {
   };
 }
 export function receiverPage(root) {
-  receiverApp(root);
+  receiverShell(root);
+  receiverApp($("#main"));
 }

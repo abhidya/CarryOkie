@@ -5766,41 +5766,6 @@ var PeerJsRoomTransport = class {
 	}
 };
 //#endregion
-//#region src/app/dom.ts
-function $(selector, root = document) {
-	return root.querySelector(selector);
-}
-function escapeHtml$1(value) {
-	return String(value ?? "").replace(/[&<>"']/g, (character) => ({
-		"&": "&amp;",
-		"<": "&lt;",
-		">": "&gt;",
-		"\"": "&quot;",
-		"'": "&#39;"
-	})[character]);
-}
-function localHttpWarning(locationLike = location) {
-	const hostname = locationLike.hostname;
-	return locationLike.protocol === "http:" && hostname !== "localhost" && hostname !== "127.0.0.1" ? "<p class=\"warn\">Phone browser is on local HTTP. If offer creation, camera QR, or protected video fails, use the GitHub Pages HTTPS URL for the full flow.</p>" : "";
-}
-function commonChrome(root, title) {
-	root.innerHTML = `<main class="shell"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>${title}</h1>${localHttpWarning()}</div><div class="mini-stage" aria-hidden="true"><span></span><span></span><span></span></div></header><section id="main"></section><section class="activity-card"><h2>Log</h2><div id="log" class="log"></div></section></main>`;
-}
-function hostShell(root) {
-	root.innerHTML = `<div id="appShell"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>CarryOkie Show Control</h1></div><div class="mini-stage" aria-hidden="true"><span></span><span></span><span></span></div></header><div id="hostShowControl"><div id="hostTopStatus" class="card"></div><div id="hostActions" class="button-row"></div><div id="hostPanels"></div><details id="manualPairingToggle" class="card"><summary>Manual Pairing Fallback</summary><div id="manualPairingPanel"></div></details><details id="diagnosticsToggle" class="card"><summary>Diagnostics</summary><div id="diagnosticsPanel"><pre id="audioPipelineStatus"></pre><div id="log" class="log"></div></div></details></div></div>`;
-}
-function playerShell(root) {
-	root.innerHTML = `<div id="playerSingerRemote"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>CarryOkie Singer Remote</h1></div><div class="mini-stage" aria-hidden="true"><span></span><span></span><span></span></div></header><section id="main"></section><details id="playerManualFallbackToggle" class="card"><summary>Manual Pairing Fallback</summary><div id="playerManualFallbackPanel"></div></details><details id="diagnosticsToggle" class="card"><summary>Diagnostics</summary><div id="diagnosticsPanel"><pre id="audioPipelineStatus"></pre><div id="log" class="log"></div></div></details></div>`;
-}
-function receiverShell(root) {
-	root.innerHTML = `<div id="receiverTvStage"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>CarryOkie TV Stage</h1></div></header><section id="main"></section><details id="receiverDiagnosticsToggle" class="card"><summary>Diagnostics</summary><div id="receiverDiagnosticsPanel"><pre id="audioPipelineStatus"></pre><div id="log" class="log"></div></div></details></div>`;
-}
-function logToPage(message) {
-	const logContainer = $("#log");
-	if (!logContainer) return;
-	logContainer.prepend(Object.assign(document.createElement("div"), { textContent: `${(/* @__PURE__ */ new Date()).toLocaleTimeString()} ${String(message)}` }));
-}
-//#endregion
 //#region src/mediaKey.ts
 var MEDIA_KEY_B64 = "NvV8BCkbvZNWft8N71lX+8pYS3/cqwjNcCz3N1zF5IE=";
 //#endregion
@@ -5926,7 +5891,7 @@ function deriveTvMediaPositionMs(playbackState, nowMs = Date.now(), hostOffsetMs
 }
 //#endregion
 //#region src/cast.ts
-function escapeHtml(value) {
+function escapeHtml$1(value) {
 	return String(value ?? "").replace(/[&<>"']/g, (c) => ({
 		"&": "&amp;",
 		"<": "&lt;",
@@ -6167,12 +6132,10 @@ function receiverApp(root) {
 		audioDiagnostics: null,
 		receiverMicLatencyStats: null
 	};
-	receiverShell(root);
-	const main = root.querySelector("#main");
-	main.innerHTML = `<div id="receiverRoomCode" class="room">${escapeHtml(initialRoomCode)}</div><div id="receiverJoinQr"></div><a id="receiverJoinLink" href="#">Scan to Join Room</a><div id="receiverStageStatus"><p class="status-pill">${escapeHtml("Waiting for host tab…")}</p></div><section id="receiverActiveSingers"><h2>Singers</h2><p>No active singers</p></section><section id="receiverNowPlaying"><h2>Now Playing</h2><p>Waiting for song…</p></section><section id="receiverMediaRegion"><video id="media" class="castMediaElement" controls playsinline></video><section id="receiverLyricsRegion" class="lyrics big"></section></section><section id="receiverQueuePreview"><h2>Queue</h2><ol></ol></section><section id="receiverLiveMicStatus"><h2>Live Mics</h2><p>Waiting for singer mic…</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button></section>`;
-	const media = main.querySelector("#media");
-	const retryLiveMicsButton = main.querySelector("#retryLiveMics");
-	const startReceiverAudioButton = main.querySelector("#startReceiverAudio");
+	root.innerHTML = `<div id="receiverRoomCode" class="room">${escapeHtml$1(initialRoomCode)}</div><div id="receiverJoinQr"></div><a id="receiverJoinLink" href="#">Scan to Join Room</a><div id="receiverStageStatus"><p class="status-pill">${escapeHtml$1("Waiting for host tab…")}</p></div><section id="receiverActiveSingers"><h2>Singers</h2><p>No active singers</p></section><section id="receiverNowPlaying"><h2>Now Playing</h2><p>Waiting for song…</p></section><section id="receiverMediaRegion"><video id="media" class="castMediaElement" controls playsinline></video><section id="receiverLyricsRegion" class="lyrics big"></section></section><section id="receiverQueuePreview"><h2>Queue</h2><ol></ol></section><section id="receiverLiveMicStatus"><h2>Live Mics</h2><p>Waiting for singer mic…</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button></section>`;
+	const media = root.querySelector("#media");
+	const retryLiveMicsButton = root.querySelector("#retryLiveMics");
+	const startReceiverAudioButton = root.querySelector("#startReceiverAudio");
 	const receiverId = crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
 	let loadedSongId = "";
 	let pendingPlay = false;
@@ -6207,35 +6170,35 @@ function receiverApp(root) {
 		const outputLatencyMs = typeof receiverLatency?.receiverOutputLatencyMs === "number" ? receiverLatency.receiverOutputLatencyMs : 0;
 		const estimatedTotalMs = typeof hostLatency?.estimatedPlayerToHostMs === "number" ? Math.round(hostLatency.estimatedPlayerToHostMs + receiverBufferMs + outputLatencyMs) : null;
 		const latencyOutput = `<p>Estimated live mic latency: ${estimatedTotalMs == null ? "collecting…" : `~${estimatedTotalMs} ms`}</p><p>Player→host: RTT ${hostLatency?.playerHostRttMs ?? "?"} ms · host jitter buffer ${hostLatency?.hostInboundJitterBufferMs ?? "?"} ms · host jitter ${hostLatency?.hostInboundJitterMs ?? "?"} ms</p><p>Host→receiver: jitter buffer ${receiverLatency?.receiverInboundJitterBufferMs ?? "?"} ms · jitter ${receiverLatency?.receiverInboundJitterMs ?? "?"} ms · lost ${receiverLatency?.receiverInboundPacketsLost ?? "?"} · level ${receiverLatency?.receiverInboundAudioLevel ?? "?"}</p><p>Receiver AudioContext: base ${receiverLatency?.receiverBaseLatencyMs ?? "?"} ms · output ${receiverLatency?.receiverOutputLatencyMs ?? "?"} ms</p>`;
-		const liveOutput = `<p>${escapeHtml(liveMicPlaybackDiagnostics())}</p>`;
-		if (d) diagEl.innerHTML = `<h2>Audio pipeline</h2><p>Host remote tracks: ${d.hostRemoteAudioTracks ?? "?"} · Relayed streams: ${d.hostRelayedStreams ?? "?"} · Receiver ready: ${d.receiverReady ? "yes" : "no"}</p><p>Receiver PC: ${d.receiverPcConnectionState ?? "?"} · ICE: ${d.receiverPcIceState ?? "?"} · Tracks added: ${d.receiverTracksAdded ?? 0}</p>${d.receiverOfferSentAt ? `<p>Offer sent: ${new Date(d.receiverOfferSentAt).toLocaleTimeString()}</p>` : ""}${d.receiverAnswerReceivedAt ? `<p>Answer received: ${new Date(d.receiverAnswerReceivedAt).toLocaleTimeString()}</p>` : ""}${d.receiverLastError ? `<p class="warn">Error: ${escapeHtml(String(d.receiverLastError))}</p>` : ""}<p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p><p>Publishing singers: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p>${latencyOutput}${liveOutput}`;
+		const liveOutput = `<p>${escapeHtml$1(liveMicPlaybackDiagnostics())}</p>`;
+		if (d) diagEl.innerHTML = `<h2>Audio pipeline</h2><p>Host remote tracks: ${d.hostRemoteAudioTracks ?? "?"} · Relayed streams: ${d.hostRelayedStreams ?? "?"} · Receiver ready: ${d.receiverReady ? "yes" : "no"}</p><p>Receiver PC: ${d.receiverPcConnectionState ?? "?"} · ICE: ${d.receiverPcIceState ?? "?"} · Tracks added: ${d.receiverTracksAdded ?? 0}</p>${d.receiverOfferSentAt ? `<p>Offer sent: ${new Date(d.receiverOfferSentAt).toLocaleTimeString()}</p>` : ""}${d.receiverAnswerReceivedAt ? `<p>Answer received: ${new Date(d.receiverAnswerReceivedAt).toLocaleTimeString()}</p>` : ""}${d.receiverLastError ? `<p class="warn">Error: ${escapeHtml$1(String(d.receiverLastError))}</p>` : ""}<p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p><p>Publishing singers: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p>${latencyOutput}${liveOutput}`;
 		else diagEl.innerHTML = `<h2>Audio pipeline</h2><p>No diagnostics received yet. Waiting for host tab…</p><p>Autoplay unlocked: ${state.audioOutputUnlocked ? "yes" : "no"} · Live mic tracks: ${liveMicTrackIds.size}</p><p>Publishing singers: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p>${latencyOutput}${liveOutput}`;
 	}
 	function render() {
-		const roomEl = main.querySelector("#receiverRoomCode");
+		const roomEl = root.querySelector("#receiverRoomCode");
 		if (roomEl) roomEl.textContent = state.roomCode;
 		const playerUrl = PeerJsRoomTransport ? PeerJsRoomTransport.playerJoinUrl(state.roomCode) : new URL(`../player/?room=${encodeURIComponent(state.roomCode)}`, location.href).toString();
-		const joinLink = main.querySelector("#receiverJoinLink");
+		const joinLink = root.querySelector("#receiverJoinLink");
 		if (joinLink) {
 			joinLink.href = playerUrl;
 			joinLink.textContent = "Scan to Join Room";
 		}
-		const joinQr = main.querySelector("#receiverJoinQr");
+		const joinQr = root.querySelector("#receiverJoinQr");
 		if (joinQr) joinQr.innerHTML = state.roomCode === "------" ? "" : qrSvg$1(playerUrl, {
 			scale: 4,
 			title: "Join CarryOkie room"
 		});
 		const queueSingerLabel = (queueItem) => (queueItem.singerNames?.length ? queueItem.singerNames : (queueItem.singerNumbers || []).map((singerNumber) => `#${singerNumber}`)).join(", ");
-		const queuePreview = main.querySelector("#receiverQueuePreview");
-		if (queuePreview) queuePreview.innerHTML = `<h2>Queue</h2><ol>` + state.queue.map((q) => `<li>${escapeHtml(q.title || q.songId)} singers ${escapeHtml(queueSingerLabel(q))}</li>`).join("") + `</ol>`;
-		const singers = main.querySelector("#receiverActiveSingers");
-		if (singers) singers.innerHTML = "<h2>Singers</h2>" + ((state.singers || []).map((p) => `<p>#${escapeHtml(p.playerNumber)} ${escapeHtml(p.displayName)}</p>`).join("") || "<p>No active singers</p>");
-		const nowPlaying = main.querySelector("#receiverNowPlaying");
-		if (nowPlaying) nowPlaying.innerHTML = `<h2>Now Playing</h2><p>${state.song ? `${escapeHtml(state.song.title)} — ${escapeHtml(state.song.artist)}` : "Waiting for song…"}</p>`;
+		const queuePreview = root.querySelector("#receiverQueuePreview");
+		if (queuePreview) queuePreview.innerHTML = `<h2>Queue</h2><ol>` + state.queue.map((q) => `<li>${escapeHtml$1(q.title || q.songId)} singers ${escapeHtml$1(queueSingerLabel(q))}</li>`).join("") + `</ol>`;
+		const singers = root.querySelector("#receiverActiveSingers");
+		if (singers) singers.innerHTML = "<h2>Singers</h2>" + ((state.singers || []).map((p) => `<p>#${escapeHtml$1(p.playerNumber)} ${escapeHtml$1(p.displayName)}</p>`).join("") || "<p>No active singers</p>");
+		const nowPlaying = root.querySelector("#receiverNowPlaying");
+		if (nowPlaying) nowPlaying.innerHTML = `<h2>Now Playing</h2><p>${state.song ? `${escapeHtml$1(state.song.title)} — ${escapeHtml$1(state.song.artist)}` : "Waiting for song…"}</p>`;
 		const resolvedLiveMicStatus = state.liveMicStatus || (liveMicTrackIds.size ? liveMicStatus() : "");
-		const stageStatus = main.querySelector("#receiverStageStatus");
-		if (stageStatus) stageStatus.innerHTML = `<p class="status-pill">${escapeHtml(state.status)}</p>` + (resolvedLiveMicStatus ? `<p class="status-pill live-status">${escapeHtml(resolvedLiveMicStatus)}</p>` : "");
-		const liveMicStatus = main.querySelector("#receiverLiveMicStatus");
+		const stageStatus = root.querySelector("#receiverStageStatus");
+		if (stageStatus) stageStatus.innerHTML = `<p class="status-pill">${escapeHtml$1(state.status)}</p>` + (resolvedLiveMicStatus ? `<p class="status-pill live-status">${escapeHtml$1(resolvedLiveMicStatus)}</p>` : "");
+		const liveMicStatus = root.querySelector("#receiverLiveMicStatus");
 		if (liveMicStatus) {
 			const { audible, muted, publishing } = singerMicSummary();
 			liveMicStatus.innerHTML = `<h2>Live Mics</h2><p class="subtle">${audible.length ? `Playing ${audible.length} unmuted live mic${audible.length === 1 ? "" : "s"}.` : muted.length ? "Mic connected, but singer is muted." : "Waiting for singer mic…"}</p><p class="subtle">Publishing: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>`;
@@ -6248,8 +6211,8 @@ function receiverApp(root) {
 			});
 		}
 		const active = activeLine();
-		const lyricsRegion = main.querySelector("#receiverLyricsRegion");
-		if (lyricsRegion) lyricsRegion.innerHTML = state.lines.length ? state.lines.map((l) => `<p class="${l === active ? "active" : ""}">${escapeHtml(l.text)}</p>`).join("") : "<p>Waiting for lyrics…</p>";
+		const lyricsRegion = root.querySelector("#receiverLyricsRegion");
+		if (lyricsRegion) lyricsRegion.innerHTML = state.lines.length ? state.lines.map((l) => `<p class="${l === active ? "active" : ""}">${escapeHtml$1(l.text)}</p>`).join("") : "<p>Waiting for lyrics…</p>";
 	}
 	async function loadLyrics(song) {
 		if (isProtectedMedia(song)) {
@@ -6365,18 +6328,18 @@ function receiverApp(root) {
 	}
 	function liveMicSummaryHtml() {
 		const status = state.liveMicStatus || (liveMicTrackIds.size ? liveMicStatus() : "");
-		return status ? `<p class="subtle">${escapeHtml(status)}</p>` : "<p class=\"subtle\">Playing all forwarded singer mics.</p>";
+		return status ? `<p class="subtle">${escapeHtml$1(status)}</p>` : "<p class=\"subtle\">Playing all forwarded singer mics.</p>";
 	}
 	function ensureLiveMicAudio() {
 		if (liveMicAudio) {
-			const liveMicSection = main.querySelector("#receiverLiveMicStatus");
+			const liveMicSection = root.querySelector("#receiverLiveMicStatus");
 			if (liveMicSection) {
 				const subtitle = liveMicSection.querySelector("p.subtle");
 				if (subtitle) subtitle.outerHTML = liveMicSummaryHtml();
 			}
 			return liveMicAudio;
 		}
-		const liveMicSection = main.querySelector("#receiverLiveMicStatus");
+		const liveMicSection = root.querySelector("#receiverLiveMicStatus");
 		if (liveMicSection) {
 			liveMicSection.innerHTML = `<h2>Live Mics</h2>${liveMicSummaryHtml()}<button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>`;
 			liveMicSection.querySelector("#startReceiverAudio")?.addEventListener("click", () => {
@@ -6394,7 +6357,7 @@ function receiverApp(root) {
 		liveMicAudio.muted = true;
 		liveMicAudio.volume = 1;
 		liveMicAudio.srcObject = liveMicStream;
-		const targetSection = main.querySelector("#receiverLiveMicStatus");
+		const targetSection = root.querySelector("#receiverLiveMicStatus");
 		if (targetSection) targetSection.appendChild(liveMicAudio);
 		return liveMicAudio;
 	}
@@ -6589,6 +6552,41 @@ function receiverApp(root) {
 	render();
 }
 //#endregion
+//#region src/app/dom.ts
+function $(selector, root = document) {
+	return root.querySelector(selector);
+}
+function escapeHtml(value) {
+	return String(value ?? "").replace(/[&<>"']/g, (character) => ({
+		"&": "&amp;",
+		"<": "&lt;",
+		">": "&gt;",
+		"\"": "&quot;",
+		"'": "&#39;"
+	})[character]);
+}
+function localHttpWarning(locationLike = location) {
+	const hostname = locationLike.hostname;
+	return locationLike.protocol === "http:" && hostname !== "localhost" && hostname !== "127.0.0.1" ? "<p class=\"warn\">Phone browser is on local HTTP. If offer creation, camera QR, or protected video fails, use the GitHub Pages HTTPS URL for the full flow.</p>" : "";
+}
+function commonChrome(root, title) {
+	root.innerHTML = `<main class="shell"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>${title}</h1>${localHttpWarning()}</div><div class="mini-stage" aria-hidden="true"><span></span><span></span><span></span></div></header><section id="main"></section><section class="activity-card"><h2>Log</h2><div id="log" class="log"></div></section></main>`;
+}
+function hostShell(root) {
+	root.innerHTML = `<div id="appShell"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>CarryOkie Show Control</h1></div><div class="mini-stage" aria-hidden="true"><span></span><span></span><span></span></div></header><div id="hostShowControl"><div id="hostTopStatus" class="card"></div><div id="hostActions" class="button-row"></div><div id="hostPanels"></div><details id="manualPairingToggle" class="card"><summary>Manual Pairing Fallback</summary><div id="manualPairingPanel"></div></details><details id="diagnosticsToggle" class="card"><summary>Diagnostics</summary><div id="diagnosticsPanel"><pre id="audioPipelineStatus"></pre><div id="log" class="log"></div></div></details></div></div>`;
+}
+function playerShell(root) {
+	root.innerHTML = `<div id="playerSingerRemote"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>CarryOkie Singer Remote</h1></div><div class="mini-stage" aria-hidden="true"><span></span><span></span><span></span></div></header><section id="main"></section><details id="playerManualFallbackToggle" class="card"><summary>Manual Pairing Fallback</summary><div id="playerManualFallbackPanel"></div></details><details id="diagnosticsToggle" class="card"><summary>Diagnostics</summary><div id="diagnosticsPanel"><pre id="audioPipelineStatus"></pre><div id="log" class="log"></div></div></details></div>`;
+}
+function receiverShell(root) {
+	root.innerHTML = `<div id="receiverTvStage"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>CarryOkie TV Stage</h1></div></header><section id="main"></section><details id="receiverDiagnosticsToggle" class="card"><summary>Diagnostics</summary><div id="receiverDiagnosticsPanel"><pre id="audioPipelineStatus"></pre><div id="log" class="log"></div></div></details></div>`;
+}
+function logToPage(message) {
+	const logContainer = $("#log");
+	if (!logContainer) return;
+	logContainer.prepend(Object.assign(document.createElement("div"), { textContent: `${(/* @__PURE__ */ new Date()).toLocaleTimeString()} ${String(message)}` }));
+}
+//#endregion
 //#region src/app/catalog.ts
 function assetUrl(path, baseUrl = import.meta.url) {
 	if (!path) return null;
@@ -6624,7 +6622,7 @@ function formatSongTitle(song, songId) {
 //#region src/app/lyricsView.ts
 function lyricView(lines = [], positionMs) {
 	const activeLine = lines.findLast?.((line) => positionMs >= line.startMs) || lines.filter((line) => positionMs >= line.startMs).pop() || lines[0];
-	return `<div>${lines.map((line) => `<p class="${line === activeLine ? "active" : ""}">${escapeHtml$1(line.text)}</p>`).join("")}</div>`;
+	return `<div>${lines.map((line) => `<p class="${line === activeLine ? "active" : ""}">${escapeHtml(line.text)}</p>`).join("")}</div>`;
 }
 //#endregion
 //#region src/app/queueService.ts
@@ -6665,12 +6663,12 @@ function singerNames(room, singerNumbers) {
 function queueHtml$1(room, mode = "host", songTitle, player) {
 	if (!room?.queue?.length) return "<p class=\"subtle\">No songs queued yet.</p>";
 	return `<ul class="queue-items">${room.queue.map((queueItem) => {
-		const queueId = escapeHtml$1(queueItem.queueItemId);
-		const status = escapeHtml$1(queueItem.status);
+		const queueId = escapeHtml(queueItem.queueItemId);
+		const status = escapeHtml(queueItem.status);
 		const requestedBy = room.players.find((roomPlayer) => roomPlayer.playerId === queueItem.requestedByPlayerId)?.displayName || "Guest";
 		const hostControls = `${["requested", "rejected"].includes(queueItem.status) ? `<button class="acceptItem" data-queue-id="${queueId}" title="Accept/requeue">Approve</button>` : ""} ${queueItem.status === "queued" ? `<button class="startItem" data-queue-id="${queueId}" title="Start on TV">Start now</button>` : ""} ${queueItem.status === "requested" ? `<button class="rejectItem" data-queue-id="${queueId}" title="Reject">Not now</button>` : ""} <button class="moveUpItem" data-queue-id="${queueId}" title="Move earlier">↑</button> <button class="moveDownItem" data-queue-id="${queueId}" title="Move later">↓</button> <button class="removeItem" data-queue-id="${queueId}" title="Remove">Remove</button>`;
 		const phoneControls = !["active", "ended"].includes(queueItem.status) ? `<button class="queueSelf" data-action="join" data-queue-id="${queueId}">Add me</button> <button class="queueSelf" data-action="leave" data-queue-id="${queueId}">Leave</button> ${queueItem.requestedByPlayerId === player?.playerId ? `<button class="queueSelf" data-action="remove" data-queue-id="${queueId}">Cancel request</button>` : ""}` : "";
-		return `<li class="queue-item"><div class="queue-top"><strong>${escapeHtml$1(songTitle(queueItem.songId))}</strong><span class="queue-status queue-status-${status}">${status}</span></div><p class="subtle">Singers: ${escapeHtml$1(singerNames(room, queueItem.singerNumbers))} · requested by ${escapeHtml$1(requestedBy)}</p><div class="button-row queue-actions">${mode === "host" ? hostControls : phoneControls}</div></li>`;
+		return `<li class="queue-item"><div class="queue-top"><strong>${escapeHtml(songTitle(queueItem.songId))}</strong><span class="queue-status queue-status-${status}">${status}</span></div><p class="subtle">Singers: ${escapeHtml(singerNames(room, queueItem.singerNumbers))} · requested by ${escapeHtml(requestedBy)}</p><div class="button-row queue-actions">${mode === "host" ? hostControls : phoneControls}</div></li>`;
 	}).join("")}</ul>`;
 }
 //#endregion
@@ -7487,7 +7485,7 @@ function renderHost(main) {
 	const tvStatus = audioPipeline.receiverReady ? audioPipeline.receiverPcConnectionState === "connected" ? "TV Connected" : audioPipeline.receiverPcConnectionState === "failed" ? "TV Failed" : "TV Tab Open" : "TV Not Open";
 	const topStatus = $("#hostTopStatus");
 	if (topStatus) topStatus.innerHTML = `<div class="host-status-grid">
-      <div class="status-item"><span class="status-label">Room</span><span id="hostRoomCode" class="status-value">${escapeHtml$1(room.roomCode)}</span></div>
+      <div class="status-item"><span class="status-label">Room</span><span id="hostRoomCode" class="status-value">${escapeHtml(room.roomCode)}</span></div>
       <div class="status-item"><span class="status-label">TV</span><span id="hostTvStatus" class="status-value">${tvStatus}</span></div>
       <div class="status-item"><span class="status-label">QR Join</span><span id="hostQrJoinStatus" class="status-value">${qrStatus}</span></div>
       <div class="status-item"><span class="status-label">Singers</span><span id="hostSingerCount" class="status-value">${room.players.length}/5</span></div>
@@ -7510,7 +7508,7 @@ function renderHost(main) {
 			if (panel) {
 				const playerUrl = new URL(`../player/?room=${encodeURIComponent(room.roomCode)}`, location.href).toString();
 				const peerJsUrl = peerJsTransport ? PeerJsRoomTransport.playerJoinUrl(room.roomCode) : playerUrl;
-				panel.innerHTML = `<div class="card"><h2>Singer Join QR</h2><div id="showQrContainer"></div><p><a href="${escapeHtml$1(peerJsUrl)}" id="singerJoinLink">${escapeHtml$1(peerJsUrl)}</a></p></div>`;
+				panel.innerHTML = `<div class="card"><h2>Singer Join QR</h2><div id="showQrContainer"></div><p><a href="${escapeHtml(peerJsUrl)}" id="singerJoinLink">${escapeHtml(peerJsUrl)}</a></p></div>`;
 				const qrContainer = $("#showQrContainer");
 				if (qrContainer) qrContainer.innerHTML = qrSvg(peerJsUrl, {
 					scale: 4,
@@ -7531,8 +7529,8 @@ function renderHost(main) {
 		panels.innerHTML = `<div class="host-panels">
       <details class="card" ${room.players.length > 1 && room.queue.length > 0 ? "" : "open"}><summary>Setup</summary><p>Share the singer link or QR above. Singers scan and join automatically.</p><p class="hint">Chrome tab cast: open TV Stage first, then cast that tab.</p></details>
       <div class="card queue-card"><h2>Run the Room</h2><div class="button-row"><button id="acceptAll">Approve Waiting</button><button id="startNext" class="primary">Start Next</button><button id="pauseSong">Pause</button><button id="resumeSong">Resume</button></div>${queueHtml(room, "host")}</div>
-      <details class="card"><summary>Singers (${activeSingers} active)</summary>${room.players.map((p) => `<div class="singer-row"><label class="check"><input type="checkbox" class="singer" value="${p.playerId}" ${p.isSingerForCurrentSong ? "checked" : ""}> #${p.playerNumber || "?"} ${escapeHtml$1(p.displayName)} ${p.micState?.enabled ? p.micState.muted ? "(muted)" : "(live)" : ""}</label></div>`).join("")}<div class="button-row"><button id="setSingers" class="primary">Update Singers</button></div></details>
-      <details class="card"><summary>Now Playing</summary>${room.currentQueueItemId ? `<p>${escapeHtml$1(songTitle(room.currentSongId || ""))}</p>` : "<p>No song active</p>"}${room.players.some((p) => p.isSingerForCurrentSong) ? "<p class=\"warn\">TV bleed risk: singers should use headphones.</p>" : ""}</details>
+      <details class="card"><summary>Singers (${activeSingers} active)</summary>${room.players.map((p) => `<div class="singer-row"><label class="check"><input type="checkbox" class="singer" value="${p.playerId}" ${p.isSingerForCurrentSong ? "checked" : ""}> #${p.playerNumber || "?"} ${escapeHtml(p.displayName)} ${p.micState?.enabled ? p.micState.muted ? "(muted)" : "(live)" : ""}</label></div>`).join("")}<div class="button-row"><button id="setSingers" class="primary">Update Singers</button></div></details>
+      <details class="card"><summary>Now Playing</summary>${room.currentQueueItemId ? `<p>${escapeHtml(songTitle(room.currentSongId || ""))}</p>` : "<p>No song active</p>"}${room.players.some((p) => p.isSingerForCurrentSong) ? "<p class=\"warn\">TV bleed risk: singers should use headphones.</p>" : ""}</details>
     </div>`;
 		$("#acceptAll").onclick = () => {
 			room.queue.filter((q) => q.status === "requested").forEach((q) => acceptQueue(room, q.queueItemId));
@@ -7688,7 +7686,7 @@ function playerIsJoined() {
 	return !!(room?.hostPeerId && player?.playerNumber && room.players?.some((p) => p.playerId === player.playerId || p.peerId === player.peerId));
 }
 function joinRoomHtml(roomCode) {
-	return `<section id="playerJoinCard" class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie Singer Remote</p><h2>Join Room</h2><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div></div><div class="card"><label>Room Code<p id="playerRoomCode" class="status-pill">${escapeHtml$1((roomCode || "").toUpperCase() || "—")}</p></label><label>Your Name<input id="playerDisplayName" value="${escapeHtml$1(player?.displayName || "")}" placeholder="Your name"></label><button id="joinRoom" class="primary">Join Room</button></div></section>`;
+	return `<section id="playerJoinCard" class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie Singer Remote</p><h2>Join Room</h2><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div></div><div class="card"><label>Room Code<p id="playerRoomCode" class="status-pill">${escapeHtml((roomCode || "").toUpperCase() || "—")}</p></label><label>Your Name<input id="playerDisplayName" value="${escapeHtml(player?.displayName || "")}" placeholder="Your name"></label><button id="joinRoom" class="primary">Join Room</button></div></section>`;
 }
 function updatePlayerDisplayName() {
 	if (!player) return;
@@ -7747,14 +7745,6 @@ async function initPeerJsPlayer(roomCode) {
 		onPeerDisconnected: () => {},
 		onError: (err) => {
 			log(`PeerJS error: ${err.message}`);
-		},
-		onAutoJoinAnswer: async (peerId, answerText) => {
-			try {
-				await peerNode.acceptManualAnswer(answerText);
-				log("Auto-join: DataChannel opening...");
-			} catch (e) {
-				log(`Auto-join answer import failed: ${e.message}`);
-			}
 		}
 	});
 	globalThis.__carryokiePeerJsTransport = peerJsTransport;
@@ -7815,16 +7805,16 @@ function renderPlayer(main) {
 	if (!main) return;
 	const song = catalog.find((s) => s.songId === (room?.currentSongId || "song_002")) || catalog[0];
 	const roomCode = new URLSearchParams(location.search).get("room") || room?.roomCode || "";
-	const currentTitle = song ? `${escapeHtml$1(song.title || song.songId)}${song.artist ? " — " + escapeHtml$1(song.artist) : ""}` : "Pick a song";
+	const currentTitle = song ? `${escapeHtml(song.title || song.songId)}${song.artist ? " — " + escapeHtml(song.artist) : ""}` : "Pick a song";
 	const micLabel = deriveMicLabel(player);
 	if (!playerIsJoined()) {
 		main.innerHTML = joinRoomHtml(roomCode);
 		attachJoinHandlers();
 		return;
 	}
-	main.innerHTML = `<section id="playerSingerRemote" class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie Singer Remote</p><h2>${currentTitle}</h2><p class="subtle"><span id="playerRoomCode">Room ${escapeHtml$1(roomCode)}</span> · Player #${escapeHtml$1(player.playerNumber || "?")} · <span id="playerConnectionStatus">connected</span></p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p id="micStatus" class="status-pill ${micLabel.includes("Live") ? "live-status" : ""}">${escapeHtml$1(micLabel)}</p><div class="primary-actions"><button id="enableMic" class="primary">Enable My Mic</button><button id="holdSing" class="hold-button">Hold to Sing</button><button id="toggleSing">Live / Mute</button><button id="muteMic" class="danger">Mute Mic</button></div></div>
-<details id="queueSongPanel" class="card"><summary>Queue Song</summary><label>Your Name<input id="displayName" value="${escapeHtml$1(player.displayName || "Player")}" placeholder="Your name"></label><label>Song<select id="song">${catalog.map((s) => `<option value="${s.songId}">${escapeHtml$1(s.title)} — ${escapeHtml$1(s.artist)}</option>`).join("")}</select></label><label>Singers<input id="singers" value="${player.playerNumber || 2}" placeholder="Singer numbers comma separated"></label><p class="subtle">Default singer is you. Add more numbers only for duets/groups.</p><div class="button-row"><button id="requestSong" class="primary">Queue Selected Song</button><button id="requestSinger">Singer Only</button></div><div class="queue-list">${queueHtml(room, "phone")}</div></details>
-<details id="soundSettingsPanel" class="card"><summary>Sing</summary><p class="warn compact">${escapeHtml$1(singerWarning)}</p><label class="check"><input type="checkbox" id="pushToSing"> Push-to-sing</label><label>Mic Filter<select id="voicePreset"><option value="clean">Clean</option><option value="alto">Alto warm</option><option value="bravo">Bravo bright</option><option value="bass">Bass low</option><option value="radio">Radio</option><option value="autotune">Autotune-style polish</option></select></label><p id="wake" class="subtle"></p></details>
+	main.innerHTML = `<section id="playerSingerRemote" class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie Singer Remote</p><h2>${currentTitle}</h2><p class="subtle"><span id="playerRoomCode">Room ${escapeHtml(roomCode)}</span> · Player #${escapeHtml(player.playerNumber || "?")} · <span id="playerConnectionStatus">connected</span></p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p id="micStatus" class="status-pill ${micLabel.includes("Live") ? "live-status" : ""}">${escapeHtml(micLabel)}</p><div class="primary-actions"><button id="enableMic" class="primary">Enable My Mic</button><button id="holdSing" class="hold-button">Hold to Sing</button><button id="toggleSing">Live / Mute</button><button id="muteMic" class="danger">Mute Mic</button></div></div>
+<details id="queueSongPanel" class="card"><summary>Queue Song</summary><label>Your Name<input id="displayName" value="${escapeHtml(player.displayName || "Player")}" placeholder="Your name"></label><label>Song<select id="song">${catalog.map((s) => `<option value="${s.songId}">${escapeHtml(s.title)} — ${escapeHtml(s.artist)}</option>`).join("")}</select></label><label>Singers<input id="singers" value="${player.playerNumber || 2}" placeholder="Singer numbers comma separated"></label><p class="subtle">Default singer is you. Add more numbers only for duets/groups.</p><div class="button-row"><button id="requestSong" class="primary">Queue Selected Song</button><button id="requestSinger">Singer Only</button></div><div class="queue-list">${queueHtml(room, "phone")}</div></details>
+<details id="soundSettingsPanel" class="card"><summary>Sing</summary><p class="warn compact">${escapeHtml(singerWarning)}</p><label class="check"><input type="checkbox" id="pushToSing"> Push-to-sing</label><label>Mic Filter<select id="voicePreset"><option value="clean">Clean</option><option value="alto">Alto warm</option><option value="bravo">Bravo bright</option><option value="bass">Bass low</option><option value="radio">Radio</option><option value="autotune">Autotune-style polish</option></select></label><p id="wake" class="subtle"></p></details>
 <details class="card"><summary>Advanced Audio</summary><div class="button-row"><button id="startBacking">Start backing monitor</button><button id="pauseBacking">Pause backing monitor</button></div><label>Remote gain <input id="remoteGain" type="range" min="0" max="2" value="1" step=".05"></label><label>Backing monitor gain <input id="backingGain" type="range" min="0" max="1" value="0.35" step=".05"></label><label>Master gain <input id="masterGain" type="range" min="0" max="2" value="1" step=".05"></label></details>
 <details class="card"><summary>Lyrics / Sync</summary><video id="phoneVideo" controls playsinline muted></video><div id="lyricsPanel"></div><div class="button-row"><button id="earlier">Lyrics earlier</button><button id="later">Lyrics later</button><button id="resetSync">Reset sync</button></div></details></section>`;
 	document.querySelectorAll("button").forEach((b) => b.addEventListener("click", unlockPhoneAudio));
@@ -8033,7 +8023,8 @@ async function debugPage(root) {
 	};
 }
 function receiverPage(root) {
-	receiverApp(root);
+	receiverShell(root);
+	receiverApp($("#main"));
 }
 //#endregion
 //#region src/main.ts

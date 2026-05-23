@@ -202,8 +202,9 @@ try {
     pass("host page UX contract");
     await hostContext.close();
   } catch (e) {
-    await saveArtifacts(await browser.newPage(), "host");
+    await saveArtifacts(hostPage, "host");
     fail("host page UX contract", e);
+    await hostContext.close();
   }
 
   // ===== PLAYER PAGE UX ASSERTIONS =====
@@ -269,8 +270,9 @@ try {
     pass("player page UX contract");
     await playerContext.close();
   } catch (e) {
-    await saveArtifacts(await browser.newPage(), "player");
+    await saveArtifacts(playerPage, "player");
     fail("player page UX contract", e);
+    await playerContext.close();
   }
 
   // ===== RECEIVER PAGE UX ASSERTIONS =====
@@ -357,8 +359,9 @@ try {
     pass("receiver page UX contract");
     await receiverContext.close();
   } catch (e) {
-    await saveArtifacts(await browser.newPage(), "receiver");
+    await saveArtifacts(receiverPage, "receiver");
     fail("receiver page UX contract", e);
+    await receiverContext.close();
   }
 
 } catch (e) {
