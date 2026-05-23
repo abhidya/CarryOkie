@@ -174,7 +174,7 @@ try {
   );
   await receiver.waitForFunction(
     () =>
-      /Playing all forwarded singer mics|Playing \d+ unmuted live mic|Mic track connected, but singer is muted\.|Tap receiver once to start|Press 'Start receiver audio'/.test(
+      /Playing all forwarded singer mics|Playing \d+ unmuted live mic|Muted\.|Tap receiver once to start|Press 'Start receiver audio'/.test(
         document.body.textContent || "",
       ),
     null,
@@ -182,7 +182,7 @@ try {
   );
   await receiver.waitForFunction(
     () =>
-      /Playing \d+ unmuted live mic|Playing all forwarded singer mics|Mic track connected, but singer is muted\.|No live mic tracks connected\./.test(
+      /Playing \d+ unmuted live mic|Playing all forwarded singer mics|Muted\.|No live mic tracks connected\./.test(
         document.body.textContent || "",
       ),
     null,
@@ -279,7 +279,7 @@ try {
   await receiver.waitForFunction(
     () =>
       document.body.textContent?.includes(
-        "Mic track connected, but singer is muted.",
+          "Muted.",
       ),
     null,
     { timeout: 20000 },
@@ -340,7 +340,7 @@ try {
   await player.waitForSelector("text=Ready, muted.", { timeout: 5000 });
   await receiver.waitForFunction(
     () =>
-      /Mic track connected, but singer is muted\./.test(
+      /Muted\./.test(
         document.body.textContent || "",
       ) && /Unmuted: 0 · Muted: 1/.test(document.body.textContent || ""),
     null,

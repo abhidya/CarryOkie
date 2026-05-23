@@ -473,8 +473,8 @@ export function receiverApp(root: HTMLElement): void {
     if (liveMicTrackIds.size && audible.length) {
       return `Playing ${audible.length} unmuted live mic${audible.length === 1 ? "" : "s"}.`;
     }
-    if (liveMicTrackIds.size && muted.length) {
-      return "Mic track connected, but singer is muted.";
+  if (liveMicTrackIds.size && muted.length) {
+    return "Muted.";
     }
     if (liveMicTrackIds.size && !publishing.length) {
       return "Mic track connected, but room mic state is stale.";
@@ -544,7 +544,7 @@ export function receiverApp(root: HTMLElement): void {
     const liveMicStatus = root.querySelector("#receiverLiveMicStatus");
     if (liveMicStatus) {
       const { audible, muted, publishing } = singerMicSummary();
-      liveMicStatus.innerHTML = `<h2>Live Mics</h2><p class="subtle">${audible.length ? `Playing ${audible.length} unmuted live mic${audible.length === 1 ? "" : "s"}.` : muted.length ? "Mic connected, but singer is muted." : "Waiting for singer mic…"}</p><p class="subtle">Publishing: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>`;
+      liveMicStatus.innerHTML = `<h2>Live Mics</h2><p class="subtle">${audible.length ? `Playing ${audible.length} unmuted live mic${audible.length === 1 ? "" : "s"}.` : muted.length ? "Muted." : "Waiting for singer mic…"}</p><p class="subtle">Publishing: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>`;
       liveMicStatus.querySelector("#startReceiverAudio")?.addEventListener("click", () => { state.audioOutputUnlocked = true; void tryPlayLiveMics(); });
       liveMicStatus.querySelector("#retryLiveMics")?.addEventListener("click", () => { void tryPlayLiveMics(); });
     }

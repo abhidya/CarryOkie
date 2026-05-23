@@ -237,9 +237,7 @@ function sinkHostRemoteAudio(stream: MediaStream) {
   });
 }
 function currentMicStatusText() {
-  if (!player?.micState?.enabled) return "Mic muted until enabled.";
-  if (player.micState.muted) return "Mic muted.";
-  return "Mic live.";
+  return deriveMicLabel(player);
 }
 async function loadCatalog() {
   catalog = await loadSongCatalog(import.meta.url);
@@ -665,7 +663,7 @@ function setOwnMicMuted(muted) {
   }
   persist();
   const status = $("#micStatus");
-  if (status) status.textContent = muted ? "Mic muted." : "Mic live.";
+  if (status) status.textContent = deriveMicLabel(player);
   peerNode?.broadcast({
     type: muted ? RPC.MIC_MUTED : RPC.MIC_UNMUTED,
     playerId: player?.playerId,

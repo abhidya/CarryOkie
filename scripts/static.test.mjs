@@ -261,7 +261,7 @@ checks.push([
   "receiver audio diagnostics include singer mic summary",
   fs
     .readFileSync("src/cast.ts", "utf8")
-    .includes("Mic track connected, but singer is muted.") &&
+        .includes("Muted.") &&
     fs.readFileSync("src/cast.ts", "utf8").includes("Publishing singers:") &&
     fs.readFileSync("src/cast.ts", "utf8").includes("liveMicStatus()"),
 ]);
