@@ -92,31 +92,33 @@ checks.push([
 checks.push([
   "host exposes progressive setup and tab-cast receiver link",
   app.includes("setupComplete") &&
-    app.includes("Open TV receiver tab") &&
+    app.includes("Open TV Stage") &&
     app.includes("receiverUrl()") &&
     app.includes("setupReceiverBridge") &&
     app.includes("RECEIVER_PLAYBACK_SYNC") &&
     app.includes("publishReceiverCommand") &&
     app.includes("receiverPendingRenegotiate") &&
-    hasCompactAppSource("song: currentSong()"),
+    app.includes("currentSong()"),
 ]);
 checks.push([
   "player only shows join controls before pairing",
   app.includes("playerIsJoined()") &&
     app.includes("joinRoomHtml") &&
-    app.includes("After joining, queue and mic controls appear"),
+    app.includes("playerJoinCard") &&
+    app.includes("Join Room"),
 ]);
 checks.push([
-  "host exposes pause seek and remote mute controls",
-  app.includes('id="castPause"') &&
-    app.includes('id="castSeek"') &&
-    app.includes('class="mutePlayer"') &&
+  "host exposes pause/resume and singer assignment controls",
+  app.includes('id="pauseSong"') &&
+    app.includes('id="resumeSong"') &&
+    app.includes('id="setSingers"') &&
+    app.includes('class="singer"') &&
     hasCompactAppSource("type: RPC.MIC_MUTED"),
 ]);
 checks.push([
-  "cast current song is one-click connect and load",
-  app.includes("Connect TV / cast current song") &&
-    app.includes("Connecting to Chromecast") &&
+  "host can open TV Stage and still supports Cast load plumbing",
+  app.includes("Open TV Stage") &&
+    app.includes("setupReceiverBridge") &&
     app.includes("await cast.init()") &&
     app.includes("await loadCurrentSongOnTv()"),
 ]);
@@ -132,9 +134,9 @@ checks.push([
       .includes("Tap receiver once to start backing track/audio"),
 ]);
 checks.push([
-  "cast media origin override for Chromecast LAN access",
-  app.includes('id="castOrigin"') &&
-    app.includes("carryokie.castOrigin") &&
+  "cast media origin override remains available without raw default UI",
+  app.includes("carryokie.castOrigin") &&
+    app.includes("function castOrigin") &&
     fs
       .readFileSync("src/cast.ts", "utf8")
       .includes("rewriteCastUrlForReceiver"),
@@ -282,10 +284,10 @@ checks.push([
     !/\.phone-hero\s*\{[^}]*position:\s*sticky/s.test(styles),
 ]);
 checks.push([
-  "player has reconnect UI",
-  app.includes("Reconnect") &&
-    app.includes("Forget room, start fresh") &&
-    app.includes("forgetRoom"),
+  "host has start-over recovery UI",
+  app.includes('id="newRoom"') &&
+    app.includes("Start Over") &&
+    app.includes("location.reload()"),
 ]);
 checks.push([
   "debug page exposes connection diagnostics",

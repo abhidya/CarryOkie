@@ -50,7 +50,7 @@ async function measureRms(page, streamAccessor, label) {
   return page.evaluate(async ([accessor, lbl]) => {
     let stream;
     try {
-      if (accessor.type === "globalThis") stream = globalThis[accessor.key];
+      if (accessor.type === "globalThis") stream = accessor.subprop ? globalThis[accessor.key]?.[accessor.subprop] : globalThis[accessor.key];
       else if (accessor.type === "globalThisNested") stream = globalThis[accessor.key]?.[accessor.index];
       else if (accessor.type === "globalThisPeerNode") stream = globalThis[accessor.key]?.[accessor.prop]?.[accessor.index]?.[accessor.subprop];
       else if (accessor.type === "querySelector") {
@@ -80,6 +80,99 @@ async function measureRms(page, streamAccessor, label) {
       return peakRms;
     } catch { return 0; }
   }, [streamAccessor, label]);
+}
+
+
+const FORBIDDEN_MANUAL_SELECTORS = [
+  "#playerManualFallbackToggle",
+  "#manualPairingToggle",
+  "#makeOffer",
+  "#answerOffer",
+  "#importAnswer",
+];
+
+async function installManualFallbackClickGuard(context) {
+  await context.addInitScript((selectors) => {
+    globalThis.__carryokieManualFallbackClicks = [];
+    document.addEventListener(
+      "click",
+      (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        for (const selector of selectors) {
+          if (target.closest(selector)) {
+            globalThis.__carryokieManualFallbackClicks.push(selector);
+          }
+        }
+      },
+      true,
+    );
+  }, FORBIDDEN_MANUAL_SELECTORS);
+}
+
+async function assertNoManualFallbackClicks(pages) {
+  for (const page of pages) {
+    const clicked = await page.evaluate(
+      () => globalThis.__carryokieManualFallbackClicks || [],
+    );
+    assert.deepStrictEqual(clicked, [], `Manual fallback controls clicked: ${clicked.join(", ")}`);
+  }
+}
+
+async function assertManualFallbackClosedAndHidden(page, role) {
+  for (const selector of ["#playerManualFallbackToggle", "#manualPairingToggle"]) {
+    if (await page.locator(selector).count()) {
+      assert.strictEqual(
+        await page.locator(selector).getAttribute("open"),
+        null,
+        `${role} manual fallback panel is closed: ${selector}`,
+      );
+    }
+  }
+
+  for (const selector of ["#makeOffer", "#answerOffer", "#importAnswer"]) {
+    if (await page.locator(selector).count()) {
+      assert.strictEqual(
+        await page.locator(selector).first().isVisible(),
+        false,
+        `${role} manual fallback control hidden: ${selector}`,
+      );
+    }
+  }
+
+  const visibleText = await page.locator("body").innerText();
+  assert.doesNotMatch(
+    visibleText,
+    /Create phone pairing code|Finish pairing|Paste host answer|Import answer|Create host answer|Player creates a join code/i,
+    `${role} does not expose manual fallback copy in happy path`,
+  );
+}
+
+async function waitForPeerJsReady(page) {
+  await page.waitForFunction(() => {
+    const text = document.querySelector("#hostQrJoinStatus")?.textContent || "";
+    if (/manual fallback|unavailable|failed/i.test(text)) {
+      throw new Error(`PeerJS QR join is not ready: ${text}`);
+    }
+    return /QR Join Ready|Automatic join ready|ready/i.test(text);
+  }, null, { timeout: 30000 });
+}
+
+async function waitForReceiverUnmutedLiveMic(page) {
+  try {
+    await page.waitForFunction(
+      () => {
+        const text = document.querySelector("#receiverLiveMicStatus")?.textContent || "";
+        return /Playing \d+ unmuted live mic/i.test(text);
+      },
+      null,
+      { timeout: 20000 },
+    );
+  } catch (error) {
+    const text = await page.locator("#receiverLiveMicStatus").innerText().catch(() => "");
+    assert.doesNotMatch(text, /No live mic tracks|Waiting for singer mic|Muted\./i, `Receiver live mic rejected state: ${text}`);
+    throw error;
+  }
 }
 
 let browser;
@@ -114,6 +207,7 @@ try {
       viewport: { width: 1440, height: 900 },
       deviceScaleFactor: 1,
     });
+    await installManualFallbackClickGuard(context);
     await context.grantPermissions(["microphone"], { origin: baseUrl });
 
     // 1. Host opens /host/
@@ -123,12 +217,9 @@ try {
     const roomCode = await hostPage.locator("#hostRoomCode").innerText();
     assert.match(roomCode.trim(), /^[A-Z]+$/, "Room code generated");
 
-    // 2. Host starts PeerJsRoomTransport (verified by QR join status)
-    const qrStatus = await hostPage.locator("#hostQrJoinStatus").innerText();
-    assert.ok(
-      /QR Join|Starting|Ready|manual fallback|unavailable/i.test(qrStatus),
-      `PeerJS host transport active: ${qrStatus}`
-    );
+    // 2. Host starts PeerJsRoomTransport (verified by strict ready status)
+    await waitForPeerJsReady(hostPage);
+    await assertManualFallbackClosedAndHidden(hostPage, "host");
 
     // 3. Receiver opens /receiver/?room=CODE
     const receiverPage = await context.newPage();
@@ -143,6 +234,7 @@ try {
     const joinLinkHref = await receiverPage.locator("#receiverJoinLink").getAttribute("href");
     assert.ok(joinLinkHref.includes("player"), "Join link points to player route");
     assert.ok(joinLinkHref.includes("room"), "Join link includes room param");
+    await receiverPage.click("#startReceiverAudio");
 
     // 5. Player opens #receiverJoinLink (simulates QR scan)
     const playerPage = await context.newPage();
@@ -154,14 +246,15 @@ try {
     await playerPage.waitForSelector("#playerDisplayName", { timeout: 5000 });
     await playerPage.waitForSelector("#joinRoom", { timeout: 5000 });
 
-    // Verify no manual offer/answer controls visible
-    const playerBody = await playerPage.locator("body").innerText();
-    assert.doesNotMatch(playerBody, /Create phone pairing code/, "No manual offer button visible");
-    assert.doesNotMatch(playerBody, /Finish pairing/, "No finish pairing visible");
+    // Verify no manual offer/answer controls visible or used before join.
+    await assertManualFallbackClosedAndHidden(playerPage, "player");
+    await assertNoManualFallbackClicks([hostPage, receiverPage, playerPage]);
 
     // 7. Player fills name and clicks Join Room
     await playerPage.fill("#playerDisplayName", "PeerJS Singer");
     await playerPage.click("#joinRoom");
+
+    await assertManualFallbackClosedAndHidden(playerPage, "player");
 
     // 8. PeerJS auto-join MUST complete — DataChannel must open
     // This is the critical assertion: if PeerJS auto-join fails, the test FAILS.
@@ -188,6 +281,8 @@ try {
       { timeout: 30000 },
     );
 
+    await assertNoManualFallbackClicks([hostPage, receiverPage, playerPage]);
+
     // 10. Verify player is joined (has player number)
     await playerPage.waitForFunction(
       () => {
@@ -203,7 +298,11 @@ try {
     await playerPage.waitForTimeout(500);
     await playerPage.fill("#singers", "2");
     await playerPage.click("#requestSong");
-    await playerPage.waitForSelector("text=Queue request sent.", { timeout: 5000 });
+    await playerPage.waitForFunction(
+      () => document.querySelector("#log")?.textContent?.includes("Queue request sent."),
+      null,
+      { timeout: 5000 },
+    );
 
     // Wait for host to receive queue request (check #log content directly)
     await hostPage.waitForFunction(
@@ -216,13 +315,21 @@ try {
     await hostPage.click(".acceptItem");
     // After accept, item becomes "queued" and startItem button appears
     await hostPage.waitForSelector(".startItem", { timeout: 10000 });
-    // Player sees queued status
-    await playerPage.waitForSelector(".queue-status-queued", { timeout: 10000 });
+    // Player state contains queued status (the details panel may be collapsed in normal UX).
+    await playerPage.waitForFunction(
+      () => document.querySelector(".queue-status-queued"),
+      null,
+      { timeout: 10000 },
+    );
     // Host starts the song
     await hostPage.click(".startItem");
     // Host and player see active status
     await hostPage.waitForSelector(".queue-status-active", { timeout: 10000 });
-    await playerPage.waitForSelector(".queue-status-active", { timeout: 10000 });
+    await playerPage.waitForFunction(
+      () => document.querySelector(".queue-status-active"),
+      null,
+      { timeout: 10000 },
+    );
     await receiverPage.waitForSelector("text=singers", { timeout: 15000 });
 
     // 12. Mic enable works
@@ -242,12 +349,8 @@ try {
       { timeout: 15000 },
     );
 
-    // 13. Receiver gets live mic track
-    await receiverPage.waitForFunction(
-      () => /Playing all forwarded singer mics|Playing \d+ unmuted live mic|Muted\.|No live mic tracks/.test(document.body.textContent || ""),
-      null,
-      { timeout: 20000 },
-    );
+    // 13. Receiver gets an active, unmuted live mic track.
+    await waitForReceiverUnmutedLiveMic(receiverPage);
 
     // 14. Fake mic RMS checks
     if (useFakeMic) {
@@ -267,37 +370,54 @@ try {
       assert.ok(hostRelayRms > 0.001, `host relayed mic RMS=${hostRelayRms}`);
 
       const liveMicRms = await receiverPage.evaluate(async () => {
-        const audio = document.querySelector("#receiverLiveMicStatus audio");
-        const stream = audio?.srcObject;
-        if (!(stream instanceof MediaStream)) return 0;
-        const track = stream.getAudioTracks().find(t => t.readyState === "live");
-        if (!track) return 0;
-        const ctx = new AudioContext();
-        await ctx.resume();
-        const source = ctx.createMediaStreamSource(new MediaStream([track]));
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 2048;
-        source.connect(analyser);
-        const samples = new Float32Array(analyser.fftSize);
-        let peakRms = 0;
-        const deadline = performance.now() + 1200;
-        while (performance.now() < deadline) {
-          analyser.getFloatTimeDomainData(samples);
-          let sumSquares = 0;
-          for (const s of samples) sumSquares += s * s;
-          peakRms = Math.max(peakRms, Math.sqrt(sumSquares / samples.length));
-          await new Promise(r => requestAnimationFrame(r));
+        async function sampleReceiverLiveMicRms() {
+          const audio = document.querySelector("#receiverLiveMicStatus audio");
+          const stream = audio?.srcObject;
+          if (!(stream instanceof MediaStream)) return 0;
+          const track = stream.getAudioTracks().find(t => t.readyState === "live");
+          if (!track) return 0;
+          const ctx = new AudioContext();
+          await ctx.resume();
+          const source = ctx.createMediaStreamSource(new MediaStream([track]));
+          const analyser = ctx.createAnalyser();
+          analyser.fftSize = 2048;
+          source.connect(analyser);
+          const samples = new Float32Array(analyser.fftSize);
+          let peakRms = 0;
+          const deadline = performance.now() + 800;
+          while (performance.now() < deadline) {
+            analyser.getFloatTimeDomainData(samples);
+            let sumSquares = 0;
+            for (const s of samples) sumSquares += s * s;
+            peakRms = Math.max(peakRms, Math.sqrt(sumSquares / samples.length));
+            await new Promise(r => requestAnimationFrame(r));
+          }
+          await ctx.close();
+          return peakRms;
         }
-        await ctx.close();
-        return peakRms;
+        let peak = 0;
+        const deadline = performance.now() + 10000;
+        while (performance.now() < deadline && peak <= 0.001) {
+          peak = Math.max(peak, await sampleReceiverLiveMicRms());
+          if (peak <= 0.001) await new Promise(r => setTimeout(r, 250));
+        }
+        return peak;
       });
       console.log(`Receiver live mic RMS: ${liveMicRms}`);
+      assert.ok(
+        liveMicRms > 0.001,
+        `receiver live mic RMS=${liveMicRms}`,
+      );
     }
 
     // 15. Mute/unmute updates receiver visible state
     await playerPage.click("#toggleSing");
     await playerPage.waitForSelector("text=Ready, muted.", { timeout: 5000 });
-    await hostPage.waitForSelector("text=MIC_MUTED", { timeout: 10000 });
+    await hostPage.waitForFunction(
+      () => document.querySelector("#log")?.textContent?.includes("MIC_MUTED"),
+      null,
+      { timeout: 10000 },
+    );
     await receiverPage.waitForFunction(
       () => document.body.textContent?.includes("Muted."),
       null,
@@ -310,12 +430,18 @@ try {
       null,
       { timeout: 5000 },
     );
-    await hostPage.waitForSelector("text=MIC_UNMUTED", { timeout: 10000 });
+    await hostPage.waitForFunction(
+      () => document.querySelector("#log")?.textContent?.includes("MIC_UNMUTED"),
+      null,
+      { timeout: 10000 },
+    );
     await receiverPage.waitForFunction(
       () => /Playing \d+ unmuted live mic/.test(document.body.textContent || ""),
       null,
       { timeout: 20000 },
     );
+
+    await assertNoManualFallbackClicks([hostPage, receiverPage, playerPage]);
 
     pass("PeerJS QR auto-join e2e");
 
@@ -336,7 +462,7 @@ try {
   }
 
 } catch (e) {
-  console.error(`Setup failed: ${e.message}`);
+  fail("PeerJS QR setup", e);
 } finally {
   if (browser) await browser.close();
   stopServer();

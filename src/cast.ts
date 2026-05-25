@@ -732,6 +732,9 @@ export function receiverApp(root: HTMLElement): void {
       if (liveMicSection) {
         const subtitle = liveMicSection.querySelector("p.subtle");
         if (subtitle) subtitle.outerHTML = liveMicSummaryHtml();
+        if (!liveMicSection.contains(liveMicAudio)) {
+          liveMicSection.appendChild(liveMicAudio);
+        }
       }
       return liveMicAudio;
     }
@@ -813,6 +816,7 @@ export function receiverApp(root: HTMLElement): void {
       liveMicLastPlayError = "";
       state.liveMicStatus = liveMicStatus();
       render();
+      ensureLiveMicAudio();
     } catch (error) {
       liveMicLastPlayError = (error as Error).message;
       state.liveMicStatus =

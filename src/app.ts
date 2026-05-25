@@ -1023,8 +1023,8 @@ async function initPeerJsHost() {
     },
     onAutoJoinOffer: async (peerId, offerText) => {
       try {
-        const answerText = await peerNode.acceptManualOffer(offerText);
-        peerJsTransport.sendAutoJoinAnswer(peerId, answerText);
+        const answerPayload = await peerNode.acceptManualOffer(offerText);
+        peerJsTransport.sendAutoJoinAnswer(peerId, answerPayload.token);
         log(`Auto-join: answered ${peerId}`);
       } catch (e) {
         log(`Auto-join failed for ${peerId}: ${e.message}`);
@@ -1137,28 +1137,36 @@ function renderHost(main) {
     $("#answerOffer").onclick = async () => { try { const encoded = await peerNode.acceptManualOffer($("#offer").value); renderPayloadCard($("#answerOut"), encoded, "Host answer"); } catch (e) { log(e.message); } };
   }
 
-  $("#castStatus").textContent = "Click to connect to Chromecast";
   const cast = castController || (castController = new CastController("CC1AD845"));
   attachCastListeners(cast);
-  $("#castBtn").onclick = async () => {
-    try {
-      saveCastOrigin();
-      $("#castBtn").disabled = true;
-      $("#castStatus").textContent = "Connecting to Chromecast…";
-      await cast.init();
-      await cast.requestSession();
-      $("#castBtn").style.display = "none";
-      showCastControls();
-      $("#castStatus").textContent = "Connected to TV";
-      publishReceiverState();
-      log("Cast connected");
-      await loadCurrentSongOnTv();
-    } catch (e) { $("#castBtn").disabled = false; log(e.message); }
-  };
-  $("#castLoadBtn").onclick = () => { saveCastOrigin(); loadCurrentSongOnTv(); };
-  $("#castPlayBtn").onclick = () => { publishReceiverCommand("CAST_PLAY"); cast.play().catch(e => log(e.message)); };
-  $("#castPause").onclick = () => { publishReceiverCommand("CAST_PAUSE"); cast.pause(); };
-  $("#castSeek").onclick = () => { const seconds = +$("#castSeekSeconds").value || 0; publishReceiverCommand("CAST_SEEK", { seconds }); cast.seek(seconds); if (room?.playbackState) { const now = Date.now(); room.playbackState = { ...room.playbackState, tvMediaTimeMs: seconds * 1000, tvMediaTimeSampledAtHostMs: now, seekOffsetMs: 0, lastUpdatedAtHostMs: now }; publishReceiverPlayback(room.playbackState); persist(); } };
+  const castStatus = $("#castStatus");
+  const castButton = $("#castBtn");
+  if (castStatus && castButton) {
+    castStatus.textContent = "Click to connect to Chromecast";
+    castButton.onclick = async () => {
+      try {
+        saveCastOrigin();
+        castButton.disabled = true;
+        castStatus.textContent = "Connecting to Chromecast…";
+        await cast.init();
+        await cast.requestSession();
+        castButton.style.display = "none";
+        showCastControls();
+        castStatus.textContent = "Connected to TV";
+        publishReceiverState();
+        log("Cast connected");
+        await loadCurrentSongOnTv();
+      } catch (e) { castButton.disabled = false; log(e.message); }
+    };
+  }
+  const castLoadButton = $("#castLoadBtn");
+  if (castLoadButton) castLoadButton.onclick = () => { saveCastOrigin(); loadCurrentSongOnTv(); };
+  const castPlayButton = $("#castPlayBtn");
+  if (castPlayButton) castPlayButton.onclick = () => { publishReceiverCommand("CAST_PLAY"); cast.play().catch(e => log(e.message)); };
+  const castPauseButton = $("#castPause");
+  if (castPauseButton) castPauseButton.onclick = () => { publishReceiverCommand("CAST_PAUSE"); cast.pause(); };
+  const castSeekButton = $("#castSeek");
+  if (castSeekButton) castSeekButton.onclick = () => { const seconds = +$("#castSeekSeconds").value || 0; publishReceiverCommand("CAST_SEEK", { seconds }); cast.seek(seconds); if (room?.playbackState) { const now = Date.now(); room.playbackState = { ...room.playbackState, tvMediaTimeMs: seconds * 1000, tvMediaTimeSampledAtHostMs: now, seekOffsetMs: 0, lastUpdatedAtHostMs: now }; publishReceiverPlayback(room.playbackState); persist(); } };
 }
 export async function playerPage(root) {
   await loadCatalog();
@@ -1249,8 +1257,8 @@ async function initPeerJsPlayer(roomCode) {
   await peerJsTransport.joinRoom(roomCode.toUpperCase(), { displayName: player.displayName, playerId: player.playerId });
   log(`PeerJS joined room ${roomCode}`);
 
-  const offerText = await peerNode.createManualOffer("host");
-  peerJsTransport.sendAutoJoinOffer(offerText);
+  const offerPayload = await peerNode.createManualOffer("host");
+  peerJsTransport.sendAutoJoinOffer(offerPayload.token);
   log("Auto-join: offer sent, waiting for answer...");
 
   const answerText = await peerJsTransport.waitForAutoJoinAnswer(30000);

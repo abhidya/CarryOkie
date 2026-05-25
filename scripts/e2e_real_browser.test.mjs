@@ -94,46 +94,19 @@ try {
     waitUntil: "networkidle",
   });
   await player.fill("#playerDisplayName", "Real E2E");
-
-  // Open manual pairing fallback on player
-  await player.click("#playerManualFallbackToggle summary");
-  await player.waitForSelector("#playerManualFallbackPanel #makeOffer", { timeout: 5000 });
-  await player.click("#makeOffer");
-  await player.waitForSelector("#offerOut [data-single-qr] svg", {
-    timeout: 10000,
-  });
-  const offer = await player.locator("#offerOut textarea").first().inputValue();
-  assert.match(offer, /#signal=ck1\./);
-
-  // Open manual pairing fallback on host
-  await host.click("#manualPairingToggle summary");
-  await host.waitForSelector("#manualPairingPanel #offer", { timeout: 5000 });
-  await host.fill("#offer", offer);
-  await host.click("#answerOffer");
-  await host.waitForSelector("#answerOut [data-single-qr] svg", {
-    timeout: 10000,
-  });
-  const answer = await host.locator("#answerOut textarea").first().inputValue();
-  assert.match(answer, /#signal=ck1\./);
-
-  // Open diagnostics on player to see log
-  await player.click("#diagnosticsToggle summary");
-  await player.fill("#answer", answer);
-  await player.click("#importAnswer");
+  await player.click("#joinRoom");
   await player.waitForSelector("text=CarryOkie Singer Remote", { timeout: 15000 });
   await player.waitForFunction(
     () =>
       document.querySelector("#log")?.textContent?.includes("DataChannel open"),
     null,
-    { timeout: 15000 },
+    { timeout: 60000 },
   );
 
-  // Open diagnostics on host to see log
-  await host.click("#diagnosticsToggle summary");
   await host.waitForFunction(
     () => document.querySelector("#log")?.textContent?.includes("ROOM_HELLO"),
     null,
-    { timeout: 15000 },
+    { timeout: 30000 },
   );
 
   await player.click("#soundSettingsPanel summary");
@@ -144,8 +117,16 @@ try {
   await player.click("#queueSongPanel summary");
   await player.fill("#singers", "2");
   await player.click("#requestSong");
-  await player.waitForSelector("text=Queue request sent.", { timeout: 5000 });
-  await host.waitForSelector("text=QUEUE_ADD_REQUEST", { timeout: 10000 });
+  await player.waitForFunction(
+    () => document.querySelector("#log")?.textContent?.includes("Queue request sent."),
+    null,
+    { timeout: 5000 },
+  );
+  await host.waitForFunction(
+    () => document.querySelector("#log")?.textContent?.includes("QUEUE_ADD_REQUEST"),
+    null,
+    { timeout: 10000 },
+  );
   await host.click("#hostPanels details summary");
   await host.waitForSelector(".acceptItem", { timeout: 10000 });
   await host.click(".acceptItem");
@@ -275,7 +256,11 @@ try {
   }
   await player.click("#toggleSing");
   await player.waitForSelector("text=Ready, muted.", { timeout: 5000 });
-  await host.waitForSelector("text=MIC_MUTED", { timeout: 10000 });
+  await host.waitForFunction(
+    () => document.querySelector("#log")?.textContent?.includes("MIC_MUTED"),
+    null,
+    { timeout: 10000 },
+  );
   await receiver.waitForFunction(
     () =>
       document.body.textContent?.includes(
@@ -290,7 +275,11 @@ try {
     null,
     { timeout: 5000 },
   );
-  await host.waitForSelector("text=MIC_UNMUTED", { timeout: 10000 });
+  await host.waitForFunction(
+    () => document.querySelector("#log")?.textContent?.includes("MIC_UNMUTED"),
+    null,
+    { timeout: 10000 },
+  );
   await receiver.waitForFunction(
     () => /Playing \d+ unmuted live mic/.test(document.body.textContent || ""),
     null,

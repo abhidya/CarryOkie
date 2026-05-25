@@ -317,6 +317,14 @@ export class PeerJsRoomTransport {
     });
   }
 
+  sendTo(peerId: string, message: RoomMessage): void {
+    const conn = this.connections.get(peerId);
+    if (!conn || !conn.open) {
+      throw new Error(`PeerJS connection is not open: ${peerId}`);
+    }
+    conn.send(message);
+  }
+
   disconnectPeer(peerId: string): void {
     const conn = this.connections.get(peerId);
     if (conn) {

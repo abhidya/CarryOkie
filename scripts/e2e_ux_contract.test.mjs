@@ -175,12 +175,6 @@ try {
     const diagPanel = hostPage.locator("#diagnosticsPanel");
     assert.ok(await diagPanel.isVisible(), "Diagnostics panel visible after toggle");
 
-    // Clicking manualPairingToggle reveals manual fallback
-    await hostPage.click("#manualPairingToggle summary");
-    await hostPage.waitForTimeout(200);
-    const manualPanel = hostPage.locator("#manualPairingPanel");
-    assert.ok(await manualPanel.isVisible(), "Manual pairing panel visible after toggle");
-
     // Mobile pass
     await hostPage.setViewportSize({ width: 390, height: 844 });
     await expectNoHorizontalOverflow(hostPage, "Host mobile horizontal overflow");
@@ -244,11 +238,6 @@ try {
     await expectHiddenText(playerPage, /Create phone pairing code/, "Create phone pairing code hidden");
     await expectHiddenText(playerPage, /Host answer/, "Host answer hidden");
     await expectHiddenText(playerPage, /Finish pairing/, "Finish pairing hidden");
-
-    // Manual controls appear only after toggle
-    await playerPage.click("#playerManualFallbackToggle summary");
-    await playerPage.waitForTimeout(200);
-    await expectVisible(playerPage, "#makeOffer", "Make offer visible after toggle");
 
     // Desktop viewport pass
     await playerPage.setViewportSize({ width: 1440, height: 900 });
