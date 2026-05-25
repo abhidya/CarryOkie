@@ -6156,7 +6156,7 @@ function receiverApp(root) {
 		const { audible, muted, publishing } = singerMicSummary();
 		if (liveMicTrackIds.size && audible.length) return `Playing ${audible.length} unmuted live mic${audible.length === 1 ? "" : "s"}.`;
 		if (liveMicTrackIds.size && muted.length) return "Muted.";
-		if (liveMicTrackIds.size && !publishing.length) return "Mic track connected, but room mic state is stale.";
+		if (liveMicTrackIds.size && !publishing.length) return "Muted.";
 		return "No live mic tracks connected.";
 	}
 	function renderAudioDiagnostics() {

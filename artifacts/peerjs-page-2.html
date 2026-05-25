@@ -1,0 +1,28 @@
+<!DOCTYPE html><html><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>CarryOkie player</title>
+    <script type="module" crossorigin="" src="../assets/player.js"></script>
+    <link rel="modulepreload" crossorigin="" href="../assets/main2.js">
+    <link rel="stylesheet" crossorigin="" href="../assets/styles.css">
+  </head>
+  <body>
+    <div id="app" data-page="player"><div id="playerSingerRemote"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>CarryOkie Singer Remote</h1></div><div class="mini-stage" aria-hidden="true"><span></span><span></span><span></span></div></header><section id="main"><section id="playerJoinCard" class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie Singer Remote</p><h2>Join Room</h2><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div></div><div class="card"><label>Room Code<p id="playerRoomCode" class="status-pill">BIRDSTAR</p></label><label>Your Name<input id="playerDisplayName" value="Player" placeholder="Your name" style=""></label><button id="joinRoom" class="primary">Join Room</button></div></section></section><details id="playerManualFallbackToggle" class="card" open=""><summary>Manual Pairing Fallback</summary><div id="playerManualFallbackPanel"><p>Player creates a join code, then imports the host answer.</p><button id="makeOffer" class="primary">Create phone pairing code</button><div id="offerOut"></div><label>Host answer<textarea id="answer" placeholder="Paste host answer/link/chunks" style=""></textarea></label><div class="button-row"><button id="scanAnswerQr">Scan host answer QR</button><button id="importAnswer" class="primary">Finish pairing</button></div></div></details><details id="diagnosticsToggle" class="card"><summary>Diagnostics</summary><div id="diagnosticsPanel"><pre id="audioPipelineStatus"></pre><div id="log" class="log"><div>12:52:51 PM Auto-join failed: Could not connect to peer BIRDSTAR. Use manual fallback below.</div><div>12:52:51 PM PeerJS state: failed</div><div>12:52:51 PM PeerJS state: disconnected</div><div>12:52:51 PM PeerJS state: disconnected</div><div>12:52:50 PM PeerJS state: starting</div></div></div></details></div></div>
+    <script data-gh-pages-bootstrap="">
+      (() => {
+        const hostname = location.hostname;
+        const parts = location.pathname
+          .replace(/\/index\.html$/, "/")
+          .split("/")
+          .filter(Boolean);
+        if (!hostname.endsWith("github.io") || parts.includes("dist")) return;
+        const page = parts.at(-1);
+        if (!page) return;
+        location.replace(
+          `${location.origin}/${[...parts.slice(0, -1), "dist", page, ""].join("/")}${location.search}${location.hash}`,
+        );
+      })();
+    </script>
+  
+
+</body></html>

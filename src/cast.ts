@@ -477,7 +477,7 @@ export function receiverApp(root: HTMLElement): void {
     return "Muted.";
     }
     if (liveMicTrackIds.size && !publishing.length) {
-      return "Mic track connected, but room mic state is stale.";
+	return "Muted.";
     }
     return "No live mic tracks connected.";
   }

@@ -1,0 +1,51 @@
+<!DOCTYPE html><html><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>CarryOkie host</title>
+    <script type="module" crossorigin="" src="../assets/host.js"></script>
+    <link rel="modulepreload" crossorigin="" href="../assets/main2.js">
+    <link rel="stylesheet" crossorigin="" href="../assets/styles.css">
+  </head>
+  <body>
+    <div id="app" data-page="host"><div id="appShell"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>CarryOkie Show Control</h1></div><div class="mini-stage" aria-hidden="true"><span></span><span></span><span></span></div></header><div id="hostShowControl"><div id="hostTopStatus" class="card"><div class="host-status-grid">
+      <div class="status-item"><span class="status-label">Room</span><span id="hostRoomCode" class="status-value">BIRDSTAR</span></div>
+      <div class="status-item"><span class="status-label">TV</span><span id="hostTvStatus" class="status-value">TV Not Open</span></div>
+      <div class="status-item"><span class="status-label">QR Join</span><span id="hostQrJoinStatus" class="status-value">Starting...</span></div>
+      <div class="status-item"><span class="status-label">Singers</span><span id="hostSingerCount" class="status-value">1/5</span></div>
+      <div class="status-item"><span class="status-label">Live Mics</span><span id="hostLiveMicCount" class="status-value">0</span></div>
+      <div class="status-item"><span class="status-label">Queue</span><span id="hostQueueCount" class="status-value">0</span></div>
+    </div></div><div id="hostActions" class="button-row"><button id="copySingerLink" class="primary">Copy Singer Link</button><button id="openTvStage">Open TV Stage</button><button id="showJoinQr">Show QR</button><button id="newRoom">Start Over</button></div><div id="hostPanels"><div class="host-panels">
+      <details class="card" open=""><summary>Setup</summary><p>Share the singer link or QR above. Singers scan and join automatically.</p><p class="hint">Chrome tab cast: open TV Stage first, then cast that tab.</p></details>
+      <div class="card queue-card"><h2>Run the Room</h2><div class="button-row"><button id="acceptAll">Approve Waiting</button><button id="startNext" class="primary">Start Next</button><button id="pauseSong">Pause</button><button id="resumeSong">Resume</button></div><p class="subtle">No songs queued yet.</p></div>
+      <details class="card"><summary>Singers (0 active)</summary><div class="singer-row"><label class="check"><input type="checkbox" class="singer" value="64aa28d9-c0e2-49cb-8651-0c18662ffc3b" style=""> #1 Host </label></div><div class="button-row"><button id="setSingers" class="primary">Update Singers</button></div></details>
+      <details class="card"><summary>Now Playing</summary><p>No song active</p></details>
+    </div></div><details id="manualPairingToggle" class="card"><summary>Manual Pairing Fallback</summary><div id="manualPairingPanel"><p>Player creates a join code. Paste or scan it here, then send back the host answer.</p><textarea id="offer" placeholder="Paste player offer/link/chunks" style=""></textarea><div class="button-row"><button id="scanOfferQr">Scan player QR</button><button id="answerOffer" class="primary">Create host answer</button></div><div id="answerOut"></div></div></details><details id="diagnosticsToggle" class="card"><summary>Diagnostics</summary><div id="diagnosticsPanel"><pre id="audioPipelineStatus">{
+  "hostRemoteAudioTracks": 0,
+  "hostRelayedStreams": 0,
+  "receiverReady": true,
+  "receiverPcConnectionState": "new",
+  "receiverPcIceState": "new",
+  "receiverTracksAdded": 0,
+  "receiverOfferSentAt": null,
+  "receiverAnswerReceivedAt": null,
+  "receiverLastError": null,
+  "micLatencyStats": null
+}</pre><div id="log" class="log"><div>12:52:46 PM PeerJS host failed: Cannot set properties of null (setting 'textContent')</div></div></div></details></div></div></div>
+    <script data-gh-pages-bootstrap="">
+      (() => {
+        const hostname = location.hostname;
+        const parts = location.pathname
+          .replace(/\/index\.html$/, "/")
+          .split("/")
+          .filter(Boolean);
+        if (!hostname.endsWith("github.io") || parts.includes("dist")) return;
+        const page = parts.at(-1);
+        if (!page) return;
+        location.replace(
+          `${location.origin}/${[...parts.slice(0, -1), "dist", page, ""].join("/")}${location.search}${location.hash}`,
+        );
+      })();
+    </script>
+  
+
+</body></html>
