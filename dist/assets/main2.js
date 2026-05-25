@@ -6122,7 +6122,8 @@ var CastController = class extends EventTarget {
 	}
 };
 function receiverApp(root) {
-	const initialRoomCode = new URLSearchParams(location.search).get("room") || "------";
+	const initialRoomCode = (PeerJsRoomTransport.readRoomCodeFromUrl() || "------").toUpperCase();
+	const lockedRoomCode = initialRoomCode === "------" ? "" : initialRoomCode;
 	const state = {
 		roomCode: initialRoomCode,
 		song: null,
@@ -6282,10 +6283,18 @@ function receiverApp(root) {
 			return null;
 		}
 	}
+	function payloadRoomCode(payload) {
+		return String(payload?.roomCode || "").toUpperCase();
+	}
+	function payloadMatchesReceiverRoom(payload) {
+		if (!lockedRoomCode) return true;
+		return payloadRoomCode(payload) === lockedRoomCode;
+	}
 	function handle(raw) {
 		const msg = unpack(raw);
 		if (!msg?.type) return;
 		const payload = msg.payload;
+		if (!payloadMatchesReceiverRoom(payload)) return;
 		if (msg.type === "CAST_LOAD_SONG" && payload) loadSong(payload.song, payload.roomCode);
 		if (msg.type === "CAST_PLAY") {
 			if (!media.src && state.song) loadSong(state.song, state.roomCode);
@@ -6302,17 +6311,17 @@ function receiverApp(root) {
 			state.playbackState = payload;
 			state.mediaTimeMs = deriveTvMediaPositionMs(payload).positionMs;
 		}
-		if (msg.type === "CAST_SHOW_JOIN_QR" && payload) state.roomCode = payload.roomCode;
+		if (msg.type === "CAST_SHOW_JOIN_QR" && payload) state.roomCode = lockedRoomCode || payload.roomCode;
 		if (msg.type === "CAST_UPDATE_QUEUE_PREVIEW" && payload) state.queue = payload.queue || [];
 		if (msg.type === "RECEIVER_STATE" && payload) {
-			state.roomCode = payload.roomCode || state.roomCode;
+			state.roomCode = lockedRoomCode || payload.roomCode || state.roomCode;
 			state.queue = payload.queue || state.queue;
 			state.singers = payload.singers || state.singers;
 			if (payload.playbackState) {
 				state.playbackState = payload.playbackState;
 				state.mediaTimeMs = deriveTvMediaPositionMs(payload.playbackState).positionMs;
 			}
-			loadSong(payload.song, payload.roomCode);
+			loadSong(payload.song, state.roomCode);
 			if (liveMicTrackIds.size) tryPlayLiveMics();
 		}
 		render();
@@ -6463,7 +6472,7 @@ function receiverApp(root) {
 		channel.onmessage = async (ev) => {
 			const msg = ev.data || {};
 			if (msg.type === "RECEIVER_STATE") handle(msg);
-			if (msg.type === "RECEIVER_AUDIO_STATUS" && msg.payload) {
+			if (msg.type === "RECEIVER_AUDIO_STATUS" && msg.payload && payloadMatchesReceiverRoom(msg.payload)) {
 				state.audioDiagnostics = msg.payload;
 				renderAudioDiagnostics();
 				if (liveMicTrackIds.size) tryPlayLiveMics();
@@ -6718,7 +6727,10 @@ function publishAudioPipelineStatus() {
 	renderAudioPipelineStatus();
 	receiverChannel?.postMessage?.({
 		type: "RECEIVER_AUDIO_STATUS",
-		payload: { ...audioPipeline }
+		payload: {
+			...audioPipeline,
+			roomCode: room?.roomCode
+		}
 	});
 }
 function summarizeInboundAudioStats(report) {
@@ -6928,13 +6940,19 @@ function publishReceiverState() {
 function publishReceiverPlayback(sample = room?.playbackState) {
 	receiverChannel?.postMessage?.({
 		type: "RECEIVER_PLAYBACK_SYNC",
-		payload: sample
+		payload: {
+			...sample || {},
+			roomCode: room?.roomCode
+		}
 	});
 }
 function publishReceiverCommand(type, payload = {}) {
 	receiverChannel?.postMessage?.({
 		type,
-		payload
+		payload: {
+			...payload,
+			roomCode: room?.roomCode
+		}
 	});
 }
 function sendCastRoomUpdate(type, payload = {}) {
@@ -7503,7 +7521,7 @@ function renderHost(main) {
 	if (actions) {
 		actions.innerHTML = `<button id="copySingerLink" class="primary">Copy Singer Link</button><button id="openTvStage">Open TV Stage</button><button id="showJoinQr">Show QR</button><button id="newRoom">Start Over</button>`;
 		$("#copySingerLink").onclick = async () => {
-			const link = new URL(`../player/?room=${encodeURIComponent(room.roomCode)}`, location.href).toString();
+			const link = PeerJsRoomTransport.playerJoinUrl(room.roomCode);
 			try {
 				await navigator.clipboard.writeText(link);
 			} catch {}
@@ -7697,6 +7715,9 @@ async function playerPage(root) {
 	showManualFallbackPanel();
 	renderPlayer($("#main"));
 }
+function roomCodeFromLocation() {
+	return PeerJsRoomTransport.readRoomCodeFromUrl() || room?.roomCode || "";
+}
 function playerIsJoined() {
 	return !!(room?.hostPeerId && player?.playerNumber && room.players?.some((p) => p.playerId === player.playerId || p.peerId === player.peerId));
 }
@@ -7723,7 +7744,7 @@ function updatePlayerDisplayName() {
 function attachJoinHandlers() {
 	document.querySelectorAll("button").forEach((b) => b.addEventListener("click", unlockPhoneAudio));
 	$("#joinRoom").onclick = async () => {
-		const roomCode = new URLSearchParams(location.search).get("room") || room?.roomCode || "";
+		const roomCode = roomCodeFromLocation();
 		const displayName = normalizeDisplayName($("#playerDisplayName")?.value, "Player");
 		player.displayName = displayName;
 		persist();
@@ -7819,7 +7840,7 @@ function showManualFallbackPanel() {
 function renderPlayer(main) {
 	if (!main) return;
 	const song = catalog.find((s) => s.songId === (room?.currentSongId || "song_002")) || catalog[0];
-	const roomCode = new URLSearchParams(location.search).get("room") || room?.roomCode || "";
+	const roomCode = roomCodeFromLocation();
 	const currentTitle = song ? `${escapeHtml(song.title || song.songId)}${song.artist ? " — " + escapeHtml(song.artist) : ""}` : "Pick a song";
 	const micLabel = deriveMicLabel(player);
 	if (!playerIsJoined()) {

@@ -208,7 +208,7 @@ try {
       deviceScaleFactor: 1,
     });
     const playerPage = await playerContext.newPage();
-    await playerPage.goto(`${baseUrl}/player/?room=TESTROOM`, { waitUntil: "networkidle" });
+    await playerPage.goto(`${baseUrl}/player/#room=TESTROOM`, { waitUntil: "networkidle" });
     await playerPage.waitForSelector("text=CarryOkie Singer Remote", { timeout: 10000 });
 
     // Shows "CarryOkie Singer Remote"
@@ -219,6 +219,7 @@ try {
 
     // Before join: room code, name input, Join Room
     await expectVisible(playerPage, "#playerRoomCode", "Player room code");
+    assert.strictEqual((await playerPage.locator("#playerRoomCode").innerText()).trim(), "TESTROOM", "Player reads hash room code");
     await expectVisible(playerPage, "#playerDisplayName", "Display name input");
     await expectVisible(playerPage, "#joinRoom", "Join Room button");
 
@@ -287,7 +288,19 @@ try {
     // Join link href includes room code and points to player route
     const joinLinkHref = await receiverPage.locator("#receiverJoinLink").getAttribute("href");
     assert.ok(joinLinkHref.includes("player"), "Join link points to player route");
-    assert.ok(joinLinkHref.includes("TESTROOM") || joinLinkHref.includes("room"), "Join link includes room code");
+    assert.ok(joinLinkHref.endsWith("#room=TESTROOM"), `Join link uses displayed room code: ${joinLinkHref}`);
+    assert.strictEqual((await receiverPage.locator("#receiverRoomCode").innerText()).trim(), "TESTROOM", "Receiver shows URL room code");
+    await receiverPage.evaluate(() => {
+      const channel = new BroadcastChannel("carryokie.receiver");
+      channel.postMessage({
+        type: "RECEIVER_STATE",
+        payload: { roomCode: "WRONGROOM", queue: [], singers: [] },
+      });
+      channel.close();
+    });
+    await receiverPage.waitForTimeout(300);
+    assert.strictEqual((await receiverPage.locator("#receiverRoomCode").innerText()).trim(), "TESTROOM", "Receiver ignores cross-room BroadcastChannel state");
+    assert.ok((await receiverPage.locator("#receiverJoinLink").getAttribute("href")).endsWith("#room=TESTROOM"), "Join link remains locked to receiver room");
 
     // QR min size at 1440x900
     await expectMinBox(receiverPage, "#receiverJoinQr", 160, 160, "Join QR min size");

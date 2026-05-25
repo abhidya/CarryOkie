@@ -90,7 +90,7 @@ function publishAudioPipelineStatus() {
   renderAudioPipelineStatus();
   receiverChannel?.postMessage?.({
     type: "RECEIVER_AUDIO_STATUS",
-    payload: { ...audioPipeline },
+    payload: { ...audioPipeline, roomCode: room?.roomCode },
   });
 }
 function summarizeInboundAudioStats(report) {
@@ -399,11 +399,14 @@ function publishReceiverState() {
 function publishReceiverPlayback(sample = room?.playbackState) {
   receiverChannel?.postMessage?.({
     type: "RECEIVER_PLAYBACK_SYNC",
-    payload: sample,
+    payload: { ...(sample || {}), roomCode: room?.roomCode },
   });
 }
 function publishReceiverCommand(type, payload = {}) {
-  receiverChannel?.postMessage?.({ type, payload });
+  receiverChannel?.postMessage?.({
+    type,
+    payload: { ...payload, roomCode: room?.roomCode },
+  });
 }
 function sendCastRoomUpdate(type, payload = {}) {
   castController?.sendSafe?.(type, payload);
@@ -1073,7 +1076,7 @@ function renderHost(main) {
   if (actions) {
     actions.innerHTML = `<button id="copySingerLink" class="primary">Copy Singer Link</button><button id="openTvStage">Open TV Stage</button><button id="showJoinQr">Show QR</button><button id="newRoom">Start Over</button>`;
     $("#copySingerLink").onclick = async () => {
-      const link = new URL(`../player/?room=${encodeURIComponent(room.roomCode)}`, location.href).toString();
+      const link = PeerJsRoomTransport.playerJoinUrl(room.roomCode);
       try { await navigator.clipboard.writeText(link); } catch {}
       log("Singer link copied.");
     };
@@ -1183,6 +1186,9 @@ export async function playerPage(root) {
   showManualFallbackPanel();
   renderPlayer($("#main"));
 }
+function roomCodeFromLocation() {
+  return PeerJsRoomTransport.readRoomCodeFromUrl() || room?.roomCode || "";
+}
 function playerIsJoined() {
   return !!(
     room?.hostPeerId &&
@@ -1215,7 +1221,7 @@ function attachJoinHandlers() {
   document.querySelectorAll("button").forEach(b => b.addEventListener("click", unlockPhoneAudio));
 
   $("#joinRoom").onclick = async () => {
-    const roomCode = new URLSearchParams(location.search).get("room") || room?.roomCode || "";
+    const roomCode = roomCodeFromLocation();
     const nameInput = $("#playerDisplayName");
     const displayName = normalizeDisplayName(nameInput?.value, "Player");
     player.displayName = displayName;
@@ -1286,7 +1292,7 @@ function showManualFallbackPanel() {
 function renderPlayer(main) {
   if (!main) return;
   const song = catalog.find(s => s.songId === (room?.currentSongId || "song_002")) || catalog[0];
-  const roomCode = new URLSearchParams(location.search).get("room") || room?.roomCode || "";
+  const roomCode = roomCodeFromLocation();
   const currentTitle = song ? `${escapeHtml(song.title || song.songId)}${song.artist ? " — " + escapeHtml(song.artist) : ""}` : "Pick a song";
   const micLabel = deriveMicLabel(player);
 

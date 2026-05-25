@@ -400,8 +400,10 @@ export class CastController extends EventTarget {
 }
 
 export function receiverApp(root: HTMLElement): void {
-  const initialRoomCode =
-    new URLSearchParams(location.search).get("room") || "------";
+  const initialRoomCode = (
+    PeerJsRoomTransport.readRoomCodeFromUrl() || "------"
+  ).toUpperCase();
+  const lockedRoomCode = initialRoomCode === "------" ? "" : initialRoomCode;
   const state: {
     roomCode: string;
     song: Song | null;
@@ -637,12 +639,20 @@ export function receiverApp(root: HTMLElement): void {
       return null;
     }
   }
+  function payloadRoomCode(payload?: Record<string, unknown>): string {
+    return String(payload?.roomCode || "").toUpperCase();
+  }
+  function payloadMatchesReceiverRoom(payload?: Record<string, unknown>): boolean {
+    if (!lockedRoomCode) return true;
+    return payloadRoomCode(payload) === lockedRoomCode;
+  }
   function handle(raw: unknown): void {
     const msg = unpack(raw);
     if (!msg?.type) return;
     const payload = (msg as Record<string, unknown>).payload as
       | Record<string, unknown>
       | undefined;
+    if (!payloadMatchesReceiverRoom(payload)) return;
     if (msg.type === "CAST_LOAD_SONG" && payload)
       loadSong(payload.song as Song, payload.roomCode as string);
     if (msg.type === "CAST_PLAY") {
@@ -670,11 +680,11 @@ export function receiverApp(root: HTMLElement): void {
       state.mediaTimeMs = derived.positionMs;
     }
     if (msg.type === "CAST_SHOW_JOIN_QR" && payload)
-      state.roomCode = payload.roomCode as string;
+      state.roomCode = lockedRoomCode || (payload.roomCode as string);
     if (msg.type === "CAST_UPDATE_QUEUE_PREVIEW" && payload)
       state.queue = (payload.queue as typeof state.queue) || [];
     if (msg.type === "RECEIVER_STATE" && payload) {
-      state.roomCode = (payload.roomCode as string) || state.roomCode;
+      state.roomCode = lockedRoomCode || (payload.roomCode as string) || state.roomCode;
       state.queue = (payload.queue as typeof state.queue) || state.queue;
       state.singers =
         (payload.singers as typeof state.singers) || state.singers;
@@ -687,7 +697,7 @@ export function receiverApp(root: HTMLElement): void {
         );
         state.mediaTimeMs = derived.positionMs;
       }
-      loadSong(payload.song as Song | null, payload.roomCode as string);
+      loadSong(payload.song as Song | null, state.roomCode);
       if (liveMicTrackIds.size) void tryPlayLiveMics();
     }
     render();
@@ -903,7 +913,11 @@ export function receiverApp(root: HTMLElement): void {
     channel.onmessage = async (ev) => {
       const msg = ev.data || {};
       if (msg.type === "RECEIVER_STATE") handle(msg);
-      if (msg.type === "RECEIVER_AUDIO_STATUS" && msg.payload) {
+      if (
+        msg.type === "RECEIVER_AUDIO_STATUS" &&
+        msg.payload &&
+        payloadMatchesReceiverRoom(msg.payload as Record<string, unknown>)
+      ) {
         state.audioDiagnostics = msg.payload as Record<string, unknown>;
         renderAudioDiagnostics();
         if (liveMicTrackIds.size) void tryPlayLiveMics();
