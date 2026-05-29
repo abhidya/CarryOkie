@@ -2,7 +2,7 @@
 
 CarryOkie is a static GitHub Pages karaoke room prototype for `DESIGN.md` Option 1: the TV/Chromecast path plays backing track/video and displays room context, while participant phones carry room controls and live singer mic streams over WebRTC.
 
-The implementation intentionally stays static: no backend, no TURN server, no required production runtime beyond built HTML/CSS/JS assets.
+The implementation stays static for the web app itself. Smooth QR auto-join uses PeerJS signaling; by default it can use PeerJS Cloud, and production deployments can point the static pages at a hosted PeerServer with URL parameters. Manual pairing remains available when no signaling server is reachable.
 
 ## High-level project overview
 
@@ -82,11 +82,28 @@ npm run preview
 3. **TV Stage** shows room code, QR code, and join link.
 4. **Singers** scan the QR (or click the join link) → opens `/player/` with room code pre-filled.
 5. **Singer** enters their name and clicks **Join Room** → auto-joins via PeerJS.
-6. **Singer** queues a song → host approves and starts it.
-7. **Singer** enables mic → live audio routes through host to TV Stage.
+6. **Singer** queues or starts a song directly from their phone; no host approval is required.
+7. **Singer** enables mic → live audio routes directly to TV Stage when possible, with host relay as fallback.
 8. **TV Stage** plays backing track and outputs live singer mic audio.
 
 Manual pairing remains available as fallback: expand "Manual Pairing Fallback" on host and player.
+
+### Reliable QR auto-join signaling
+
+PeerJS Cloud is convenient but external and can be unavailable. For reliable events or production use, host a PeerServer and open the host/receiver/player pages with the same signaling parameters:
+
+```text
+?peerHost=YOUR_PEER_SERVER_HOST&peerPort=443&peerPath=/peerjs&peerSecure=1
+```
+
+Local example:
+
+```bash
+npx peerjs --port 9000 --path /peerjs
+# then open /host/?peerHost=127.0.0.1&peerPort=9000&peerPath=/peerjs&peerSecure=0
+```
+
+CarryOkie preserves these parameters in the TV Stage and singer QR links, so a hosted room, receiver tab, and singers all use the same PeerServer. The browser app remains static; the PeerServer is only the rendezvous/signaling broker.
 
 ## Build
 
@@ -117,7 +134,7 @@ The test suite includes static route checks, state/use-case tests, Cast UI tests
 
 ## MVP caveats
 
-- **PeerJS Cloud** is an external signaling service used for QR auto-join. If PeerJS Cloud is unavailable, manual pairing fallback still works.
+- **PeerJS signaling** is required for frictionless QR auto-join across separate devices. PeerJS Cloud is the default, but reliable deployments should provide a hosted PeerServer via `peerHost`/`peerPort`/`peerPath`/`peerSecure`; manual pairing fallback still works without it.
 - **Public STUN-only** connectivity can fail on some networks (symmetric NATs, restrictive Wi-Fi). The UI shows clear network-incompatible errors when ICE fails.
 - **Real Chromecast** hardware still needs a supported Chrome/Android browser, a real Chromecast/Google TV target, and same-network discovery.
 - **Real multi-device audio** still needs hardware validation with physical phones, headphones, and speakers.

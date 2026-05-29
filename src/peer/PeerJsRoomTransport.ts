@@ -17,6 +17,23 @@ interface PeerInstance {
 }
 
 type PeerConstructor = new (...args: unknown[]) => PeerInstance;
+
+export interface PeerServerConfig {
+  host?: string;
+  port?: number;
+  path?: string;
+  secure?: boolean;
+  key?: string;
+}
+
+const PEER_SERVER_QUERY_KEYS = [
+  "peerHost",
+  "peerPort",
+  "peerPath",
+  "peerSecure",
+  "peerKey",
+];
+
 const DefaultPeer = ((PeerModule as unknown as { default?: PeerConstructor }).default ??
   PeerModule) as PeerConstructor;
 
@@ -69,9 +86,11 @@ export class PeerJsRoomTransport {
   private _myId: string | null = null;
   private _roomCode: string | null = null;
   private _isHost: boolean = false;
+  private serverConfig: PeerServerConfig;
 
-  constructor(handlers: TransportHandlers) {
+  constructor(handlers: TransportHandlers, serverConfig = PeerJsRoomTransport.readServerConfigFromUrl()) {
     this.handlers = handlers;
+    this.serverConfig = serverConfig;
   }
 
   get state(): ConnectionState {
@@ -96,6 +115,14 @@ export class PeerJsRoomTransport {
     this.handlers.onStateChange(s);
   }
 
+  private peerOptions(): Record<string, unknown> {
+    return {
+      ...this.serverConfig,
+      config: { iceServers: [STUN_SERVER] },
+      debug: 0,
+    };
+  }
+
   /**
    * Host: create a room with the given room code as the PeerJS peer ID.
    * If the ID is taken, onError fires with "unavailable-id" and caller must retry.
@@ -106,10 +133,7 @@ export class PeerJsRoomTransport {
     this.setState("starting");
 
     return new Promise((resolve, reject) => {
-      const peer = new PeerJsRoomTransport.PeerCtor(roomCode, {
-        config: { iceServers: [STUN_SERVER] },
-        debug: 0,
-      });
+      const peer = new PeerJsRoomTransport.PeerCtor(roomCode, this.peerOptions());
 
       const onOpen = (id: string) => {
         this._myId = id;
@@ -154,10 +178,7 @@ export class PeerJsRoomTransport {
     this.setState("starting");
 
     return new Promise((resolve, reject) => {
-      const peer = new PeerJsRoomTransport.PeerCtor({
-        config: { iceServers: [STUN_SERVER] },
-        debug: 0,
-      });
+      const peer = new PeerJsRoomTransport.PeerCtor(this.peerOptions());
 
       const onOpen = (id: string) => {
         this._myId = id;
@@ -371,6 +392,40 @@ export class PeerJsRoomTransport {
     this.setState("idle");
   }
 
+
+  static readServerConfigFromUrl(): PeerServerConfig {
+    const config: PeerServerConfig = {};
+    try {
+      const params = new URLSearchParams(location.search);
+      const hash = new URLSearchParams(location.hash.slice(1));
+      const get = (key: string) => params.get(key) ?? hash.get(key);
+      const host = get("peerHost");
+      if (host) config.host = host.trim();
+      const port = get("peerPort");
+      if (port && Number.isFinite(Number(port))) config.port = Number(port);
+      const path = get("peerPath");
+      if (path) config.path = path.startsWith("/") ? path : `/${path}`;
+      const secure = get("peerSecure");
+      if (secure) config.secure = !/^(0|false|no)$/i.test(secure);
+      const key = get("peerKey");
+      if (key) config.key = key;
+    } catch {
+      // ignore non-browser test environments
+    }
+    return config;
+  }
+
+  static appendServerConfig(url: URL, serverConfig = PeerJsRoomTransport.readServerConfigFromUrl()): URL {
+    for (const key of PEER_SERVER_QUERY_KEYS) url.searchParams.delete(key);
+    if (serverConfig.host) url.searchParams.set("peerHost", serverConfig.host);
+    if (serverConfig.port) url.searchParams.set("peerPort", String(serverConfig.port));
+    if (serverConfig.path) url.searchParams.set("peerPath", serverConfig.path);
+    if (typeof serverConfig.secure === "boolean")
+      url.searchParams.set("peerSecure", serverConfig.secure ? "1" : "0");
+    if (serverConfig.key) url.searchParams.set("peerKey", serverConfig.key);
+    return url;
+  }
+
   /**
    * Extract room code from URL hash or query parameter.
    * Priority: #room=CODE > ?room=CODE
@@ -393,8 +448,8 @@ export class PeerJsRoomTransport {
   /**
    * Build a player join URL for the given room code.
    */
-  static playerJoinUrl(roomCode: string): string {
-    const base = new URL("../player/", location.href);
+  static playerJoinUrl(roomCode: string, serverConfig = PeerJsRoomTransport.readServerConfigFromUrl()): string {
+    const base = PeerJsRoomTransport.appendServerConfig(new URL("../player/", location.href), serverConfig);
     base.searchParams.set("room", roomCode);
     base.hash = "";
     return base.toString();

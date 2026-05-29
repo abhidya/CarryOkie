@@ -3,11 +3,47 @@ import assert from "node:assert";
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { PeerServer } from "peer";
 
 const port = process.env.E2E_PORT || "4180";
 const baseUrl = process.env.E2E_BASE_URL || `http://127.0.0.1:${port}/`;
 const headless = process.env.HEADLESS !== "0";
 const useFakeMic = process.env.E2E_FAKE_MIC === "1";
+const usePeerJsCloud = process.env.E2E_PEERJS_CLOUD === "1";
+const peerServerPort = process.env.E2E_PEER_PORT || String(Number(port) + 1000);
+const peerServerPath = process.env.E2E_PEER_PATH || "/peerjs";
+
+let peerServerHttp = null;
+let peerServerApp = null;
+
+function withPeerServerParams(rawUrl) {
+  const url = new URL(rawUrl);
+  if (!usePeerJsCloud) {
+    url.searchParams.set("peerHost", "127.0.0.1");
+    url.searchParams.set("peerPort", peerServerPort);
+    url.searchParams.set("peerPath", peerServerPath);
+    url.searchParams.set("peerSecure", "0");
+  }
+  return url.toString();
+}
+
+async function startPeerServer() {
+  if (usePeerJsCloud) return;
+  await new Promise((resolveStart, rejectStart) => {
+    peerServerApp = PeerServer(
+      { port: Number(peerServerPort), host: "127.0.0.1", path: peerServerPath },
+      (server) => {
+        peerServerHttp = server;
+        resolveStart();
+      },
+    );
+    peerServerApp.on("error", rejectStart);
+  });
+}
+
+function stopPeerServer() {
+  if (peerServerHttp?.listening) peerServerHttp.close();
+}
 
 const server = spawn(
   "npx",
@@ -221,6 +257,7 @@ function fail(name, err) {
 }
 
 try {
+  await startPeerServer();
   await waitForServer();
   browser = await chromium.launch({
     headless,
@@ -248,7 +285,7 @@ try {
 
     // 1. Host opens /host/
     const hostPage = await context.newPage();
-    await hostPage.goto(`${baseUrl}/host/`, { waitUntil: "networkidle" });
+    await hostPage.goto(withPeerServerParams(`${baseUrl}/host/`), { waitUntil: "networkidle" });
     await hostPage.waitForSelector("#hostRoomCode", { timeout: 10000 });
     const roomCode = await hostPage.locator("#hostRoomCode").innerText();
     assert.match(roomCode.trim(), /^[A-Z]+$/, "Room code generated");
@@ -259,7 +296,7 @@ try {
 
     // 3. Receiver opens /receiver/?room=CODE
     const receiverPage = await context.newPage();
-    await receiverPage.goto(`${baseUrl}/receiver/?room=${roomCode}`, {
+    await receiverPage.goto(withPeerServerParams(`${baseUrl}/receiver/?room=${roomCode}`), {
       waitUntil: "networkidle",
     });
     await receiverPage.waitForSelector(`text=${roomCode}`, { timeout: 10000 });
@@ -269,7 +306,7 @@ try {
     await receiverPage.waitForSelector("#receiverJoinLink", { timeout: 5000 });
     const joinLinkHref = await receiverPage.locator("#receiverJoinLink").getAttribute("href");
     assert.ok(joinLinkHref.includes("player"), "Join link points to player route");
-    assert.ok(joinLinkHref.endsWith(`?room=${roomCode.trim()}`), `Join link matches receiver room: ${joinLinkHref}`);
+    assert.equal(new URL(joinLinkHref).searchParams.get("room"), roomCode.trim(), `Join link matches receiver room: ${joinLinkHref}`);
     await receiverPage.click("#startReceiverAudio");
 
     // 5. Player opens #receiverJoinLink (simulates QR scan)
@@ -511,6 +548,7 @@ try {
   fail("PeerJS QR setup", e);
 } finally {
   if (browser) await browser.close();
+  stopPeerServer();
   stopServer();
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed > 0 ? 1 : 0);

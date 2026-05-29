@@ -30,6 +30,7 @@ class MockDataConnection extends EventEmitter {
 }
 
 class MockPeer extends EventEmitter {
+  static instances = [];
   id = null;
   connections = new Map();
   options;
@@ -44,6 +45,7 @@ class MockPeer extends EventEmitter {
     } else {
       this.options = idOrOptions || {};
     }
+    MockPeer.instances.push(this);
     setTimeout(() => {
       this.id = this.id || "mock-peer-id";
       this.emit("open", this.id);
@@ -137,6 +139,47 @@ test("playerJoinUrl encodes room code", () => {
   globalThis.location = new URL("http://localhost:5173/host/");
   const url = PeerJsRoomTransport.playerJoinUrl("ROOM 123");
   assert.match(url, /room=ROOM(?:%20|\+)123$/);
+});
+
+test("readServerConfigFromUrl extracts custom PeerServer params", () => {
+  globalThis.location = new URL("http://localhost:5173/host/?peerHost=signal.example.com&peerPort=443&peerPath=peerjs&peerSecure=1&peerKey=abc");
+  const config = PeerJsRoomTransport.readServerConfigFromUrl();
+  assert.deepEqual(config, {
+    host: "signal.example.com",
+    port: 443,
+    path: "/peerjs",
+    secure: true,
+    key: "abc",
+  });
+});
+
+test("playerJoinUrl preserves custom PeerServer params", () => {
+  globalThis.location = new URL("http://localhost:5173/receiver/?room=ROOM123&peerHost=127.0.0.1&peerPort=9000&peerPath=/peerjs&peerSecure=0");
+  const url = new URL(PeerJsRoomTransport.playerJoinUrl("ROOM123"));
+  assert.equal(url.searchParams.get("room"), "ROOM123");
+  assert.equal(url.searchParams.get("peerHost"), "127.0.0.1");
+  assert.equal(url.searchParams.get("peerPort"), "9000");
+  assert.equal(url.searchParams.get("peerPath"), "/peerjs");
+  assert.equal(url.searchParams.get("peerSecure"), "0");
+});
+
+test("custom PeerServer params are passed to PeerJS", async () => {
+  MockPeer.instances = [];
+  globalThis.location = new URL("http://localhost:5173/host/?peerHost=127.0.0.1&peerPort=9000&peerPath=/peerjs&peerSecure=0");
+  const transport = new PeerJsRoomTransport({
+    onStateChange: () => {},
+    onMessage: () => {},
+    onPeerConnected: () => {},
+    onPeerDisconnected: () => {},
+    onError: () => {},
+  });
+  await transport.startHost("ROOM123");
+  const peer = MockPeer.instances.at(-1);
+  assert.equal(peer.options.host, "127.0.0.1");
+  assert.equal(peer.options.port, 9000);
+  assert.equal(peer.options.path, "/peerjs");
+  assert.equal(peer.options.secure, false);
+  transport.close();
 });
 
 test("Host mode: startHost transitions correctly", async () => {
