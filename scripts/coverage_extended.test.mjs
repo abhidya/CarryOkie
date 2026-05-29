@@ -69,7 +69,7 @@ test("relay helper rejects unsupported relay types", () => {
   );
 });
 
-test("phone mic input requests echo-cancelled audio and mute toggles tracks", async () => {
+test("phone mic input requests ultra-low-latency audio and mute toggles tracks", async () => {
   const oldAudioContext = globalThis.AudioContext;
   const oldNavigator = globalThis.navigator;
   const calls = [];

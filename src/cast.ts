@@ -506,7 +506,9 @@ export function receiverApp(root: HTMLElement): void {
     return "No live mic tracks connected.";
   }
   function renderAudioDiagnostics(): void {
-    const diagEl = root.querySelector("#receiverDiagnosticsPanel");
+    const diagEl =
+      root.querySelector("#receiverDiagnosticsPanel") ||
+      root.ownerDocument?.querySelector("#receiverDiagnosticsPanel");
     if (!diagEl) return;
     const d = state.audioDiagnostics;
     const { audible, muted, publishing } = singerMicSummary();

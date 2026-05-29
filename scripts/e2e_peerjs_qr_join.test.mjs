@@ -2,6 +2,7 @@ import { chromium } from "playwright";
 import assert from "node:assert";
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const port = process.env.E2E_PORT || "4180";
 const baseUrl = process.env.E2E_BASE_URL || `http://127.0.0.1:${port}/`;
@@ -33,9 +34,39 @@ async function waitForServer() {
   throw new Error(`Server not ready at ${baseUrl}`);
 }
 
+
+function makeFakeMicWav(path) {
+  const sampleRate = 48000;
+  const seconds = 4;
+  const samples = sampleRate * seconds;
+  const bytesPerSample = 2;
+  const dataSize = samples * bytesPerSample;
+  const buffer = Buffer.alloc(44 + dataSize);
+  buffer.write("RIFF", 0);
+  buffer.writeUInt32LE(36 + dataSize, 4);
+  buffer.write("WAVE", 8);
+  buffer.write("fmt ", 12);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(1, 22);
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(sampleRate * bytesPerSample, 28);
+  buffer.writeUInt16LE(bytesPerSample, 32);
+  buffer.writeUInt16LE(16, 34);
+  buffer.write("data", 36);
+  buffer.writeUInt32LE(dataSize, 40);
+  for (let i = 0; i < samples; i++) {
+    const tone = Math.sin((2 * Math.PI * 440 * i) / sampleRate);
+    buffer.writeInt16LE(Math.round(tone * 12000), 44 + i * bytesPerSample);
+  }
+  writeFileSync(path, buffer);
+}
+
 // Artifact helpers
 const ARTIFACTS_DIR = "artifacts";
 try { mkdirSync(ARTIFACTS_DIR, { recursive: true }); } catch {}
+const fakeMicWavPath = resolve(ARTIFACTS_DIR, "fake-mic.wav");
+if (useFakeMic) makeFakeMicWav(fakeMicWavPath);
 
 async function saveArtifacts(page, role) {
   try {
@@ -195,7 +226,12 @@ try {
     headless,
     args: [
       "--use-fake-ui-for-media-stream",
-      ...(useFakeMic ? ["--use-fake-device-for-media-stream"] : []),
+      ...(useFakeMic
+        ? [
+            "--use-fake-device-for-media-stream",
+            `--use-file-for-fake-audio-capture=${fakeMicWavPath}`,
+          ]
+        : []),
     ],
   });
 

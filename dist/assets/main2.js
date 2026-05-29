@@ -3105,6 +3105,58 @@ async function scanQrInto(target, log = () => {}) {
 }
 //#endregion
 //#region src/webrtc.ts
+var LOW_LATENCY_AUDIO_FMTP = "stereo=0;sprop-stereo=0;useinbandfec=1;ptime=10;maxptime=20";
+function tuneAudioSenderForLowLatency(sender) {
+	try {
+		const parameters = sender.getParameters?.();
+		if (!parameters) return;
+		if (!parameters.encodings || parameters.encodings.length === 0) parameters.encodings = [{}];
+		for (const encoding of parameters.encodings) {
+			encoding.priority = "high";
+			encoding.networkPriority = "high";
+			encoding.maxBitrate = 96e3;
+			encoding.dtx = "disabled";
+		}
+		sender.setParameters?.(parameters).catch(() => {});
+	} catch {}
+}
+function preferLowLatencyAudioSdp(description) {
+	if (!description.sdp || !/^v=0/m.test(description.sdp)) return description;
+	const lines = description.sdp.split(/\r?\n/);
+	const opusRtpmap = lines.find((line) => /a=rtpmap:(\d+) opus\/48000/i.test(line));
+	const payload = opusRtpmap?.match(/a=rtpmap:(\d+) opus\/48000/i)?.[1];
+	if (!payload) return description;
+	const fmtpPrefix = `a=fmtp:${payload} `;
+	let added = false;
+	const tuned = lines.map((line) => {
+		if (!line.startsWith(fmtpPrefix)) return line;
+		added = true;
+		const existing = line.slice(fmtpPrefix.length);
+		const params = /* @__PURE__ */ new Map();
+		for (const part of existing.split(";")) {
+			const token = part.trim();
+			if (!token) continue;
+			const [key, value] = token.split("=");
+			params.set(key, value ?? true);
+		}
+		for (const part of LOW_LATENCY_AUDIO_FMTP.split(";")) {
+			const [key, value] = part.split("=");
+			params.set(key, value);
+		}
+		return `${fmtpPrefix}${[...params.entries()].map(([key, value]) => value === true ? key : `${key}=${value}`).join(";")}`;
+	});
+	if (!added) {
+		const rtpmapIndex = tuned.findIndex((line) => line === opusRtpmap);
+		tuned.splice(rtpmapIndex + 1, 0, `${fmtpPrefix}${LOW_LATENCY_AUDIO_FMTP}`);
+	}
+	return {
+		...description,
+		sdp: tuned.join("\r\n")
+	};
+}
+async function setLowLatencyLocalDescription(pc, description) {
+	await pc.setLocalDescription(preferLowLatencyAudioSdp(description));
+}
 var rtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 var RPC = {
 	ROOM_HELLO: "ROOM_HELLO",
@@ -3237,7 +3289,8 @@ var PeerNode = class extends EventTarget {
 		if (!edge.streams.includes(stream)) edge.streams.push(stream);
 		newTracks.forEach((track) => {
 			edge.sentTrackKeys.add(mediaTrackKey(track));
-			edge.pc.addTrack(track, stream);
+			const sender = edge.pc.addTrack(track, stream);
+			if (track.kind === "audio") tuneAudioSenderForLowLatency(sender);
 		});
 		return true;
 	}
@@ -3318,7 +3371,7 @@ var PeerNode = class extends EventTarget {
 		if (edge.pc.signalingState === "have-local-offer") await edge.pc.setLocalDescription({ type: "rollback" });
 		await edge.pc.setRemoteDescription(this.signalDescription(msg));
 		const answer = await edge.pc.createAnswer();
-		await edge.pc.setLocalDescription(answer);
+		await setLowLatencyLocalDescription(edge.pc, answer);
 		await waitForIceComplete(edge.pc);
 		this.send(remotePeerId, {
 			type: RPC.SIGNAL_RELAY_ANSWER,
@@ -3354,7 +3407,7 @@ var PeerNode = class extends EventTarget {
 		edge.needsNegotiation = false;
 		try {
 			const offer = await edge.pc.createOffer({ offerToReceiveAudio: true });
-			await edge.pc.setLocalDescription(offer);
+			await setLowLatencyLocalDescription(edge.pc, offer);
 			await waitForIceComplete(edge.pc);
 			this.send(edge.remotePeerId, {
 				type: RPC.SIGNAL_RELAY_OFFER,
@@ -3411,7 +3464,7 @@ var PeerNode = class extends EventTarget {
 			replace: true
 		});
 		const offer = await edge.pc.createOffer({ offerToReceiveAudio: true });
-		await edge.pc.setLocalDescription(offer);
+		await setLowLatencyLocalDescription(edge.pc, offer);
 		await waitForIceComplete(edge.pc);
 		return encodeSignalPayload({
 			kind: "offer",
@@ -3430,7 +3483,7 @@ var PeerNode = class extends EventTarget {
 		});
 		await edge.pc.setRemoteDescription(payload.description);
 		const answer = await edge.pc.createAnswer();
-		await edge.pc.setLocalDescription(answer);
+		await setLowLatencyLocalDescription(edge.pc, answer);
 		await waitForIceComplete(edge.pc);
 		return encodeSignalPayload({
 			kind: "answer",
@@ -3500,6 +3553,17 @@ function waitForIceComplete(pc, timeoutMs = 4e3, idleMs = 1e3) {
 }
 //#endregion
 //#region src/audio.ts
+var LOW_LATENCY_MIC_CONSTRAINTS = {
+	echoCancellation: false,
+	noiseSuppression: false,
+	autoGainControl: false,
+	channelCount: { ideal: 1 },
+	sampleRate: { ideal: 48e3 },
+	latency: {
+		ideal: 0,
+		max: .02
+	}
+};
 var PhoneAudio = class {
 	log;
 	ctx;
@@ -3587,17 +3651,7 @@ var PhoneAudio = class {
 	}
 	async openMic(pushToSing) {
 		await this.init();
-		const audioConstraints = {
-			echoCancellation: true,
-			noiseSuppression: true,
-			autoGainControl: true,
-			channelCount: { ideal: 1 },
-			sampleRate: { ideal: 48e3 },
-			latency: {
-				ideal: .01,
-				max: .05
-			}
-		};
+		const audioConstraints = LOW_LATENCY_MIC_CONSTRAINTS;
 		try {
 			this.localStream = await this.getUserMediaWithTimeout({
 				audio: audioConstraints,
@@ -3605,7 +3659,7 @@ var PhoneAudio = class {
 			});
 		} catch (error) {
 			if (!isConstraintCompatibilityError(error)) throw error;
-			this.log(`Mic request with karaoke constraints failed: ${error.message}. Retrying with basic audio.`);
+			this.log(`Mic request with ultra-low-latency karaoke constraints failed: ${error.message}. Retrying with basic audio.`);
 			this.localStream = await this.getUserMediaWithTimeout({
 				audio: true,
 				video: false
@@ -8575,7 +8629,7 @@ function receiverApp(root) {
 		return "No live mic tracks connected.";
 	}
 	function renderAudioDiagnostics() {
-		const diagEl = root.querySelector("#receiverDiagnosticsPanel");
+		const diagEl = root.querySelector("#receiverDiagnosticsPanel") || root.ownerDocument?.querySelector("#receiverDiagnosticsPanel");
 		if (!diagEl) return;
 		const d = state.audioDiagnostics;
 		const { audible, muted, publishing } = singerMicSummary();
@@ -8900,7 +8954,7 @@ function receiverApp(root) {
 				removeStaleLiveMicTracks();
 				await pc.setRemoteDescription(msg.description);
 				const answer = await pc.createAnswer();
-				await pc.setLocalDescription(answer);
+				await pc.setLocalDescription(preferLowLatencyAudioSdp(answer));
 				await waitForIceComplete(pc);
 				channel.postMessage({
 					type: "RECEIVER_ANSWER",
@@ -9450,11 +9504,11 @@ async function negotiateReceiverAudio() {
 		for (const { stream } of receiverStreams) stream.getAudioTracks().filter((track) => !receiverTrackKeys.has(mediaTrackKey(track))).forEach((track) => {
 			receiverTrackKeys.add(mediaTrackKey(track));
 			audioPipeline.receiverTracksAdded++;
-			receiverPc.addTrack(track, stream);
+			tuneAudioSenderForLowLatency(receiverPc.addTrack(track, stream));
 		});
 		if (!receiverTrackKeys.size) return;
 		const offer = await receiverPc.createOffer({ offerToReceiveAudio: true });
-		await receiverPc.setLocalDescription(offer);
+		await receiverPc.setLocalDescription(preferLowLatencyAudioSdp(offer));
 		await waitForIceComplete(receiverPc);
 		receiverChannel?.postMessage({
 			type: "RECEIVER_OFFER",
