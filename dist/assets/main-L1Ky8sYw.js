@@ -66,6 +66,7 @@ function uuid() {
 function nowMs() {
 	return Date.now();
 }
+var PEERJS_ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 function makeRoomCode() {
 	const words = [
 		"BLUE",
@@ -80,6 +81,14 @@ function makeRoomCode() {
 		"WAVE"
 	];
 	return words[Math.floor(Math.random() * words.length)] + words[Math.floor(Math.random() * words.length)];
+}
+function makePeerJsRoomCode() {
+	const chars = PEERJS_ROOM_ALPHABET;
+	let code = "";
+	const arr = new Uint8Array(5);
+	crypto.getRandomValues(arr);
+	for (let i = 0; i < 5; i++) code += chars[arr[i] % 32];
+	return code;
 }
 function normalizeDisplayName(displayName, fallback = "Guest") {
 	if (typeof displayName !== "string") return fallback;
@@ -263,7 +272,7 @@ function loadRoom() {
 	}
 }
 //#endregion
-//#region ../../../../../node_modules/qrcode-generator/dist/qrcode.mjs
+//#region node_modules/qrcode-generator/dist/qrcode.mjs
 /**
 * qrcode
 * @param typeNumber 1 to 40
@@ -3986,7 +3995,7 @@ function isConstraintCompatibilityError(error) {
 }
 var singerWarning = "TV backing track bleed risk: your phone mic can hear the TV backing track. Use headphones or push-to-sing to avoid sending backing track to everyone.";
 //#endregion
-//#region ../../../../../node_modules/peerjs-js-binarypack/dist/binarypack.mjs
+//#region node_modules/peerjs-js-binarypack/dist/binarypack.mjs
 var $e8379818650e2442$export$93654d4f2d6cd524 = class {
 	constructor() {
 		this.encoder = new TextEncoder();
@@ -4404,7 +4413,7 @@ var $0cfd7828ad59115f$export$b9ec4b114aa40074 = class {
 	}
 };
 //#endregion
-//#region ../../../../../node_modules/webrtc-adapter/src/js/utils.js
+//#region node_modules/webrtc-adapter/src/js/utils.js
 var logDisabled_ = true;
 var deprecationWarnings_ = true;
 /**
@@ -4583,7 +4592,7 @@ function filterStats(result, track, outbound) {
 	return filteredResult;
 }
 //#endregion
-//#region ../../../../../node_modules/webrtc-adapter/src/js/chrome/getusermedia.js
+//#region node_modules/webrtc-adapter/src/js/chrome/getusermedia.js
 var logging = log$1;
 function shimGetUserMedia$2(window, browserDetails) {
 	const navigator = window && window.navigator;
@@ -4712,7 +4721,7 @@ function shimGetUserMedia$2(window, browserDetails) {
 	}
 }
 //#endregion
-//#region ../../../../../node_modules/webrtc-adapter/src/js/chrome/chrome_shim.js
+//#region node_modules/webrtc-adapter/src/js/chrome/chrome_shim.js
 var chrome_shim_exports = /* @__PURE__ */ __exportAll({
 	fixNegotiationNeeded: () => fixNegotiationNeeded,
 	shimAddTrackRemoveTrack: () => shimAddTrackRemoveTrack,
@@ -5096,7 +5105,7 @@ function fixNegotiationNeeded(window, browserDetails) {
 	});
 }
 //#endregion
-//#region ../../../../../node_modules/webrtc-adapter/src/js/firefox/getusermedia.js
+//#region node_modules/webrtc-adapter/src/js/firefox/getusermedia.js
 function shimGetUserMedia$1(window, browserDetails) {
 	const navigator = window && window.navigator;
 	const MediaStreamTrack = window && window.MediaStreamTrack;
@@ -5143,7 +5152,7 @@ function shimGetUserMedia$1(window, browserDetails) {
 	}
 }
 //#endregion
-//#region ../../../../../node_modules/webrtc-adapter/src/js/firefox/getdisplaymedia.js
+//#region node_modules/webrtc-adapter/src/js/firefox/getdisplaymedia.js
 function shimGetDisplayMedia(window, preferredMediaSource) {
 	if (window.navigator.mediaDevices && "getDisplayMedia" in window.navigator.mediaDevices) return;
 	if (!window.navigator.mediaDevices) return;
@@ -5160,7 +5169,7 @@ function shimGetDisplayMedia(window, preferredMediaSource) {
 	};
 }
 //#endregion
-//#region ../../../../../node_modules/webrtc-adapter/src/js/firefox/firefox_shim.js
+//#region node_modules/webrtc-adapter/src/js/firefox/firefox_shim.js
 var firefox_shim_exports = /* @__PURE__ */ __exportAll({
 	shimAddTransceiver: () => shimAddTransceiver,
 	shimCreateAnswer: () => shimCreateAnswer,
@@ -5345,7 +5354,7 @@ function shimCreateAnswer(window) {
 	};
 }
 //#endregion
-//#region ../../../../../node_modules/webrtc-adapter/src/js/safari/safari_shim.js
+//#region node_modules/webrtc-adapter/src/js/safari/safari_shim.js
 var safari_shim_exports = /* @__PURE__ */ __exportAll({
 	shimAudioContext: () => shimAudioContext,
 	shimCallbacksAPI: () => shimCallbacksAPI,
@@ -5555,7 +5564,7 @@ function shimAudioContext(window) {
 	window.AudioContext = window.webkitAudioContext;
 }
 //#endregion
-//#region ../../../../../node_modules/sdp/sdp.js
+//#region node_modules/sdp/sdp.js
 var require_sdp = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	var SDPUtils = {};
 	SDPUtils.generateIdentifier = function() {
@@ -6043,7 +6052,7 @@ var require_sdp = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	if (typeof module === "object") module.exports = SDPUtils;
 }));
 //#endregion
-//#region ../../../../../node_modules/webrtc-adapter/src/js/common_shim.js
+//#region node_modules/webrtc-adapter/src/js/common_shim.js
 var common_shim_exports = /* @__PURE__ */ __exportAll({
 	removeExtmapAllowMixed: () => removeExtmapAllowMixed,
 	shimAddIceCandidateNullOrEmpty: () => shimAddIceCandidateNullOrEmpty,
@@ -6296,7 +6305,7 @@ function shimParameterlessSetLocalDescription(window, browserDetails) {
 	};
 }
 //#endregion
-//#region ../../../../../node_modules/webrtc-adapter/src/js/adapter_factory.js
+//#region node_modules/webrtc-adapter/src/js/adapter_factory.js
 function adapterFactory({ window } = {}, options = {
 	shimChrome: true,
 	shimFirefox: true,
@@ -6397,10 +6406,10 @@ function adapterFactory({ window } = {}, options = {
 	return adapter;
 }
 //#endregion
-//#region ../../../../../node_modules/webrtc-adapter/src/js/adapter_core.js
+//#region node_modules/webrtc-adapter/src/js/adapter_core.js
 var adapter = adapterFactory({ window: typeof window === "undefined" ? void 0 : window });
 //#endregion
-//#region ../../../../../node_modules/peerjs/dist/bundler.mjs
+//#region node_modules/peerjs/dist/bundler.mjs
 function $parcel$export(e, n, v, s) {
 	Object.defineProperty(e, n, {
 		get: v,
@@ -7975,11 +7984,19 @@ var $dd0187d7f28e386f$export$2e2bcd8739ae039 = class $416260bce337df90$export$ec
 * Uses PeerJS Cloud by default; no custom backend needed.
 * WebRTC data/media still flows peer-to-peer after signaling.
 */
+var DefaultPeer = $dd0187d7f28e386f$export$2e2bcd8739ae039.default ?? $dd0187d7f28e386f$export$2e2bcd8739ae039;
 var AUTO_JOIN_WEBRTC_OFFER = "AUTO_JOIN_WEBRTC_OFFER";
 var AUTO_JOIN_WEBRTC_ANSWER = "AUTO_JOIN_WEBRTC_ANSWER";
 var AUTO_JOIN_FAILED = "AUTO_JOIN_FAILED";
 var STUN_SERVER = { urls: "stun:stun.l.google.com:19302" };
-var PeerJsRoomTransport = class {
+var PeerJsRoomTransport = class PeerJsRoomTransport {
+	static PeerCtor = DefaultPeer;
+	static setPeerConstructorForTests(ctor) {
+		PeerJsRoomTransport.PeerCtor = ctor;
+	}
+	static resetPeerConstructorForTests() {
+		PeerJsRoomTransport.PeerCtor = DefaultPeer;
+	}
 	peer = null;
 	connections = /* @__PURE__ */ new Map();
 	handlers;
@@ -8006,6 +8023,7 @@ var PeerJsRoomTransport = class {
 		return [...this.connections.keys()];
 	}
 	setState(s) {
+		if (this._state === s) return;
 		this._state = s;
 		this.handlers.onStateChange(s);
 	}
@@ -8018,7 +8036,7 @@ var PeerJsRoomTransport = class {
 		this._roomCode = roomCode;
 		this.setState("starting");
 		return new Promise((resolve, reject) => {
-			const peer = new $dd0187d7f28e386f$export$2e2bcd8739ae039(roomCode, {
+			const peer = new PeerJsRoomTransport.PeerCtor(roomCode, {
 				config: { iceServers: [STUN_SERVER] },
 				debug: 0
 			});
@@ -8057,7 +8075,7 @@ var PeerJsRoomTransport = class {
 		this._roomCode = roomCode;
 		this.setState("starting");
 		return new Promise((resolve, reject) => {
-			const peer = new $dd0187d7f28e386f$export$2e2bcd8739ae039({
+			const peer = new PeerJsRoomTransport.PeerCtor({
 				config: { iceServers: [STUN_SERVER] },
 				debug: 0
 			});
@@ -8187,12 +8205,20 @@ var PeerJsRoomTransport = class {
 	* Player: wait for the host's answer after sending an offer.
 	*/
 	waitForAutoJoinAnswer(timeoutMs = 3e4) {
+		const peerId = this._roomCode;
+		if (!peerId) return Promise.reject(/* @__PURE__ */ new Error("Not in a room"));
+		const existing = this._autoJoinAnswerResolvers.get(peerId);
+		if (existing) {
+			clearTimeout(existing.timer);
+			this._autoJoinAnswerResolvers.delete(peerId);
+			existing.reject(/* @__PURE__ */ new Error("Auto-join answer wait superseded"));
+		}
 		return new Promise((resolve, reject) => {
 			const timer = setTimeout(() => {
-				this._autoJoinAnswerResolvers.delete(this._roomCode || "unknown");
+				this._autoJoinAnswerResolvers.delete(peerId);
 				reject(/* @__PURE__ */ new Error("Auto-join answer timeout"));
 			}, timeoutMs);
-			this._autoJoinAnswerResolvers.set(this._roomCode || "unknown", {
+			this._autoJoinAnswerResolvers.set(peerId, {
 				resolve,
 				reject,
 				timer
@@ -10104,11 +10130,22 @@ async function initPeerJsHost() {
 		}
 	});
 	globalThis.__carryokiePeerJsTransport = peerJsTransport;
-	try {
+	const maxAttempts = 3;
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) try {
 		await peerJsTransport.startHost(room.roomCode);
 		log(`PeerJS host ready: room ${room.roomCode}`);
+		break;
 	} catch (e) {
-		log(`PeerJS host failed: ${e.message}`);
+		const message = e instanceof Error ? e.message : String(e);
+		const type = e?.type || "";
+		if (!(attempt < maxAttempts && (type === "unavailable-id" || /unavailable-id|taken|collision/i.test(message)))) {
+			log(`PeerJS host failed: ${message}`);
+			break;
+		}
+		const oldCode = room.roomCode;
+		room.roomCode = makePeerJsRoomCode();
+		persist();
+		log(`PeerJS room ${oldCode} unavailable; retrying with ${room.roomCode}.`);
 	}
 	renderHost(document.body);
 }

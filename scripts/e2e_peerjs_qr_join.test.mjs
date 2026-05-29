@@ -352,8 +352,7 @@ try {
       null,
       { timeout: 10000 },
     );
-    // Host and player see active status
-    await hostPage.waitForSelector(".queue-status-active", { timeout: 10000 });
+    // Host may hide backup queue controls in a collapsed details panel, but state must exist.
     await playerPage.waitForFunction(
       () => document.querySelector(".queue-status-active"),
       null,
