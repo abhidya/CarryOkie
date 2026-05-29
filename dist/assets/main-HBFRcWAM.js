@@ -263,7 +263,7 @@ function loadRoom() {
 	}
 }
 //#endregion
-//#region node_modules/qrcode-generator/dist/qrcode.mjs
+//#region ../../../../../node_modules/qrcode-generator/dist/qrcode.mjs
 /**
 * qrcode
 * @param typeNumber 1 to 40
@@ -3986,7 +3986,7 @@ function isConstraintCompatibilityError(error) {
 }
 var singerWarning = "TV backing track bleed risk: your phone mic can hear the TV backing track. Use headphones or push-to-sing to avoid sending backing track to everyone.";
 //#endregion
-//#region node_modules/peerjs-js-binarypack/dist/binarypack.mjs
+//#region ../../../../../node_modules/peerjs-js-binarypack/dist/binarypack.mjs
 var $e8379818650e2442$export$93654d4f2d6cd524 = class {
 	constructor() {
 		this.encoder = new TextEncoder();
@@ -4404,7 +4404,7 @@ var $0cfd7828ad59115f$export$b9ec4b114aa40074 = class {
 	}
 };
 //#endregion
-//#region node_modules/webrtc-adapter/src/js/utils.js
+//#region ../../../../../node_modules/webrtc-adapter/src/js/utils.js
 var logDisabled_ = true;
 var deprecationWarnings_ = true;
 /**
@@ -4583,7 +4583,7 @@ function filterStats(result, track, outbound) {
 	return filteredResult;
 }
 //#endregion
-//#region node_modules/webrtc-adapter/src/js/chrome/getusermedia.js
+//#region ../../../../../node_modules/webrtc-adapter/src/js/chrome/getusermedia.js
 var logging = log$1;
 function shimGetUserMedia$2(window, browserDetails) {
 	const navigator = window && window.navigator;
@@ -4712,7 +4712,7 @@ function shimGetUserMedia$2(window, browserDetails) {
 	}
 }
 //#endregion
-//#region node_modules/webrtc-adapter/src/js/chrome/chrome_shim.js
+//#region ../../../../../node_modules/webrtc-adapter/src/js/chrome/chrome_shim.js
 var chrome_shim_exports = /* @__PURE__ */ __exportAll({
 	fixNegotiationNeeded: () => fixNegotiationNeeded,
 	shimAddTrackRemoveTrack: () => shimAddTrackRemoveTrack,
@@ -5096,7 +5096,7 @@ function fixNegotiationNeeded(window, browserDetails) {
 	});
 }
 //#endregion
-//#region node_modules/webrtc-adapter/src/js/firefox/getusermedia.js
+//#region ../../../../../node_modules/webrtc-adapter/src/js/firefox/getusermedia.js
 function shimGetUserMedia$1(window, browserDetails) {
 	const navigator = window && window.navigator;
 	const MediaStreamTrack = window && window.MediaStreamTrack;
@@ -5143,7 +5143,7 @@ function shimGetUserMedia$1(window, browserDetails) {
 	}
 }
 //#endregion
-//#region node_modules/webrtc-adapter/src/js/firefox/getdisplaymedia.js
+//#region ../../../../../node_modules/webrtc-adapter/src/js/firefox/getdisplaymedia.js
 function shimGetDisplayMedia(window, preferredMediaSource) {
 	if (window.navigator.mediaDevices && "getDisplayMedia" in window.navigator.mediaDevices) return;
 	if (!window.navigator.mediaDevices) return;
@@ -5160,7 +5160,7 @@ function shimGetDisplayMedia(window, preferredMediaSource) {
 	};
 }
 //#endregion
-//#region node_modules/webrtc-adapter/src/js/firefox/firefox_shim.js
+//#region ../../../../../node_modules/webrtc-adapter/src/js/firefox/firefox_shim.js
 var firefox_shim_exports = /* @__PURE__ */ __exportAll({
 	shimAddTransceiver: () => shimAddTransceiver,
 	shimCreateAnswer: () => shimCreateAnswer,
@@ -5345,7 +5345,7 @@ function shimCreateAnswer(window) {
 	};
 }
 //#endregion
-//#region node_modules/webrtc-adapter/src/js/safari/safari_shim.js
+//#region ../../../../../node_modules/webrtc-adapter/src/js/safari/safari_shim.js
 var safari_shim_exports = /* @__PURE__ */ __exportAll({
 	shimAudioContext: () => shimAudioContext,
 	shimCallbacksAPI: () => shimCallbacksAPI,
@@ -5555,7 +5555,7 @@ function shimAudioContext(window) {
 	window.AudioContext = window.webkitAudioContext;
 }
 //#endregion
-//#region node_modules/sdp/sdp.js
+//#region ../../../../../node_modules/sdp/sdp.js
 var require_sdp = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	var SDPUtils = {};
 	SDPUtils.generateIdentifier = function() {
@@ -6043,7 +6043,7 @@ var require_sdp = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	if (typeof module === "object") module.exports = SDPUtils;
 }));
 //#endregion
-//#region node_modules/webrtc-adapter/src/js/common_shim.js
+//#region ../../../../../node_modules/webrtc-adapter/src/js/common_shim.js
 var common_shim_exports = /* @__PURE__ */ __exportAll({
 	removeExtmapAllowMixed: () => removeExtmapAllowMixed,
 	shimAddIceCandidateNullOrEmpty: () => shimAddIceCandidateNullOrEmpty,
@@ -6296,7 +6296,7 @@ function shimParameterlessSetLocalDescription(window, browserDetails) {
 	};
 }
 //#endregion
-//#region node_modules/webrtc-adapter/src/js/adapter_factory.js
+//#region ../../../../../node_modules/webrtc-adapter/src/js/adapter_factory.js
 function adapterFactory({ window } = {}, options = {
 	shimChrome: true,
 	shimFirefox: true,
@@ -6397,10 +6397,10 @@ function adapterFactory({ window } = {}, options = {
 	return adapter;
 }
 //#endregion
-//#region node_modules/webrtc-adapter/src/js/adapter_core.js
+//#region ../../../../../node_modules/webrtc-adapter/src/js/adapter_core.js
 var adapter = adapterFactory({ window: typeof window === "undefined" ? void 0 : window });
 //#endregion
-//#region node_modules/peerjs/dist/bundler.mjs
+//#region ../../../../../node_modules/peerjs/dist/bundler.mjs
 function $parcel$export(e, n, v, s) {
 	Object.defineProperty(e, n, {
 		get: v,
