@@ -10116,6 +10116,7 @@ function renderHost(main) {
 	if (!main || !room) return;
 	const activeSingers = room.players.filter((p) => p.isSingerForCurrentSong).length;
 	const liveMicCount = room.players.filter((p) => p.isSingerForCurrentSong && p.micState?.enabled && !p.micState?.muted).length;
+	const singerCount = room.players.filter((p) => !p.isHost).length;
 	const qrStatus = peerJsTransport ? peerJsTransport.state === "ready" ? "QR Join Ready" : peerJsTransport.state === "starting" ? "Starting..." : peerJsTransport.state === "failed" ? "Unavailable — manual fallback ready" : "Manual only" : "Manual only";
 	const tvStatus = audioPipeline.receiverReady ? audioPipeline.receiverPcConnectionState === "connected" ? "TV Connected" : audioPipeline.receiverPcConnectionState === "failed" ? "TV Failed" : "TV Tab Open" : "TV Not Open";
 	const queuedCount = room.queue.filter((q) => q.status === "queued").length;
@@ -10126,7 +10127,7 @@ function renderHost(main) {
       <div class="status-item"><span class="status-label">Room</span><span id="hostRoomCode" class="status-value">${escapeHtml(room.roomCode)}</span></div>
       <div class="status-item"><span class="status-label">TV</span><span id="hostTvStatus" class="status-value">${tvStatus}</span></div>
       <div class="status-item"><span class="status-label">QR Join</span><span id="hostQrJoinStatus" class="status-value">${qrStatus}</span></div>
-      <div class="status-item"><span class="status-label">Singers</span><span id="hostSingerCount" class="status-value">${room.players.length}/5</span></div>
+      <div class="status-item"><span class="status-label">Singers</span><span id="hostSingerCount" class="status-value">${singerCount}/4</span></div>
       <div class="status-item"><span class="status-label">Live Mics</span><span id="hostLiveMicCount" class="status-value">${liveMicCount}</span></div>
       <div class="status-item"><span class="status-label">Queue</span><span id="hostQueueCount" class="status-value">${queuedCount} ready</span></div>
     </div>`;
@@ -10137,8 +10138,11 @@ function renderHost(main) {
 			const link = PeerJsRoomTransport.playerJoinUrl(room.roomCode);
 			try {
 				await navigator.clipboard.writeText(link);
-			} catch {}
-			log("Singer link copied.");
+				log("Singer link copied.");
+			} catch {
+				$("#showJoinQr")?.click();
+				log("Clipboard blocked. QR and singer link are shown.");
+			}
 		};
 		$("#openTvStage").onclick = () => window.open(receiverUrl(), "_blank");
 		$("#showJoinQr").onclick = () => {
@@ -10156,6 +10160,7 @@ function renderHost(main) {
 			}
 		};
 		$("#newRoom").onclick = () => {
+			if (!confirm("Start over with a new empty room?")) return;
 			player = makePlayer("host", "Host");
 			player.playerNumber = 1;
 			room = makeRoom(player);
@@ -10324,10 +10329,12 @@ function roomCodeFromLocation() {
 	return PeerJsRoomTransport.readRoomCodeFromUrl() || room?.roomCode || "";
 }
 function playerIsJoined() {
+	const requestedRoomCode = PeerJsRoomTransport.readRoomCodeFromUrl();
+	if (requestedRoomCode && room?.roomCode && requestedRoomCode.toUpperCase() !== String(room.roomCode).toUpperCase()) return false;
 	return !!(room?.hostPeerId && player?.playerNumber && room.players?.some((p) => p.playerId === player.playerId || p.peerId === player.peerId));
 }
 function joinRoomHtml(roomCode) {
-	return `<section id="playerJoinCard" class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie Singer Remote</p><h2>Join Room</h2><p class="subtle">Enter your name, then join.</p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div></div><div class="card"><label>Room Code<p id="playerRoomCode" class="status-pill">${escapeHtml((roomCode || "").toUpperCase() || "—")}</p></label><label>Your Name<input id="playerDisplayName" value="${escapeHtml(player?.displayName || "")}" placeholder="Your name"></label><button id="joinRoom" class="primary">Join Room</button></div></section>`;
+	return `<section id="playerJoinCard" class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie Singer Remote</p><h2>Join Room</h2><p class="subtle">Enter your name, then join.</p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div></div><div class="card"><label>Room Code<p id="playerRoomCode" class="status-pill">${escapeHtml((roomCode || "").toUpperCase() || "—")}</p></label><label>Your Name<input id="playerDisplayName" value="${escapeHtml(player?.displayName || "")}" placeholder="Your name"></label><p id="playerJoinStatus" class="subtle">Ready to join.</p><button id="joinRoom" class="primary">Join Room</button></div></section>`;
 }
 function updatePlayerDisplayName() {
 	if (!player) return;
@@ -10358,10 +10365,13 @@ function attachJoinHandlers() {
 			button.disabled = true;
 			button.textContent = "Joining...";
 		}
+		const joinStatus = $("#playerJoinStatus");
+		if (joinStatus) joinStatus.textContent = "Joining room…";
 		try {
 			await initPeerJsPlayer(roomCode);
 		} catch (e) {
 			log(`Auto-join failed: ${e.message}. Use manual fallback below.`);
+			if (joinStatus) joinStatus.textContent = "Could not join automatically. Try again, or use Manual Pairing Fallback below.";
 			if (button) {
 				button.disabled = false;
 				button.textContent = "Join Room";
