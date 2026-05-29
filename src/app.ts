@@ -1116,11 +1116,27 @@ async function initPeerJsHost() {
     },
   });
   globalThis.__carryokiePeerJsTransport = peerJsTransport;
-  try {
-    await peerJsTransport.startHost(room.roomCode);
-    log(`PeerJS host ready: room ${room.roomCode}`);
-  } catch (e) {
-    log(`PeerJS host failed: ${e.message}`);
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await peerJsTransport.startHost(room.roomCode);
+      log(`PeerJS host ready: room ${room.roomCode}`);
+      break;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      const type = e?.type || "";
+      const canRetry =
+        attempt < maxAttempts &&
+        (type === "unavailable-id" || /unavailable-id|taken|collision/i.test(message));
+      if (!canRetry) {
+        log(`PeerJS host failed: ${message}`);
+        break;
+      }
+      const oldCode = room.roomCode;
+      room.roomCode = makePeerJsRoomCode();
+      persist();
+      log(`PeerJS room ${oldCode} unavailable; retrying with ${room.roomCode}.`);
+    }
   }
   renderHost(document.body);
 }

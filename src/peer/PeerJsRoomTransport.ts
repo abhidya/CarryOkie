@@ -6,7 +6,11 @@
  * WebRTC data/media still flows peer-to-peer after signaling.
  */
 
-import Peer, { DataConnection } from "peerjs";
+import PeerModule, { type DataConnection } from "peerjs";
+
+type PeerConstructor = new (...args: unknown[]) => Peer;
+const DefaultPeer = ((PeerModule as unknown as { default?: PeerConstructor }).default ??
+  PeerModule) as PeerConstructor;
 
 export type ConnectionState =
   | "idle"
@@ -18,12 +22,9 @@ export type ConnectionState =
   | "failed";
 
 // Auto-join message types exchanged over PeerJS DataChannel
-export const AUTO_JOIN_HELLO = "AUTO_JOIN_HELLO";
-export const AUTO_JOIN_HOST_READY = "AUTO_JOIN_HOST_READY";
 export const AUTO_JOIN_WEBRTC_OFFER = "AUTO_JOIN_WEBRTC_OFFER";
 export const AUTO_JOIN_WEBRTC_ANSWER = "AUTO_JOIN_WEBRTC_ANSWER";
 export const AUTO_JOIN_FAILED = "AUTO_JOIN_FAILED";
-export const AUTO_JOIN_STATUS = "AUTO_JOIN_STATUS";
 
 export interface RoomMessage {
   type: string;
@@ -43,6 +44,16 @@ export interface TransportHandlers {
 const STUN_SERVER = { urls: "stun:stun.l.google.com:19302" };
 
 export class PeerJsRoomTransport {
+  private static PeerCtor: PeerConstructor = DefaultPeer;
+
+  static setPeerConstructorForTests(ctor: PeerConstructor): void {
+    PeerJsRoomTransport.PeerCtor = ctor;
+  }
+
+  static resetPeerConstructorForTests(): void {
+    PeerJsRoomTransport.PeerCtor = DefaultPeer;
+  }
+
   private peer: Peer | null = null;
   private connections: Map<string, DataConnection> = new Map();
   private handlers: TransportHandlers;
@@ -72,6 +83,7 @@ export class PeerJsRoomTransport {
   }
 
   private setState(s: ConnectionState): void {
+    if (this._state === s) return;
     this._state = s;
     this.handlers.onStateChange(s);
   }
@@ -86,7 +98,7 @@ export class PeerJsRoomTransport {
     this.setState("starting");
 
     return new Promise((resolve, reject) => {
-      const peer = new Peer(roomCode, {
+      const peer = new PeerJsRoomTransport.PeerCtor(roomCode, {
         config: { iceServers: [STUN_SERVER] },
         debug: 0,
       });
@@ -134,7 +146,7 @@ export class PeerJsRoomTransport {
     this.setState("starting");
 
     return new Promise((resolve, reject) => {
-      const peer = new Peer({
+      const peer = new PeerJsRoomTransport.PeerCtor({
         config: { iceServers: [STUN_SERVER] },
         debug: 0,
       });
@@ -303,13 +315,23 @@ export class PeerJsRoomTransport {
    * Player: wait for the host's answer after sending an offer.
    */
   waitForAutoJoinAnswer(timeoutMs = 30000): Promise<string> {
+    const peerId = this._roomCode;
+    if (!peerId) return Promise.reject(new Error("Not in a room"));
+
+    const existing = this._autoJoinAnswerResolvers.get(peerId);
+    if (existing) {
+      clearTimeout(existing.timer);
+      this._autoJoinAnswerResolvers.delete(peerId);
+      existing.reject(new Error("Auto-join answer wait superseded"));
+    }
+
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        this._autoJoinAnswerResolvers.delete(this._roomCode || "unknown");
+        this._autoJoinAnswerResolvers.delete(peerId);
         reject(new Error("Auto-join answer timeout"));
       }, timeoutMs);
 
-      this._autoJoinAnswerResolvers.set(this._roomCode || "unknown", {
+      this._autoJoinAnswerResolvers.set(peerId, {
         resolve,
         reject,
         timer,
