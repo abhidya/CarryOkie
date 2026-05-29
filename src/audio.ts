@@ -1,3 +1,12 @@
+export const LOW_LATENCY_MIC_CONSTRAINTS = {
+  echoCancellation: false,
+  noiseSuppression: false,
+  autoGainControl: false,
+  channelCount: { ideal: 1 },
+  sampleRate: { ideal: 48000 },
+  latency: { ideal: 0, max: 0.02 },
+} as MediaTrackConstraints;
+
 export class PhoneAudio {
   log: (msg: string) => void;
   ctx: AudioContext | null;
@@ -108,14 +117,7 @@ export class PhoneAudio {
   }
   async openMic(pushToSing: boolean): Promise<MediaStream> {
     await this.init();
-    const audioConstraints = {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-      channelCount: { ideal: 1 },
-      sampleRate: { ideal: 48000 },
-      latency: { ideal: 0.01, max: 0.05 },
-    } as MediaTrackConstraints;
+    const audioConstraints = LOW_LATENCY_MIC_CONSTRAINTS;
     try {
       this.localStream = await this.getUserMediaWithTimeout({
         audio: audioConstraints,
@@ -126,7 +128,7 @@ export class PhoneAudio {
         throw error;
       }
       this.log(
-        `Mic request with karaoke constraints failed: ${(error as Error).message}. Retrying with basic audio.`,
+        `Mic request with ultra-low-latency karaoke constraints failed: ${(error as Error).message}. Retrying with basic audio.`,
       );
       this.localStream = await this.getUserMediaWithTimeout({
         audio: true,

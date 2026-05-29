@@ -23,7 +23,9 @@ import {
   RPC,
   assertWebRtcSupported,
   mediaTrackKey,
+  preferLowLatencyAudioSdp,
   rtcConfig,
+  tuneAudioSenderForLowLatency,
   waitForIceComplete,
 } from "./webrtc.ts";
 import {
@@ -516,12 +518,12 @@ async function negotiateReceiverAudio() {
       newTracks.forEach((track) => {
         receiverTrackKeys.add(mediaTrackKey(track));
         audioPipeline.receiverTracksAdded++;
-        receiverPc.addTrack(track, stream);
+        tuneAudioSenderForLowLatency(receiverPc.addTrack(track, stream));
       });
     }
     if (!receiverTrackKeys.size) return;
     const offer = await receiverPc.createOffer({ offerToReceiveAudio: true });
-    await receiverPc.setLocalDescription(offer);
+    await receiverPc.setLocalDescription(preferLowLatencyAudioSdp(offer));
     await waitForIceComplete(receiverPc);
     receiverChannel?.postMessage({
       type: "RECEIVER_OFFER",

@@ -3,6 +3,69 @@ import {
   decodeSignalPayload,
   joinChunks,
 } from "./signaling.ts";
+
+const LOW_LATENCY_AUDIO_FMTP = "stereo=0;sprop-stereo=0;useinbandfec=1;ptime=10;maxptime=20";
+
+export function tuneAudioSenderForLowLatency(sender: RTCRtpSender): void {
+  try {
+    const parameters = sender.getParameters?.();
+    if (!parameters) return;
+    if (!parameters.encodings || parameters.encodings.length === 0)
+      parameters.encodings = [{}];
+    for (const encoding of parameters.encodings) {
+      encoding.priority = "high" as RTCPriorityType;
+      encoding.networkPriority = "high" as RTCPriorityType;
+      encoding.maxBitrate = 96000;
+      (encoding as RTCRtpEncodingParameters & { dtx?: string }).dtx = "disabled";
+    }
+    void sender.setParameters?.(parameters).catch(() => {});
+  } catch {
+    /* Browser support varies; SDP ptime hints still apply below. */
+  }
+}
+
+export function preferLowLatencyAudioSdp(
+  description: RTCSessionDescriptionInit,
+): RTCSessionDescriptionInit {
+  if (!description.sdp || !/^v=0/m.test(description.sdp)) return description;
+  const lines = description.sdp.split(/\r?\n/);
+  const opusRtpmap = lines.find((line) => /a=rtpmap:(\d+) opus\/48000/i.test(line));
+  const payload = opusRtpmap?.match(/a=rtpmap:(\d+) opus\/48000/i)?.[1];
+  if (!payload) return description;
+  const fmtpPrefix = `a=fmtp:${payload} `;
+  let added = false;
+  const tuned = lines.map((line) => {
+    if (!line.startsWith(fmtpPrefix)) return line;
+    added = true;
+    const existing = line.slice(fmtpPrefix.length);
+    const params = new Map<string, string | true>();
+    for (const part of existing.split(";")) {
+      const token = part.trim();
+      if (!token) continue;
+      const [key, value] = token.split("=");
+      params.set(key, value ?? true);
+    }
+    for (const part of LOW_LATENCY_AUDIO_FMTP.split(";")) {
+      const [key, value] = part.split("=");
+      params.set(key, value);
+    }
+    return `${fmtpPrefix}${[...params.entries()]
+      .map(([key, value]) => (value === true ? key : `${key}=${value}`))
+      .join(";")}`;
+  });
+  if (!added) {
+    const rtpmapIndex = tuned.findIndex((line) => line === opusRtpmap);
+    tuned.splice(rtpmapIndex + 1, 0, `${fmtpPrefix}${LOW_LATENCY_AUDIO_FMTP}`);
+  }
+  return { ...description, sdp: tuned.join("\r\n") };
+}
+
+async function setLowLatencyLocalDescription(
+  pc: RTCPeerConnection,
+  description: RTCSessionDescriptionInit,
+): Promise<void> {
+  await pc.setLocalDescription(preferLowLatencyAudioSdp(description));
+}
 export const rtcConfig: RTCConfiguration = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 };
@@ -178,7 +241,8 @@ export class PeerNode extends EventTarget {
     if (!edge.streams.includes(stream)) edge.streams.push(stream);
     newTracks.forEach((track) => {
       edge.sentTrackKeys.add(mediaTrackKey(track));
-      edge.pc.addTrack(track, stream);
+      const sender = edge.pc.addTrack(track, stream);
+      if (track.kind === "audio") tuneAudioSenderForLowLatency(sender);
     });
     return true;
   }
@@ -272,7 +336,7 @@ export class PeerNode extends EventTarget {
       await edge.pc.setLocalDescription({ type: "rollback" });
     await edge.pc.setRemoteDescription(this.signalDescription(msg));
     const answer = await edge.pc.createAnswer();
-    await edge.pc.setLocalDescription(answer);
+    await setLowLatencyLocalDescription(edge.pc, answer);
     await waitForIceComplete(edge.pc);
     this.send(remotePeerId, {
       type: RPC.SIGNAL_RELAY_ANSWER,
@@ -323,7 +387,7 @@ export class PeerNode extends EventTarget {
     edge.needsNegotiation = false;
     try {
       const offer = await edge.pc.createOffer({ offerToReceiveAudio: true });
-      await edge.pc.setLocalDescription(offer);
+      await setLowLatencyLocalDescription(edge.pc, offer);
       await waitForIceComplete(edge.pc);
       this.send(edge.remotePeerId, {
         type: RPC.SIGNAL_RELAY_OFFER,
@@ -388,7 +452,7 @@ export class PeerNode extends EventTarget {
       replace: true,
     });
     const offer = await edge.pc.createOffer({ offerToReceiveAudio: true });
-    await edge.pc.setLocalDescription(offer);
+    await setLowLatencyLocalDescription(edge.pc, offer);
     await waitForIceComplete(edge.pc);
     return encodeSignalPayload({
       kind: "offer",
@@ -409,7 +473,7 @@ export class PeerNode extends EventTarget {
       payload.description as RTCSessionDescriptionInit,
     );
     const answer = await edge.pc.createAnswer();
-    await edge.pc.setLocalDescription(answer);
+    await setLowLatencyLocalDescription(edge.pc, answer);
     await waitForIceComplete(edge.pc);
     return encodeSignalPayload({
       kind: "answer",

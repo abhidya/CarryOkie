@@ -7,7 +7,11 @@ import {
   resolveDefaultCastMediaType,
   isProtectedMedia,
 } from "./protectedMedia.ts";
-import { rtcConfig, waitForIceComplete } from "./webrtc.ts";
+import {
+  preferLowLatencyAudioSdp,
+  rtcConfig,
+  waitForIceComplete,
+} from "./webrtc.ts";
 import { deriveTvMediaPositionMs } from "./sync.ts";
 
 function escapeHtml(value: unknown): string {
@@ -962,7 +966,7 @@ export function receiverApp(root: HTMLElement): void {
           removeStaleLiveMicTracks();
           await pc.setRemoteDescription(msg.description);
           const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
+          await pc.setLocalDescription(preferLowLatencyAudioSdp(answer));
           await waitForIceComplete(pc);
           channel.postMessage({
             type: "RECEIVER_ANSWER",

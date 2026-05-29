@@ -6,7 +6,7 @@ import {
   renderPayloadCard,
   scanQrInto,
 } from "../src/signaling.ts";
-import { PeerNode, RPC } from "../src/webrtc.ts";
+import { PeerNode, RPC, preferLowLatencyAudioSdp } from "../src/webrtc.ts";
 import { PhoneAudio } from "../src/audio.ts";
 
 const tests = [];
@@ -110,12 +110,12 @@ test("phone mic input requests echo-cancelled audio and mute toggles tracks", as
     assert.equal(got, stream);
     assert.deepEqual(calls[0], {
       audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
         channelCount: { ideal: 1 },
         sampleRate: { ideal: 48000 },
-        latency: { ideal: 0.01, max: 0.05 },
+        latency: { ideal: 0, max: 0.02 },
       },
       video: false,
     });
