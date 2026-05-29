@@ -208,6 +208,9 @@ h2 {
   width: min(100%, 520px);
   margin: 0 auto;
 }
+.primary-actions.mic-needs-enable button:not(#enableMic) {
+  display: none;
+}
 
 .card,
 .payload {

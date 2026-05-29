@@ -1158,12 +1158,12 @@ function renderHost(main) {
   const queuedCount = room.queue.filter(q => q.status === "queued").length;
   const activeSong = room.currentQueueItemId ? songTitle(room.currentSongId || "") : "";
   const hostNextStep = !audioPipeline.receiverReady
-    ? "1. Open TV Stage, then cast that tab to the TV."
+    ? "Open TV Stage, then cast that tab."
     : !room.queue.length
-      ? "2. Ask singers to scan the TV QR. They can queue, start, and sing from their phones."
+      ? "Waiting for singers to scan, join, and queue."
       : !room.currentQueueItemId
-        ? "3. A singer can start their queued song; Start Next is only a host override."
-        : "Show is running. Singers can keep queuing; host controls are backup.";
+        ? "Ready. A singer can start the next song from their phone."
+        : "Show is live. Singers can queue and sing.";
 
   const topStatus = $("#hostTopStatus");
   if (topStatus) {
@@ -1179,7 +1179,7 @@ function renderHost(main) {
 
   const actions = $("#hostActions");
   if (actions) {
-    actions.innerHTML = `<button id="openTvStage" class="primary">1 Open TV Stage</button><button id="copySingerLink">Copy Singer Link</button><button id="showJoinQr">Show QR Here</button><button id="newRoom">Start Over</button>`;
+    actions.innerHTML = `<button id="openTvStage" class="primary">Open TV Stage</button><button id="copySingerLink">Copy Singer Link</button><button id="showJoinQr">Show QR Here</button><button id="newRoom">Start Over</button>`;
     $("#copySingerLink").onclick = async () => {
       const link = PeerJsRoomTransport.playerJoinUrl(room.roomCode);
       try { await navigator.clipboard.writeText(link); } catch {}
@@ -1191,7 +1191,7 @@ function renderHost(main) {
       if (panel) {
         const playerUrl = new URL(`../player/?room=${encodeURIComponent(room.roomCode)}`, location.href).toString();
         const peerJsUrl = peerJsTransport ? PeerJsRoomTransport.playerJoinUrl(room.roomCode) : playerUrl;
-        panel.innerHTML = `<div class="card"><h2>Singer Join QR</h2><p class="hint">Scan with any camera app to join, queue songs, or sing live.</p><div id="showQrContainer"></div><p><a href="${escapeHtml(peerJsUrl)}" id="singerJoinLink">${escapeHtml(peerJsUrl)}</a></p></div>`;
+        panel.innerHTML = `<div class="card"><h2>Singer Join QR</h2><p class="hint">Scan to join, queue, and sing.</p><div id="showQrContainer"></div><p><a href="${escapeHtml(peerJsUrl)}" id="singerJoinLink">${escapeHtml(peerJsUrl)}</a></p></div>`;
         const qrContainer = $("#showQrContainer");
         if (qrContainer) qrContainer.innerHTML = qrSvg(peerJsUrl, { scale: 7, quiet: 6, title: "Join CarryOkie room" });
       }
@@ -1210,12 +1210,12 @@ function renderHost(main) {
     const setupComplete = room.players.length > 1 && room.queue.length > 0;
     panels.innerHTML = `<div class="host-panels">
       <section class="host-journey grid">
-        <div class="card step-card ${audioPipeline.receiverReady ? "step-done" : ""}"><p class="eyebrow">Step 1 · TV</p><h2>Open and cast TV Stage</h2><p>Use the button above. Cast the TV Stage browser tab, not this host control tab.</p></div>
-        <div class="card step-card ${room.players.length > 1 ? "step-done" : ""}"><p class="eyebrow">Step 2 · Singers</p><h2>Singers scan the TV QR</h2><p>They enter a name, queue songs, and can go live without host approval.</p></div>
-        <div class="card step-card ${room.currentQueueItemId ? "step-done" : ""}"><p class="eyebrow">Step 3 · Show</p><h2>${activeSong ? escapeHtml(activeSong) : "Start the first queued song"}</h2><p>${room.queue.length ? `${queuedCount} queued song${queuedCount === 1 ? "" : "s"} ready.` : "Waiting for singers to queue songs."}</p></div>
+        <div class="card step-card ${audioPipeline.receiverReady ? "step-done" : ""}"><p class="eyebrow">TV</p><h2>${audioPipeline.receiverReady ? "TV Stage is open" : "Open TV Stage"}</h2><p>${audioPipeline.receiverReady ? "Ready for singers." : "Cast that tab to the TV."}</p></div>
+        <div class="card step-card ${room.players.length > 1 ? "step-done" : ""}"><p class="eyebrow">Room</p><h2>${room.players.length > 1 ? "Singers joined" : "Waiting for singers"}</h2><p>${room.players.length > 1 ? `${room.players.length - 1} singer${room.players.length === 2 ? "" : "s"} in the room.` : "They scan the TV QR."}</p></div>
+        <div class="card step-card ${room.currentQueueItemId ? "step-done" : ""}"><p class="eyebrow">Song</p><h2>${activeSong ? escapeHtml(activeSong) : room.queue.length ? "Ready to start" : "Waiting for a song"}</h2><p>${room.queue.length ? `${queuedCount} queued.` : "Singers queue from their phones."}</p></div>
       </section>
-      <details class="card" ${setupComplete ? "" : "open"}><summary>Setup help</summary><ol class="quickstart"><li>Click <strong>Open TV Stage</strong>.</li><li>Cast that receiver/TV Stage tab to the TV.</li><li>Click <strong>Start TV audio</strong> on the TV tab once if the browser blocks sound.</li><li>Singers scan the TV QR with any camera app.</li><li>Singers queue/start songs and enable their mic from their phone. Host controls are backup.</li></ol></details>
-      <div class="card queue-card"><h2>Host Backup Controls</h2><p class="hint">Singers can start their own queued songs when the TV is idle. Use these controls only to recover, pause, or override the room.</p><div class="button-row"><button id="startNext" class="primary">Start Next Queued Song</button><button id="pauseSong">Pause TV</button><button id="resumeSong">Resume TV</button></div>${queueHtml(room, "host")}</div>
+      <details class="card" ${setupComplete ? "" : "open"}><summary>Setup help</summary><ol class="quickstart"><li>Open and cast the TV Stage.</li><li>Singers scan the TV QR.</li><li>Singers queue, start, enable mic, and sing.</li></ol></details>
+      <details class="card queue-card"><summary>Host Backup Controls</summary><p class="hint">Use only to recover or override the room.</p><div class="button-row"><button id="startNext" class="primary">Start Next Queued Song</button><button id="pauseSong">Pause TV</button><button id="resumeSong">Resume TV</button></div>${queueHtml(room, "host")}</details>
       <details class="card"><summary>Singers (${activeSingers} active)</summary>${room.players.map(p => `<div class="singer-row"><label class="check"><input type="checkbox" class="singer" value="${p.playerId}" ${p.isSingerForCurrentSong ? "checked" : ""}> #${p.playerNumber || "?"} ${escapeHtml(p.displayName)} ${p.micState?.enabled ? (p.micState.muted ? "(muted)" : "(live)") : ""}</label></div>`).join("")}<div class="button-row"><button id="setSingers" class="primary">Update Singers</button></div></details>
       <details class="card"><summary>Now Playing</summary>${room.currentQueueItemId ? `<p>${escapeHtml(songTitle(room.currentSongId || ""))}</p>` : "<p>No song active</p>"}${room.players.some(p => p.isSingerForCurrentSong) ? '<p class="warn">TV bleed risk: singers should use headphones.</p>' : ""}</details>
     </div>`;
@@ -1303,7 +1303,7 @@ function playerIsJoined() {
 }
 function joinRoomHtml(roomCode) {
   const roomCodeUpper = (roomCode || "").toUpperCase();
-  return `<section id="playerJoinCard" class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie Singer Remote</p><h2>Join Room</h2><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div></div><div class="card"><label>Room Code<p id="playerRoomCode" class="status-pill">${escapeHtml(roomCodeUpper || "—")}</p></label><label>Your Name<input id="playerDisplayName" value="${escapeHtml(player?.displayName || "")}" placeholder="Your name"></label><button id="joinRoom" class="primary">Join Room</button></div></section>`;
+  return `<section id="playerJoinCard" class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie Singer Remote</p><h2>Join Room</h2><p class="subtle">Enter your name, then join.</p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div></div><div class="card"><label>Room Code<p id="playerRoomCode" class="status-pill">${escapeHtml(roomCodeUpper || "—")}</p></label><label>Your Name<input id="playerDisplayName" value="${escapeHtml(player?.displayName || "")}" placeholder="Your name"></label><button id="joinRoom" class="primary">Join Room</button></div></section>`;
 }
 function updatePlayerDisplayName() {
   if (!player) return;
@@ -1405,7 +1405,8 @@ function renderPlayer(main) {
     return;
   }
 
-  main.innerHTML = `<section id="playerSingerRemote" class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie Singer Remote</p><h2>${currentTitle}</h2><p class="subtle"><span id="playerRoomCode">Room ${escapeHtml(roomCode)}</span> · Player #${escapeHtml(player.playerNumber || "?")} · <span id="playerConnectionStatus">connected</span></p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p id="micStatus" class="status-pill ${micLabel.includes("Live") ? "live-status" : ""}">${escapeHtml(micLabel)}</p><div class="primary-actions"><button id="enableMic" class="primary">Enable My Mic</button><button id="holdSing" class="hold-button">Hold to Sing</button><button id="toggleSing">Live / Mute</button><button id="muteMic" class="danger">Mute Mic</button></div></div>
+  const micIsEnabled = !!player?.micState?.enabled;
+  main.innerHTML = `<section id="playerSingerRemote" class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie Singer Remote</p><h2>${currentTitle}</h2><p class="subtle"><span id="playerRoomCode">Room ${escapeHtml(roomCode)}</span> · Player #${escapeHtml(player.playerNumber || "?")} · <span id="playerConnectionStatus">connected</span></p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p id="micStatus" class="status-pill ${micLabel.includes("Live") ? "live-status" : ""}">${escapeHtml(micLabel)}</p><div class="primary-actions ${micIsEnabled ? "mic-enabled" : "mic-needs-enable"}"><button id="enableMic" class="primary">${micIsEnabled ? "Reconnect Mic" : "Enable My Mic"}</button><button id="holdSing" class="hold-button">Hold to Sing</button><button id="toggleSing">Live / Mute</button><button id="muteMic" class="danger">Mute Mic</button></div></div>
 <details id="queueSongPanel" class="card" open><summary>Queue / Start Song</summary><label>Your Name<input id="displayName" value="${escapeHtml(player.displayName || "Player")}" placeholder="Your name"></label><label>Song<select id="song">${catalog.map(s => `<option value="${s.songId}">${escapeHtml(s.title)} — ${escapeHtml(s.artist)}</option>`).join("")}</select></label><label>Singers<input id="singers" value="${player.playerNumber || 2}" placeholder="Singer numbers comma separated"></label><p class="subtle">Default singer is you. If nothing is playing, your request starts on the TV automatically. Add more numbers only for duets/groups.</p><div class="button-row"><button id="requestSong" class="primary">Queue / Start on TV</button><button id="requestSinger">Go Live as Singer</button></div><div class="queue-list">${queueHtml(room, "phone")}</div></details>
 <details id="soundSettingsPanel" class="card"><summary>Sing</summary><p class="warn compact">${escapeHtml(singerWarning)}</p><label class="check"><input type="checkbox" id="pushToSing"> Push-to-sing</label><label>Mic Filter<select id="voicePreset"><option value="clean">Clean</option><option value="alto">Alto warm</option><option value="bravo">Bravo bright</option><option value="bass">Bass low</option><option value="radio">Radio</option><option value="autotune">Autotune-style polish</option></select></label><p id="wake" class="subtle"></p></details>
 <details class="card"><summary>Advanced Audio</summary><div class="button-row"><button id="startBacking">Start backing monitor</button><button id="pauseBacking">Pause backing monitor</button></div><label>Remote gain <input id="remoteGain" type="range" min="0" max="2" value="1" step=".05"></label><label>Backing monitor gain <input id="backingGain" type="range" min="0" max="1" value="0.35" step=".05"></label><label>Master gain <input id="masterGain" type="range" min="0" max="2" value="1" step=".05"></label></details>
@@ -1441,6 +1442,9 @@ function renderPlayer(main) {
       await connectDirectReceiverIfNeeded();
       const label = deriveMicLabel(player);
       $("#micStatus").textContent = label;
+      const actions = document.querySelector(".primary-actions");
+      actions?.classList.remove("mic-needs-enable");
+      actions?.classList.add("mic-enabled");
       log(isNewMicStream ? "Mic publishing. Own mic not locally monitored." : "Mic already publishing. Own mic not locally monitored.");
     } catch (e) { $("#micStatus").textContent = e.message; log(e.message); } finally { if (enableButton) enableButton.disabled = false; }
   };
