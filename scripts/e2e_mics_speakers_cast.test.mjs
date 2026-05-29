@@ -364,7 +364,7 @@ test("E2E: Full room with 3 singers, 2 listeners, and Chromecast", async () => {
   // Verify receiver has live mic rendering logic
   assert.match(
     receiverCode,
-    /liveMics|live-mics/,
+    /receiverLiveMicStatus/,
     "Receiver should have live mic container",
   );
 

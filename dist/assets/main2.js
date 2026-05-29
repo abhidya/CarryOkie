@@ -1166,6 +1166,9 @@ var PhoneAudio = class {
 	localStream;
 	publishedStream;
 	pendingMicRequest;
+	activeCaptureRequest;
+	activeCaptureWaiters;
+	activeCaptureConsumed;
 	micSource;
 	micDestination;
 	micFilters;
@@ -1189,6 +1192,9 @@ var PhoneAudio = class {
 		this.localStream = null;
 		this.publishedStream = null;
 		this.pendingMicRequest = null;
+		this.activeCaptureRequest = null;
+		this.activeCaptureWaiters = 0;
+		this.activeCaptureConsumed = false;
 		this.micSource = null;
 		this.micDestination = null;
 		this.micFilters = {};
@@ -1238,25 +1244,62 @@ var PhoneAudio = class {
 	}
 	async openMic(pushToSing) {
 		await this.init();
-		this.localStream = await navigator.mediaDevices.getUserMedia({
-			audio: {
-				echoCancellation: true,
-				noiseSuppression: true,
-				autoGainControl: true,
-				channelCount: { ideal: 1 },
-				sampleRate: { ideal: 48e3 },
-				latency: {
-					ideal: .01,
-					max: .05
-				}
-			},
-			video: false
-		});
+		const audioConstraints = {
+			echoCancellation: true,
+			noiseSuppression: true,
+			autoGainControl: true,
+			channelCount: { ideal: 1 },
+			sampleRate: { ideal: 48e3 },
+			latency: {
+				ideal: .01,
+				max: .05
+			}
+		};
+		try {
+			this.localStream = await this.getUserMediaWithTimeout({
+				audio: audioConstraints,
+				video: false
+			});
+		} catch (error) {
+			if (!isConstraintCompatibilityError(error)) throw error;
+			this.log(`Mic request with karaoke constraints failed: ${error.message}. Retrying with basic audio.`);
+			this.localStream = await this.getUserMediaWithTimeout({
+				audio: true,
+				video: false
+			});
+		}
 		this.applyGate();
 		this.buildMicFilterStream(this.localStream);
 		this.publishedStream = this.localStream;
 		this.setMicMuted(pushToSing);
 		return this.publishedStream;
+	}
+	async getUserMediaWithTimeout(constraints, timeoutMs = 5e3) {
+		let timer;
+		if (!this.activeCaptureRequest) {
+			this.activeCaptureConsumed = false;
+			this.activeCaptureRequest = navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
+				if (this.activeCaptureWaiters === 0 && !this.activeCaptureConsumed) stream.getTracks().forEach((track) => track.stop());
+				return stream;
+			}).finally(() => {
+				this.activeCaptureRequest = null;
+				this.activeCaptureWaiters = 0;
+				this.activeCaptureConsumed = false;
+			});
+		}
+		this.activeCaptureWaiters += 1;
+		try {
+			const stream = await Promise.race([this.activeCaptureRequest, new Promise((_, reject) => {
+				timer = setTimeout(() => {
+					reject(/* @__PURE__ */ new Error("Microphone permission timed out. Check browser mic permission and try again."));
+				}, timeoutMs);
+			})]);
+			this.activeCaptureConsumed = true;
+			return stream;
+		} finally {
+			this.activeCaptureWaiters = Math.max(0, this.activeCaptureWaiters - 1);
+			clearTimeout(timer);
+		}
 	}
 	hasLiveMic() {
 		return this.streamHasLiveAudio(this.localStream) && this.streamHasLiveAudio(this.publishedStream);
@@ -1460,8 +1503,11 @@ var PhoneAudio = class {
 	async tryWakeLock() {
 		try {
 			if ("wakeLock" in navigator) {
-				this.wakeLock = await navigator.wakeLock.request("screen");
-				return "active";
+				const request = navigator.wakeLock.request("screen").then((lock) => {
+					this.wakeLock = lock;
+					return "active";
+				});
+				return await Promise.race([request, new Promise((resolve) => setTimeout(() => resolve("timeout"), 1e3))]);
 			}
 			if (!this.wakeLockVideo) {
 				this.wakeLockVideo = document.createElement("video");
@@ -1514,6 +1560,10 @@ var PhoneAudio = class {
 		this.ctx.createMediaStreamSource(stream).connect(this.duetMonitorGains.get(peerId));
 	}
 };
+function isConstraintCompatibilityError(error) {
+	const name = error?.name;
+	return name === "OverconstrainedError" || name === "ConstraintNotSatisfiedError";
+}
 var singerWarning = "TV backing track bleed risk: your phone mic can hear the TV backing track. Use headphones or push-to-sing to avoid sending backing track to everyone.";
 //#endregion
 //#region node_modules/peerjs-js-binarypack/dist/binarypack.mjs
@@ -6204,15 +6254,15 @@ function receiverApp(root) {
 		const resolvedLiveMicStatus = state.liveMicStatus || (liveMicTrackIds.size ? liveMicStatus() : "");
 		const stageStatus = root.querySelector("#receiverStageStatus");
 		if (stageStatus) stageStatus.innerHTML = `<p class="status-pill">${escapeHtml$1(state.status)}</p>` + (resolvedLiveMicStatus ? `<p class="status-pill live-status">${escapeHtml$1(resolvedLiveMicStatus)}</p>` : "");
-		const liveMicStatus = root.querySelector("#receiverLiveMicStatus");
-		if (liveMicStatus) {
+		const liveMicStatusEl = root.querySelector("#receiverLiveMicStatus");
+		if (liveMicStatusEl) {
 			const { audible, muted, publishing } = singerMicSummary();
-			liveMicStatus.innerHTML = `<h2>Live Mics</h2><p class="subtle">${audible.length ? `Playing ${audible.length} unmuted live mic${audible.length === 1 ? "" : "s"}.` : muted.length ? "Muted." : "Waiting for singer mic…"}</p><p class="subtle">Publishing: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>`;
-			liveMicStatus.querySelector("#startReceiverAudio")?.addEventListener("click", () => {
+			liveMicStatusEl.innerHTML = `<h2>Live Mics</h2><p class="subtle">${audible.length ? `Playing ${audible.length} unmuted live mic${audible.length === 1 ? "" : "s"}.` : muted.length ? "Muted." : "Waiting for singer mic…"}</p><p class="subtle">Publishing: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>`;
+			liveMicStatusEl.querySelector("#startReceiverAudio")?.addEventListener("click", () => {
 				state.audioOutputUnlocked = true;
 				tryPlayLiveMics();
 			});
-			liveMicStatus.querySelector("#retryLiveMics")?.addEventListener("click", () => {
+			liveMicStatusEl.querySelector("#retryLiveMics")?.addEventListener("click", () => {
 				tryPlayLiveMics();
 			});
 		}

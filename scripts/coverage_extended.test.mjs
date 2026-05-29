@@ -132,6 +132,217 @@ test("phone mic input requests echo-cancelled audio and mute toggles tracks", as
   }
 });
 
+test("phone mic retries only constraint compatibility failures", async () => {
+  const oldAudioContext = globalThis.AudioContext;
+  const oldNavigator = globalThis.navigator;
+  const calls = [];
+  const track = { enabled: true, kind: "audio", readyState: "live" };
+  const stream = {
+    getAudioTracks() {
+      return [track];
+    },
+    getTracks() {
+      return [track];
+    },
+  };
+  globalThis.AudioContext = class {
+    constructor() {
+      this.destination = {};
+    }
+    createGain() {
+      return { gain: { value: 0 }, connect() {} };
+    }
+    createMediaStreamSource() {
+      return { connect() {} };
+    }
+    createScriptProcessor() {
+      return { connect() {}, onaudioprocess: null };
+    }
+  };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: {
+      mediaDevices: {
+        async getUserMedia(constraints) {
+          calls.push(constraints);
+          if (calls.length === 1) {
+            throw Object.assign(new Error("unsupported ideal sample rate"), {
+              name: "OverconstrainedError",
+            });
+          }
+          return stream;
+        },
+      },
+    },
+  });
+  try {
+    const audio = new PhoneAudio(() => {});
+    assert.equal(await audio.requestMic(), stream);
+    assert.equal(calls.length, 2);
+    assert.deepEqual(calls[1], { audio: true, video: false });
+  } finally {
+    globalThis.AudioContext = oldAudioContext;
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: oldNavigator,
+    });
+  }
+
+  const deniedCalls = [];
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: {
+      mediaDevices: {
+        async getUserMedia(constraints) {
+          deniedCalls.push(constraints);
+          throw Object.assign(new Error("denied"), { name: "NotAllowedError" });
+        },
+      },
+    },
+  });
+  globalThis.AudioContext = class {
+    constructor() {
+      this.destination = {};
+    }
+    createGain() {
+      return { gain: { value: 0 }, connect() {} };
+    }
+    createMediaStreamSource() {
+      return { connect() {} };
+    }
+    createScriptProcessor() {
+      return { connect() {}, onaudioprocess: null };
+    }
+  };
+  try {
+    const audio = new PhoneAudio(() => {});
+    await assert.rejects(() => audio.requestMic(), /denied/);
+    assert.equal(
+      deniedCalls.length,
+      1,
+      "permission/security failures must not trigger a second mic request",
+    );
+  } finally {
+    globalThis.AudioContext = oldAudioContext;
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: oldNavigator,
+    });
+  }
+});
+
+test("timed-out mic capture is reused until browser request settles", async () => {
+  const oldNavigator = globalThis.navigator;
+  const calls = [];
+  let resolveCapture;
+  const track = {
+    kind: "audio",
+    readyState: "live",
+    stopped: false,
+    stop() {
+      this.stopped = true;
+      this.readyState = "ended";
+    },
+  };
+  const stream = {
+    getTracks() {
+      return [track];
+    },
+  };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: {
+      mediaDevices: {
+        getUserMedia(constraints) {
+          calls.push(constraints);
+          return new Promise((resolve) => {
+            resolveCapture = () => resolve(stream);
+          });
+        },
+      },
+    },
+  });
+  try {
+    const audio = new PhoneAudio(() => {});
+    await assert.rejects(
+      () => audio.getUserMediaWithTimeout({ audio: true }, 1),
+      /timed out/,
+    );
+    await assert.rejects(
+      () => audio.getUserMediaWithTimeout({ audio: true }, 1),
+      /timed out/,
+    );
+    assert.equal(
+      calls.length,
+      1,
+      "retry while the browser prompt is still pending must not start a second getUserMedia request",
+    );
+    resolveCapture();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(track.stopped, true);
+  } finally {
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: oldNavigator,
+    });
+  }
+});
+
+test("active retry can consume a capture after an earlier timeout", async () => {
+  const oldNavigator = globalThis.navigator;
+  const calls = [];
+  let resolveCapture;
+  const track = {
+    kind: "audio",
+    readyState: "live",
+    stopped: false,
+    stop() {
+      this.stopped = true;
+      this.readyState = "ended";
+    },
+  };
+  const stream = {
+    getTracks() {
+      return [track];
+    },
+  };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: {
+      mediaDevices: {
+        getUserMedia(constraints) {
+          calls.push(constraints);
+          return new Promise((resolve) => {
+            resolveCapture = () => resolve(stream);
+          });
+        },
+      },
+    },
+  });
+  try {
+    const audio = new PhoneAudio(() => {});
+    await assert.rejects(
+      () => audio.getUserMediaWithTimeout({ audio: true }, 1),
+      /timed out/,
+    );
+    const retry = audio.getUserMediaWithTimeout({ audio: true }, 50);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    resolveCapture();
+    assert.equal(await retry, stream);
+    assert.equal(calls.length, 1);
+    assert.equal(
+      track.stopped,
+      false,
+      "a stale timed-out waiter must not stop a stream consumed by an active retry",
+    );
+  } finally {
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: oldNavigator,
+    });
+  }
+});
+
 test("phone mic enable is idempotent while the current mic stream is live", async () => {
   const oldAudioContext = globalThis.AudioContext;
   const oldNavigator = globalThis.navigator;

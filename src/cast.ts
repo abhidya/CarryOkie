@@ -543,12 +543,12 @@ export function receiverApp(root: HTMLElement): void {
     const stageStatus = root.querySelector("#receiverStageStatus");
     if (stageStatus) stageStatus.innerHTML = `<p class="status-pill">${escapeHtml(state.status)}</p>` + (resolvedLiveMicStatus ? `<p class="status-pill live-status">${escapeHtml(resolvedLiveMicStatus)}</p>` : "");
 
-    const liveMicStatus = root.querySelector("#receiverLiveMicStatus");
-    if (liveMicStatus) {
+    const liveMicStatusEl = root.querySelector("#receiverLiveMicStatus");
+    if (liveMicStatusEl) {
       const { audible, muted, publishing } = singerMicSummary();
-      liveMicStatus.innerHTML = `<h2>Live Mics</h2><p class="subtle">${audible.length ? `Playing ${audible.length} unmuted live mic${audible.length === 1 ? "" : "s"}.` : muted.length ? "Muted." : "Waiting for singer mic…"}</p><p class="subtle">Publishing: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>`;
-      liveMicStatus.querySelector("#startReceiverAudio")?.addEventListener("click", () => { state.audioOutputUnlocked = true; void tryPlayLiveMics(); });
-      liveMicStatus.querySelector("#retryLiveMics")?.addEventListener("click", () => { void tryPlayLiveMics(); });
+      liveMicStatusEl.innerHTML = `<h2>Live Mics</h2><p class="subtle">${audible.length ? `Playing ${audible.length} unmuted live mic${audible.length === 1 ? "" : "s"}.` : muted.length ? "Muted." : "Waiting for singer mic…"}</p><p class="subtle">Publishing: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>`;
+      liveMicStatusEl.querySelector("#startReceiverAudio")?.addEventListener("click", () => { state.audioOutputUnlocked = true; void tryPlayLiveMics(); });
+      liveMicStatusEl.querySelector("#retryLiveMics")?.addEventListener("click", () => { void tryPlayLiveMics(); });
     }
 
     const active = activeLine();
@@ -877,7 +877,7 @@ export function receiverApp(root: HTMLElement): void {
         inbound.push(stat);
     });
     if (!inbound.length) return;
-    const stats = inbound[inbound.length - 1] as Record<string, number>;
+    const stats = inbound[inbound.length - 1] as unknown as Record<string, number>;
     const jitterBufferMs =
       stats.jitterBufferDelay && stats.jitterBufferEmittedCount
         ? (stats.jitterBufferDelay / stats.jitterBufferEmittedCount) * 1000

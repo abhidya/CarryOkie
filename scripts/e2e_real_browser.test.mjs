@@ -1,7 +1,4 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { chromium } from "playwright";
 
 const baseUrl = process.env.E2E_BASE_URL || "http://127.0.0.1:4180/";
@@ -10,50 +7,12 @@ const keepBrowserOpen = process.env.KEEP_BROWSER_OPEN === "1";
 const useDeterministicFakeMic =
   process.env.E2E_FAKE_MIC === "1" ||
   (!headed && process.env.E2E_REAL_MIC !== "1");
-function makeSineWaveWav({
-  seconds = 60,
-  sampleRate = 48000,
-  frequency = 440,
-} = {}) {
-  const sampleCount = seconds * sampleRate;
-  const dataBytes = sampleCount * 2;
-  const buffer = Buffer.alloc(44 + dataBytes);
-  buffer.write("RIFF", 0);
-  buffer.writeUInt32LE(36 + dataBytes, 4);
-  buffer.write("WAVE", 8);
-  buffer.write("fmt ", 12);
-  buffer.writeUInt32LE(16, 16);
-  buffer.writeUInt16LE(1, 20);
-  buffer.writeUInt16LE(1, 22);
-  buffer.writeUInt32LE(sampleRate, 24);
-  buffer.writeUInt32LE(sampleRate * 2, 28);
-  buffer.writeUInt16LE(2, 32);
-  buffer.writeUInt16LE(16, 34);
-  buffer.write("data", 36);
-  buffer.writeUInt32LE(dataBytes, 40);
-  for (let i = 0; i < sampleCount; i++) {
-    const sample = Math.round(
-      Math.sin((2 * Math.PI * frequency * i) / sampleRate) * 0x3fff,
-    );
-    buffer.writeInt16LE(sample, 44 + i * 2);
-  }
-  const dir = mkdtempSync(join(tmpdir(), "carryokie-e2e-audio-"));
-  const wavPath = join(dir, "mic-tone.wav");
-  writeFileSync(wavPath, buffer);
-  return wavPath;
-}
-const fakeMicAudioPath = useDeterministicFakeMic ? makeSineWaveWav() : null;
 const browser = await chromium.launch({
   headless: !headed,
   slowMo: headed ? 150 : 0,
   args: [
     "--use-fake-ui-for-media-stream",
-    ...(useDeterministicFakeMic
-      ? [
-          "--use-fake-device-for-media-stream",
-          `--use-file-for-fake-audio-capture=${fakeMicAudioPath}`,
-        ]
-      : []),
+    ...(useDeterministicFakeMic ? ["--use-fake-device-for-media-stream"] : []),
   ],
 });
 const context = await browser.newContext();
@@ -359,6 +318,36 @@ try {
 } catch (error) {
   console.error("Host log:\n" + (await pageLog(host)));
   console.error("Player log:\n" + (await pageLog(player)));
+  console.error(
+    "Player body:\n" +
+      (await player
+        .locator("body")
+        .innerText()
+        .catch(() => "")),
+  );
+  console.error(
+    "Player diagnostics:",
+    JSON.stringify(
+      await player
+        .evaluate(() => ({
+          enableMicExists: !!document.querySelector("#enableMic"),
+          enableMicDisabled: document.querySelector("#enableMic")?.disabled,
+          enableMicHasOnclick: !!document.querySelector("#enableMic")?.onclick,
+          micStatus: document.querySelector("#micStatus")?.textContent,
+          wakeText: document.querySelector("#wake")?.textContent,
+          audioExists: !!globalThis.__carryokieAudio,
+          hasMediaDevices: !!navigator.mediaDevices,
+          hasGetUserMedia: !!navigator.mediaDevices?.getUserMedia,
+          hasWakeLock: "wakeLock" in navigator,
+          localStream: !!globalThis.__carryokieAudio?.localStream,
+          pendingMicRequest: !!globalThis.__carryokieAudio?.pendingMicRequest,
+          localStreams: globalThis.__carryokiePeerNode?.localStreams?.length ?? null,
+        }))
+        .catch((error) => ({ error: error.message })),
+      null,
+      2,
+    ),
+  );
   console.error(
     "Receiver body:\n" +
       (await receiver

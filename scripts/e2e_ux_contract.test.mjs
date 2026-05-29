@@ -13,8 +13,17 @@ const server = spawn(
   { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env } },
 );
 
-server.stdout.on("data", () => {});
-server.stderr.on("data", () => {});
+let serverOutput = "";
+let serverExited = false;
+server.stdout.on("data", (chunk) => {
+  serverOutput += String(chunk);
+});
+server.stderr.on("data", (chunk) => {
+  serverOutput += String(chunk);
+});
+server.on("exit", () => {
+  serverExited = true;
+});
 
 function stopServer() {
   if (!server.killed) server.kill("SIGTERM");
@@ -23,6 +32,8 @@ function stopServer() {
 async function waitForServer() {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
+    if (serverExited)
+      throw new Error(`Preview server exited before ready.\n${serverOutput}`);
     try {
       const response = await fetch(baseUrl);
       if (response.ok) return;
@@ -367,6 +378,7 @@ try {
   }
 
 } catch (e) {
+  failed += 1;
   console.error(`Setup failed: ${e.message}`);
 } finally {
   if (browser) await browser.close();

@@ -7,6 +7,9 @@ export class PhoneAudio {
   localStream: MediaStream | null;
   publishedStream: MediaStream | null;
   pendingMicRequest: Promise<MediaStream> | null;
+  activeCaptureRequest: Promise<MediaStream> | null;
+  activeCaptureWaiters: number;
+  activeCaptureConsumed: boolean;
   micSource: MediaStreamAudioSourceNode | null;
   micDestination: MediaStreamAudioDestinationNode | null;
   micFilters: {
@@ -39,6 +42,9 @@ export class PhoneAudio {
     this.localStream = null;
     this.publishedStream = null;
     this.pendingMicRequest = null;
+    this.activeCaptureRequest = null;
+    this.activeCaptureWaiters = 0;
+    this.activeCaptureConsumed = false;
     this.micSource = null;
     this.micDestination = null;
     this.micFilters = {};
@@ -102,22 +108,81 @@ export class PhoneAudio {
   }
   async openMic(pushToSing: boolean): Promise<MediaStream> {
     await this.init();
-    this.localStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        channelCount: { ideal: 1 },
-        sampleRate: { ideal: 48000 },
-        latency: { ideal: 0.01, max: 0.05 },
-      },
-      video: false,
-    });
+    const audioConstraints = {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      channelCount: { ideal: 1 },
+      sampleRate: { ideal: 48000 },
+      latency: { ideal: 0.01, max: 0.05 },
+    } as MediaTrackConstraints;
+    try {
+      this.localStream = await this.getUserMediaWithTimeout({
+        audio: audioConstraints,
+        video: false,
+      });
+    } catch (error) {
+      if (!isConstraintCompatibilityError(error)) {
+        throw error;
+      }
+      this.log(
+        `Mic request with karaoke constraints failed: ${(error as Error).message}. Retrying with basic audio.`,
+      );
+      this.localStream = await this.getUserMediaWithTimeout({
+        audio: true,
+        video: false,
+      });
+    }
     this.applyGate();
     this.buildMicFilterStream(this.localStream);
     this.publishedStream = this.localStream;
     this.setMicMuted(pushToSing);
     return this.publishedStream;
+  }
+  async getUserMediaWithTimeout(
+    constraints: MediaStreamConstraints,
+    timeoutMs = 5000,
+  ): Promise<MediaStream> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (!this.activeCaptureRequest) {
+      this.activeCaptureConsumed = false;
+      this.activeCaptureRequest = navigator.mediaDevices
+        .getUserMedia(constraints)
+        .then((stream) => {
+          if (this.activeCaptureWaiters === 0 && !this.activeCaptureConsumed) {
+            stream.getTracks().forEach((track) => track.stop());
+          }
+          return stream;
+        })
+        .finally(() => {
+          this.activeCaptureRequest = null;
+          this.activeCaptureWaiters = 0;
+          this.activeCaptureConsumed = false;
+        });
+    }
+    this.activeCaptureWaiters += 1;
+    try {
+      const stream = await Promise.race([
+        this.activeCaptureRequest,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => {
+              reject(
+                new Error(
+                  "Microphone permission timed out. Check browser mic permission and try again.",
+                ),
+              );
+            },
+            timeoutMs,
+          );
+        }),
+      ]);
+      this.activeCaptureConsumed = true;
+      return stream;
+    } finally {
+      this.activeCaptureWaiters = Math.max(0, this.activeCaptureWaiters - 1);
+      clearTimeout(timer);
+    }
   }
   hasLiveMic(): boolean {
     return (
@@ -373,8 +438,16 @@ export class PhoneAudio {
   async tryWakeLock(): Promise<string> {
     try {
       if ("wakeLock" in navigator) {
-        this.wakeLock = await navigator.wakeLock.request("screen");
-        return "active";
+        const request = navigator.wakeLock.request("screen").then((lock) => {
+          this.wakeLock = lock;
+          return "active";
+        });
+        return await Promise.race([
+          request,
+          new Promise<"timeout">((resolve) =>
+            setTimeout(() => resolve("timeout"), 1000),
+          ),
+        ]);
       }
       if (!this.wakeLockVideo) {
         this.wakeLockVideo = document.createElement("video");
@@ -434,6 +507,11 @@ export class PhoneAudio {
     const source = this.ctx.createMediaStreamSource(stream);
     source.connect(this.duetMonitorGains.get(peerId)!);
   }
+}
+
+function isConstraintCompatibilityError(error: unknown): boolean {
+  const name = (error as { name?: string } | null)?.name;
+  return name === "OverconstrainedError" || name === "ConstraintNotSatisfiedError";
 }
 export const singerWarning: string =
   "TV backing track bleed risk: your phone mic can hear the TV backing track. Use headphones or push-to-sing to avoid sending backing track to everyone.";
