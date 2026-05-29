@@ -19,6 +19,11 @@ export interface QueueUpdateRequestMessage {
   action?: "join" | "leave" | "remove" | string;
 }
 
+export interface QueueStartRequestMessage {
+  playerId?: string;
+  queueItemId?: string;
+}
+
 export function pairedActor(
   room: Room | null | undefined,
   remotePeerId: string,
@@ -94,4 +99,22 @@ export function applyPhoneQueueUpdate(
   )
     removeQueueItem(room, queueItem.queueItemId);
   else throw new Error("Queue update not allowed.");
+}
+
+export function queuedItemRequestedByActor(
+  room: Room,
+  remotePeerId: string,
+  message: QueueStartRequestMessage,
+): QueueItem {
+  const actor = pairedActor(room, remotePeerId, message.playerId);
+  if (!actor?.playerNumber)
+    throw new Error("Start request needs a paired player number.");
+  const queueItem = room.queue.find(
+    (item) => item.queueItemId === message.queueItemId,
+  );
+  if (!queueItem) throw new Error("Queue item not found.");
+  if (queueItem.status !== "queued") throw new Error("Only queued songs can start.");
+  if (queueItem.requestedByPlayerId !== actor.playerId)
+    throw new Error("Only the requester can start this song from their phone.");
+  return queueItem;
 }

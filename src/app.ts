@@ -812,6 +812,9 @@ function resumeCurrentPlayback() {
   broadcastRoom(RPC.PLAYBACK_STARTED);
   persist();
 }
+function roomHasActiveSong() {
+  return !!room?.queue?.some((q) => q.status === "active");
+}
 function startQueueItem(item) {
   if (!item) {
     log("Queue is empty. Singers can add a song from their phones.");
@@ -862,7 +865,17 @@ function pairedActor(remotePeerId, msgPlayerId) {
   return findPairedActor(room, remotePeerId, msgPlayerId);
 }
 function handleQueueAddRequest(remotePeerId, msg) {
+  const beforeActive = roomHasActiveSong();
   handleQueueAddRequestForRoom(room, catalog, remotePeerId, msg);
+  const added = room.queue.find((q) => q.queueItemId === msg.item?.queueItemId);
+  if (!beforeActive && added?.status === "queued") startQueueItem(added);
+}
+function handleQueueStartRequest(remotePeerId, msg) {
+  if (roomHasActiveSong()) {
+    log("Song is already playing; queued request will stay next.");
+    return;
+  }
+  startQueueItem(queuedItemRequestedByActor(room, remotePeerId, msg));
 }
 function applyPhoneQueueUpdate(remotePeerId, msg) {
   applyPhoneQueueUpdateToRoom(room, remotePeerId, msg);
@@ -901,6 +914,19 @@ function handleRpc(remotePeerId, msg) {
   if (msg.type === RPC.QUEUE_ADD_REQUEST && player?.isHost) {
     try {
       handleQueueAddRequest(remotePeerId, msg);
+      publishQueueUpdate();
+      renderHost(document.body);
+    } catch (e) {
+      peerNode.send(remotePeerId, {
+        type: RPC.ERROR_NOTICE,
+        message: e.message,
+      });
+      log(e.message);
+    }
+  }
+  if (msg.type === RPC.QUEUE_START_REQUEST && player?.isHost) {
+    try {
+      handleQueueStartRequest(remotePeerId, msg);
       publishQueueUpdate();
       renderHost(document.body);
     } catch (e) {
@@ -1364,7 +1390,7 @@ function renderPlayer(main) {
   }
 
   main.innerHTML = `<section id="playerSingerRemote" class="phone-screen"><div class="phone-hero card"><p class="eyebrow">CarryOkie Singer Remote</p><h2>${currentTitle}</h2><p class="subtle"><span id="playerRoomCode">Room ${escapeHtml(roomCode)}</span> · Player #${escapeHtml(player.playerNumber || "?")} · <span id="playerConnectionStatus">connected</span></p><div class="soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p id="micStatus" class="status-pill ${micLabel.includes("Live") ? "live-status" : ""}">${escapeHtml(micLabel)}</p><div class="primary-actions"><button id="enableMic" class="primary">Enable My Mic</button><button id="holdSing" class="hold-button">Hold to Sing</button><button id="toggleSing">Live / Mute</button><button id="muteMic" class="danger">Mute Mic</button></div></div>
-<details id="queueSongPanel" class="card"><summary>Queue Song</summary><label>Your Name<input id="displayName" value="${escapeHtml(player.displayName || "Player")}" placeholder="Your name"></label><label>Song<select id="song">${catalog.map(s => `<option value="${s.songId}">${escapeHtml(s.title)} — ${escapeHtml(s.artist)}</option>`).join("")}</select></label><label>Singers<input id="singers" value="${player.playerNumber || 2}" placeholder="Singer numbers comma separated"></label><p class="subtle">Default singer is you. Add more numbers only for duets/groups.</p><div class="button-row"><button id="requestSong" class="primary">Queue Selected Song</button><button id="requestSinger">Singer Only</button></div><div class="queue-list">${queueHtml(room, "phone")}</div></details>
+<details id="queueSongPanel" class="card" open><summary>Queue / Start Song</summary><label>Your Name<input id="displayName" value="${escapeHtml(player.displayName || "Player")}" placeholder="Your name"></label><label>Song<select id="song">${catalog.map(s => `<option value="${s.songId}">${escapeHtml(s.title)} — ${escapeHtml(s.artist)}</option>`).join("")}</select></label><label>Singers<input id="singers" value="${player.playerNumber || 2}" placeholder="Singer numbers comma separated"></label><p class="subtle">Default singer is you. If nothing is playing, your request starts on the TV automatically. Add more numbers only for duets/groups.</p><div class="button-row"><button id="requestSong" class="primary">Queue / Start on TV</button><button id="requestSinger">Singer Only</button></div><div class="queue-list">${queueHtml(room, "phone")}</div></details>
 <details id="soundSettingsPanel" class="card"><summary>Sing</summary><p class="warn compact">${escapeHtml(singerWarning)}</p><label class="check"><input type="checkbox" id="pushToSing"> Push-to-sing</label><label>Mic Filter<select id="voicePreset"><option value="clean">Clean</option><option value="alto">Alto warm</option><option value="bravo">Bravo bright</option><option value="bass">Bass low</option><option value="radio">Radio</option><option value="autotune">Autotune-style polish</option></select></label><p id="wake" class="subtle"></p></details>
 <details class="card"><summary>Advanced Audio</summary><div class="button-row"><button id="startBacking">Start backing monitor</button><button id="pauseBacking">Pause backing monitor</button></div><label>Remote gain <input id="remoteGain" type="range" min="0" max="2" value="1" step=".05"></label><label>Backing monitor gain <input id="backingGain" type="range" min="0" max="1" value="0.35" step=".05"></label><label>Master gain <input id="masterGain" type="range" min="0" max="2" value="1" step=".05"></label></details>
 <details class="card"><summary>Lyrics / Sync</summary><video id="phoneVideo" controls playsinline muted></video><div id="lyricsPanel"></div><div class="button-row"><button id="earlier">Lyrics earlier</button><button id="later">Lyrics later</button><button id="resetSync">Reset sync</button></div></details></section>`;
@@ -1374,10 +1400,11 @@ function renderPlayer(main) {
   $("#requestSong").onclick = () => {
     const item = queueRequest($("#song").value, $("#singers").value.split(",").map(s => +s.trim()).filter(Boolean), player.playerId, room?.queue?.length || 0);
     peerNode.broadcast({ type: RPC.QUEUE_ADD_REQUEST, item });
-    log("Song queued. Host approval not required.");
+    log("Song queued. If the TV is idle it starts without host approval.");
   };
   $("#requestSinger").onclick = () => { peerNode.broadcast({ type: RPC.SINGER_JOIN_REQUEST, playerId: player.playerId }); log("Singer slot activated."); };
   document.querySelectorAll(".queueSelf").forEach(b => b.onclick = () => { peerNode.broadcast({ type: RPC.QUEUE_UPDATE_REQUEST, action: b.dataset.action, queueItemId: b.dataset.queueId, playerId: player.playerId }); log("Queue update sent."); });
+  document.querySelectorAll(".startSelf").forEach(b => b.onclick = () => { peerNode.broadcast({ type: RPC.QUEUE_START_REQUEST, queueItemId: b.dataset.queueId, playerId: player.playerId }); log("Start request sent. Host approval not required."); });
   $("#voicePreset").onchange = (e) => { const target = e.target; audio?.setVoicePreset(target.value); const status = $("#micStatus"); if (status) status.textContent = `Mic filter: ${target.selectedOptions?.[0]?.textContent || target.value}`; };
   $("#enableMic").onclick = async () => {
     const enableButton = $("#enableMic");

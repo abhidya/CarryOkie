@@ -335,7 +335,7 @@ try {
     await playerPage.fill("#singers", "2");
     await playerPage.click("#requestSong");
     await playerPage.waitForFunction(
-      () => document.querySelector("#log")?.textContent?.includes("Host approval not required."),
+      () => /starts without host approval|Host approval not required/i.test(document.querySelector("#log")?.textContent || ""),
       null,
       { timeout: 5000 },
     );
@@ -346,17 +346,13 @@ try {
       null,
       { timeout: 10000 },
     );
-    // Item is immediately queued and startItem button appears.
-    await hostPage.waitForSelector(".startItem", { timeout: 10000 });
     assert.equal(await hostPage.locator(".acceptItem").count(), 0, "host approval button must not block song queue");
-    // Player state contains queued status (the details panel may be collapsed in normal UX).
-    await playerPage.waitForFunction(
-      () => document.querySelector(".queue-status-queued"),
+    // First queued song starts automatically on an idle TV; no host click.
+    await hostPage.waitForFunction(
+      () => document.querySelector(".queue-status-active"),
       null,
       { timeout: 10000 },
     );
-    // Host starts the song
-    await hostPage.click(".startItem");
     // Host and player see active status
     await hostPage.waitForSelector(".queue-status-active", { timeout: 10000 });
     await playerPage.waitForFunction(
