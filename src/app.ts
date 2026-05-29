@@ -82,6 +82,8 @@ const audioPipeline = {
   receiverAnswerReceivedAt: null,
   receiverLastError: null,
   micLatencyStats: null,
+  directReceiverPeerId: null,
+  directReceiverConnected: false,
 };
 function renderAudioPipelineStatus() {
   const el = $("#audioPipelineStatus");
@@ -375,6 +377,22 @@ function handlePlayerLeft(remotePeerId) {
 }
 function broadcastRoom(type = RPC.ROOM_STATE_SNAPSHOT) {
   peerNode?.broadcast({ type, room });
+}
+async function connectDirectReceiverIfNeeded() {
+  if (player?.isHost || !peerNode || !room?.directReceiverPeerId || !room?.hostPeerId)
+    return;
+  if (!peerNode.localStreams?.some((stream) => stream?.getAudioTracks?.().length))
+    return;
+  const receiverPeerId = room.directReceiverPeerId;
+  if (receiverPeerId === peerNode.localPeerId) return;
+  const edge = peerNode.peers?.get(receiverPeerId);
+  if (edge && !["failed", "closed"].includes(edge.pc?.connectionState || "")) return;
+  try {
+    await peerNode.createRelayedOffer(receiverPeerId, room.hostPeerId);
+    log("Direct receiver audio offer sent.");
+  } catch (error) {
+    log(`Direct receiver audio route failed: ${error.message}`);
+  }
 }
 function receiverUrl() {
   return new URL(
@@ -868,6 +886,17 @@ function handleRpc(remotePeerId, msg) {
     if (self) player = { ...player, ...self };
     persist();
     renderPlayer($("#main"));
+    connectDirectReceiverIfNeeded().catch((error) => log(error.message));
+  }
+  if (msg.type === RPC.RECEIVER_PEER_READY && player?.isHost) {
+    const receiverPeerId = msg.receiverPeerId || remotePeerId;
+    room.directReceiverPeerId = receiverPeerId;
+    audioPipeline.directReceiverPeerId = receiverPeerId;
+    audioPipeline.directReceiverConnected = true;
+    peerNode.send(remotePeerId, { type: RPC.ROOM_STATE_SNAPSHOT, room });
+    broadcastRoom(RPC.ROOM_STATE_SNAPSHOT);
+    publishAudioPipelineStatus();
+    log(`Direct receiver peer ready: ${receiverPeerId}`);
   }
   if (msg.type === RPC.QUEUE_ADD_REQUEST && player?.isHost) {
     try {
@@ -942,6 +971,7 @@ function handleRpc(remotePeerId, msg) {
     if (self) player = { ...player, ...self };
     persist();
     renderPlayer($("#main"));
+    connectDirectReceiverIfNeeded().catch((error) => log(error.message));
   }
   if (msg.type === RPC.PLAYER_LEFT && !player?.isHost) {
     room = msg.room;
@@ -1365,6 +1395,7 @@ function renderPlayer(main) {
       player.micState = { ...player.micState, enabled: true, publishing: true, muted: pushToSing };
       persist();
       if (isNewMicStream || !alreadyPublishing) { peerNode.broadcast({ type: RPC.MIC_ENABLED, playerId: player.playerId, muted: pushToSing }); } else if (previousMuted !== pushToSing) { peerNode.broadcast({ type: pushToSing ? RPC.MIC_MUTED : RPC.MIC_UNMUTED, playerId: player.playerId, muted: pushToSing }); }
+      await connectDirectReceiverIfNeeded();
       const label = deriveMicLabel(player);
       $("#micStatus").textContent = label;
       log(isNewMicStream ? "Mic publishing. Own mic not locally monitored." : "Mic already publishing. Own mic not locally monitored.");

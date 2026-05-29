@@ -3180,6 +3180,7 @@ var RPC = {
 	PLAYBACK_SYNC: "PLAYBACK_SYNC",
 	LATENCY_PING: "LATENCY_PING",
 	LATENCY_PONG: "LATENCY_PONG",
+	RECEIVER_PEER_READY: "RECEIVER_PEER_READY",
 	SIGNAL_RELAY_OFFER: "SIGNAL_RELAY_OFFER",
 	SIGNAL_RELAY_ANSWER: "SIGNAL_RELAY_ANSWER",
 	SIGNAL_RELAY_ICE: "SIGNAL_RELAY_ICE",
@@ -3364,7 +3365,9 @@ var PeerNode = class extends EventTarget {
 		return signal?.description || signal;
 	}
 	async acceptRenegotiationOffer(remotePeerId, msg) {
-		const edge = this.peers.get(remotePeerId) || this.makeConnection(remotePeerId, {
+		const signalFromPeerId = typeof msg.fromPeerId === "string" ? msg.fromPeerId : remotePeerId;
+		const viaPeerId = remotePeerId === signalFromPeerId ? null : remotePeerId;
+		const edge = this.peers.get(signalFromPeerId) || this.makeConnection(signalFromPeerId, {
 			manual: false,
 			initiator: false
 		});
@@ -3373,20 +3376,39 @@ var PeerNode = class extends EventTarget {
 		const answer = await edge.pc.createAnswer();
 		await setLowLatencyLocalDescription(edge.pc, answer);
 		await waitForIceComplete(edge.pc);
-		this.send(remotePeerId, {
+		const answerMsg = {
 			type: RPC.SIGNAL_RELAY_ANSWER,
 			fromPeerId: this.localPeerId,
-			toPeerId: remotePeerId,
+			toPeerId: signalFromPeerId,
 			signal: edge.pc.localDescription
-		});
+		};
+		this.send(viaPeerId || signalFromPeerId, answerMsg);
 	}
 	async acceptRenegotiationAnswer(remotePeerId, msg) {
-		const edge = this.peers.get(remotePeerId);
+		const signalFromPeerId = typeof msg.fromPeerId === "string" ? msg.fromPeerId : remotePeerId;
+		const edge = this.peers.get(signalFromPeerId);
 		if (!edge) throw new Error("No peer connection for renegotiation answer.");
 		await edge.pc.setRemoteDescription(this.signalDescription(msg));
 		clearTimeout(edge.negotiationTimer);
 		edge.negotiating = false;
 		if (edge.needsNegotiation) this.requestNegotiation(edge);
+	}
+	async createRelayedOffer(remotePeerId, viaPeerId) {
+		if (remotePeerId === viaPeerId) throw new Error("Relayed offer needs a separate signaling peer.");
+		const edge = this.makeConnection(remotePeerId, {
+			manual: false,
+			initiator: true,
+			replace: false
+		});
+		const offer = await edge.pc.createOffer({ offerToReceiveAudio: true });
+		await setLowLatencyLocalDescription(edge.pc, offer);
+		await waitForIceComplete(edge.pc);
+		this.send(viaPeerId, {
+			type: RPC.SIGNAL_RELAY_OFFER,
+			fromPeerId: this.localPeerId,
+			toPeerId: remotePeerId,
+			signal: edge.pc.localDescription
+		});
 	}
 	requestNegotiation(edge) {
 		if (!edge.dc || edge.dc.readyState !== "open" || edge.negotiating || edge.pc.signalingState !== "stable") {
@@ -8591,6 +8613,9 @@ function receiverApp(root) {
 	const retryLiveMicsButton = root.querySelector("#retryLiveMics");
 	const startReceiverAudioButton = root.querySelector("#startReceiverAudio");
 	const receiverId = crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+	let receiverPeerNode = null;
+	let receiverPeerTransport = null;
+	let directReceiverJoined = false;
 	let loadedSongId = "";
 	let pendingPlay = false;
 	async function startReceiverAudio() {
@@ -8606,6 +8631,56 @@ function receiverApp(root) {
 			state.status = state.song ? "Audio unlocked. Loading backing track…" : "Audio unlocked. Waiting for host to start a song.";
 		}
 		if (liveMicTrackIds.size) await tryPlayLiveMics();
+		render();
+	}
+	async function initDirectReceiverPeer() {
+		if (!state.roomCode || state.roomCode === "------" || receiverPeerTransport) return;
+		receiverPeerNode = new PeerNode(receiverId);
+		receiverPeerNode.addEventListener("open", (event) => {
+			const remotePeerId = event.detail?.remotePeerId;
+			if (!remotePeerId) return;
+			receiverPeerNode?.send(remotePeerId, {
+				type: RPC.RECEIVER_PEER_READY,
+				receiverPeerId: receiverId
+			});
+			state.status = "Direct singer audio route ready.";
+			render();
+		});
+		receiverPeerNode.addEventListener("track", (event) => {
+			const detail = event.detail || {};
+			const stream = detail.stream || (detail.track ? new MediaStream([detail.track]) : null);
+			if (stream) addLiveMic(stream);
+		});
+		receiverPeerNode.addEventListener("error", (event) => {
+			const message = event.detail?.message || "Direct audio route failed.";
+			state.status = String(message);
+			render();
+		});
+		receiverPeerTransport = new PeerJsRoomTransport({
+			onStateChange: (peerState) => {
+				if (!directReceiverJoined && peerState !== "connected") {
+					state.status = `Direct audio route: ${peerState}`;
+					render();
+				}
+			},
+			onMessage: () => {},
+			onPeerConnected: () => {},
+			onPeerDisconnected: () => {},
+			onError: (error) => {
+				state.status = `Direct audio route error: ${error.message}`;
+				render();
+			}
+		});
+		await receiverPeerTransport.joinRoom(state.roomCode.toUpperCase(), {
+			role: "receiver",
+			receiverPeerId: receiverId
+		});
+		const offerPayload = await receiverPeerNode.createManualOffer("host");
+		receiverPeerTransport.sendAutoJoinOffer(offerPayload.token);
+		const answerText = await receiverPeerTransport.waitForAutoJoinAnswer(3e4);
+		await receiverPeerNode.acceptManualAnswer(answerText);
+		directReceiverJoined = true;
+		state.status = "Direct singer audio route connected.";
 		render();
 	}
 	function activeLine() {
@@ -8982,6 +9057,10 @@ function receiverApp(root) {
 			roomCode: state.roomCode
 		}), 3e3);
 	}
+	initDirectReceiverPeer().catch((error) => {
+		state.status = `Direct audio route unavailable: ${error.message}`;
+		render();
+	});
 	retryLiveMicsButton.addEventListener("click", () => {
 		tryPlayLiveMics();
 	});
@@ -9180,7 +9259,9 @@ var audioPipeline = {
 	receiverOfferSentAt: null,
 	receiverAnswerReceivedAt: null,
 	receiverLastError: null,
-	micLatencyStats: null
+	micLatencyStats: null,
+	directReceiverPeerId: null,
+	directReceiverConnected: false
 };
 function renderAudioPipelineStatus() {
 	const el = $("#audioPipelineStatus");
@@ -9381,6 +9462,20 @@ function broadcastRoom(type = RPC.ROOM_STATE_SNAPSHOT) {
 		type,
 		room
 	});
+}
+async function connectDirectReceiverIfNeeded() {
+	if (player?.isHost || !peerNode || !room?.directReceiverPeerId || !room?.hostPeerId) return;
+	if (!peerNode.localStreams?.some((stream) => stream?.getAudioTracks?.().length)) return;
+	const receiverPeerId = room.directReceiverPeerId;
+	if (receiverPeerId === peerNode.localPeerId) return;
+	const edge = peerNode.peers?.get(receiverPeerId);
+	if (edge && !["failed", "closed"].includes(edge.pc?.connectionState || "")) return;
+	try {
+		await peerNode.createRelayedOffer(receiverPeerId, room.hostPeerId);
+		log("Direct receiver audio offer sent.");
+	} catch (error) {
+		log(`Direct receiver audio route failed: ${error.message}`);
+	}
 }
 function receiverUrl() {
 	return new URL(`../receiver/?room=${encodeURIComponent(room?.roomCode || "")}`, location.href).toString();
@@ -9815,6 +9910,20 @@ function handleRpc(remotePeerId, msg) {
 		};
 		persist();
 		renderPlayer($("#main"));
+		connectDirectReceiverIfNeeded().catch((error) => log(error.message));
+	}
+	if (msg.type === RPC.RECEIVER_PEER_READY && player?.isHost) {
+		const receiverPeerId = msg.receiverPeerId || remotePeerId;
+		room.directReceiverPeerId = receiverPeerId;
+		audioPipeline.directReceiverPeerId = receiverPeerId;
+		audioPipeline.directReceiverConnected = true;
+		peerNode.send(remotePeerId, {
+			type: RPC.ROOM_STATE_SNAPSHOT,
+			room
+		});
+		broadcastRoom(RPC.ROOM_STATE_SNAPSHOT);
+		publishAudioPipelineStatus();
+		log(`Direct receiver peer ready: ${receiverPeerId}`);
 	}
 	if (msg.type === RPC.QUEUE_ADD_REQUEST && player?.isHost) try {
 		handleQueueAddRequest(remotePeerId, msg);
@@ -9876,6 +9985,7 @@ function handleRpc(remotePeerId, msg) {
 		};
 		persist();
 		renderPlayer($("#main"));
+		connectDirectReceiverIfNeeded().catch((error) => log(error.message));
 	}
 	if (msg.type === RPC.PLAYER_LEFT && !player?.isHost) {
 		room = msg.room;
@@ -10385,6 +10495,7 @@ function renderPlayer(main) {
 				playerId: player.playerId,
 				muted: pushToSing
 			});
+			await connectDirectReceiverIfNeeded();
 			const label = deriveMicLabel(player);
 			$("#micStatus").textContent = label;
 			log(isNewMicStream ? "Mic publishing. Own mic not locally monitored." : "Mic already publishing. Own mic not locally monitored.");

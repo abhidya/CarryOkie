@@ -8,6 +8,8 @@ import {
   isProtectedMedia,
 } from "./protectedMedia.ts";
 import {
+  PeerNode,
+  RPC,
   preferLowLatencyAudioSdp,
   rtcConfig,
   waitForIceComplete,
@@ -452,6 +454,9 @@ export function receiverApp(root: HTMLElement): void {
   const retryLiveMicsButton = root.querySelector<HTMLButtonElement>("#retryLiveMics")!;
   const startReceiverAudioButton = root.querySelector<HTMLButtonElement>("#startReceiverAudio")!;
   const receiverId = crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+  let receiverPeerNode: PeerNode | null = null;
+  let receiverPeerTransport: PeerJsRoomTransport | null = null;
+  let directReceiverJoined = false;
   let loadedSongId = "";
   let mediaReady = false;
   let pendingPlay = false;
@@ -473,6 +478,62 @@ export function receiverApp(root: HTMLElement): void {
     if (liveMicTrackIds.size) await tryPlayLiveMics();
     render();
   }
+  async function initDirectReceiverPeer(): Promise<void> {
+    if (!state.roomCode || state.roomCode === "------" || receiverPeerTransport)
+      return;
+    receiverPeerNode = new PeerNode(receiverId);
+    receiverPeerNode.addEventListener("open", (event: Event) => {
+      const remotePeerId = (event as CustomEvent).detail?.remotePeerId;
+      if (!remotePeerId) return;
+      receiverPeerNode?.send(remotePeerId, {
+        type: RPC.RECEIVER_PEER_READY,
+        receiverPeerId: receiverId,
+      });
+      state.status = "Direct singer audio route ready.";
+      render();
+    });
+    receiverPeerNode.addEventListener("track", (event: Event) => {
+      const detail = (event as CustomEvent).detail || {};
+      const stream =
+        detail.stream ||
+        (detail.track ? new MediaStream([detail.track as MediaStreamTrack]) : null);
+      if (stream) addLiveMic(stream as MediaStream);
+    });
+    receiverPeerNode.addEventListener("error", (event: Event) => {
+      const message = (event as CustomEvent).detail?.message || "Direct audio route failed.";
+      state.status = String(message);
+      render();
+    });
+
+    receiverPeerTransport = new PeerJsRoomTransport({
+      onStateChange: (peerState) => {
+        if (!directReceiverJoined && peerState !== "connected") {
+          state.status = `Direct audio route: ${peerState}`;
+          render();
+        }
+      },
+      onMessage: () => {},
+      onPeerConnected: () => {},
+      onPeerDisconnected: () => {},
+      onError: (error) => {
+        state.status = `Direct audio route error: ${error.message}`;
+        render();
+      },
+    });
+
+    await receiverPeerTransport.joinRoom(state.roomCode.toUpperCase(), {
+      role: "receiver",
+      receiverPeerId: receiverId,
+    });
+    const offerPayload = await receiverPeerNode.createManualOffer("host");
+    receiverPeerTransport.sendAutoJoinOffer(offerPayload.token);
+    const answerText = await receiverPeerTransport.waitForAutoJoinAnswer(30000);
+    await receiverPeerNode.acceptManualAnswer(answerText);
+    directReceiverJoined = true;
+    state.status = "Direct singer audio route connected.";
+    render();
+  }
+
   function activeLine(): (typeof state.lines)[0] | undefined {
     const t = state.mediaTimeMs;
     return (
@@ -1001,6 +1062,11 @@ export function receiverApp(root: HTMLElement): void {
       3000,
     );
   }
+  void initDirectReceiverPeer().catch((error) => {
+    state.status = `Direct audio route unavailable: ${(error as Error).message}`;
+    render();
+  });
+
   retryLiveMicsButton.addEventListener("click", () => {
     void tryPlayLiveMics();
   });

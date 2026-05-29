@@ -91,6 +91,7 @@ export const RPC: Record<string, string> = {
   PLAYBACK_SYNC: "PLAYBACK_SYNC",
   LATENCY_PING: "LATENCY_PING",
   LATENCY_PONG: "LATENCY_PONG",
+  RECEIVER_PEER_READY: "RECEIVER_PEER_READY",
   SIGNAL_RELAY_OFFER: "SIGNAL_RELAY_OFFER",
   SIGNAL_RELAY_ANSWER: "SIGNAL_RELAY_ANSWER",
   SIGNAL_RELAY_ICE: "SIGNAL_RELAY_ICE",
@@ -329,32 +330,60 @@ export class PeerNode extends EventTarget {
     remotePeerId: string,
     msg: Record<string, unknown>,
   ): Promise<void> {
+    const signalFromPeerId =
+      typeof msg.fromPeerId === "string" ? msg.fromPeerId : remotePeerId;
+    const viaPeerId = remotePeerId === signalFromPeerId ? null : remotePeerId;
     const edge =
-      this.peers.get(remotePeerId) ||
-      this.makeConnection(remotePeerId, { manual: false, initiator: false });
+      this.peers.get(signalFromPeerId) ||
+      this.makeConnection(signalFromPeerId, { manual: false, initiator: false });
     if (edge.pc.signalingState === "have-local-offer")
       await edge.pc.setLocalDescription({ type: "rollback" });
     await edge.pc.setRemoteDescription(this.signalDescription(msg));
     const answer = await edge.pc.createAnswer();
     await setLowLatencyLocalDescription(edge.pc, answer);
     await waitForIceComplete(edge.pc);
-    this.send(remotePeerId, {
+    const answerMsg = {
       type: RPC.SIGNAL_RELAY_ANSWER,
       fromPeerId: this.localPeerId,
-      toPeerId: remotePeerId,
+      toPeerId: signalFromPeerId,
       signal: edge.pc.localDescription,
-    });
+    };
+    this.send(viaPeerId || signalFromPeerId, answerMsg);
   }
   async acceptRenegotiationAnswer(
     remotePeerId: string,
     msg: Record<string, unknown>,
   ): Promise<void> {
-    const edge = this.peers.get(remotePeerId);
+    const signalFromPeerId =
+      typeof msg.fromPeerId === "string" ? msg.fromPeerId : remotePeerId;
+    const edge = this.peers.get(signalFromPeerId);
     if (!edge) throw new Error("No peer connection for renegotiation answer.");
     await edge.pc.setRemoteDescription(this.signalDescription(msg));
     clearTimeout(edge.negotiationTimer);
     edge.negotiating = false;
     if (edge.needsNegotiation) this.requestNegotiation(edge);
+  }
+
+  async createRelayedOffer(
+    remotePeerId: string,
+    viaPeerId: string,
+  ): Promise<void> {
+    if (remotePeerId === viaPeerId)
+      throw new Error("Relayed offer needs a separate signaling peer.");
+    const edge = this.makeConnection(remotePeerId, {
+      manual: false,
+      initiator: true,
+      replace: false,
+    });
+    const offer = await edge.pc.createOffer({ offerToReceiveAudio: true });
+    await setLowLatencyLocalDescription(edge.pc, offer);
+    await waitForIceComplete(edge.pc);
+    this.send(viaPeerId, {
+      type: RPC.SIGNAL_RELAY_OFFER,
+      fromPeerId: this.localPeerId,
+      toPeerId: remotePeerId,
+      signal: edge.pc.localDescription,
+    });
   }
   requestNegotiation(edge: PeerEdge): void {
     if (

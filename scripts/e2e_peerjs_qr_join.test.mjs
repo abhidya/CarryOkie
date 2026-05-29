@@ -383,10 +383,28 @@ try {
       { timeout: 15000 },
     );
 
-    // 13. Receiver gets an active, unmuted live mic track.
+    // 13. Direct receiver route is established; host relay may still exist as fallback.
+    await hostPage.waitForFunction(
+      () => /Direct receiver peer ready/.test(document.querySelector("#log")?.textContent || ""),
+      null,
+      { timeout: 30000 },
+    );
+    await playerPage.waitForFunction(
+      () => /Direct receiver audio offer sent/.test(document.querySelector("#log")?.textContent || ""),
+      null,
+      { timeout: 30000 },
+    );
+    const playerLogAfterDirectOffer = await playerPage.locator("#log").innerText();
+    assert.doesNotMatch(
+      playerLogAfterDirectOffer,
+      /Direct receiver audio route failed/i,
+      "direct singer-to-receiver route must not fail before falling back",
+    );
+
+    // 14. Receiver gets an active, unmuted live mic track.
     await waitForReceiverUnmutedLiveMic(receiverPage);
 
-    // 14. Fake mic RMS checks
+    // 15. Fake mic RMS checks
     if (useFakeMic) {
       const publishedMicRms = await measureRms(playerPage, {
         type: "globalThis", key: "__carryokieAudio", subprop: "publishedStream"
@@ -444,7 +462,7 @@ try {
       );
     }
 
-    // 15. Mute/unmute updates receiver visible state
+    // 16. Mute/unmute updates receiver visible state
     await playerPage.click("#toggleSing");
     await playerPage.waitForSelector("text=Ready, muted.", { timeout: 5000 });
     await hostPage.waitForFunction(
