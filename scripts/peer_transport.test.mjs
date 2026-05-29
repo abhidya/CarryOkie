@@ -71,32 +71,10 @@ class MockPeer extends EventEmitter {
 // Mock global location for URL helpers
 globalThis.location = new URL("http://localhost:5173/host/");
 
-// Mock peerjs module
-const mockPeerJs = {
-  Peer: MockPeer,
-  DataConnection: MockDataConnection,
-};
-
-// @ts-ignore - override peerjs import
-globalThis.peerjs = mockPeerJs;
-
-// Mock the peerjs import in the module
-import originalModule from "module";
-const require = originalModule.createRequire(import.meta.url);
-
-// Intercept peerjs require
-const Module = originalModule;
-const originalResolve = Module._resolveFilename;
-Module._resolveFilename = function (request, parent) {
-  if (request === "peerjs" || request.startsWith("peerjs/")) {
-    return request;
-  }
-  return originalResolve.call(this, request, parent);
-};
-
 // Now import the module
-const { PeerJsRoomTransport, ConnectionState } =
+const { PeerJsRoomTransport, AUTO_JOIN_WEBRTC_ANSWER } =
   await import("../src/peer/PeerJsRoomTransport.ts");
+PeerJsRoomTransport.setPeerConstructorForTests(MockPeer);
 
 const tests = [];
 function test(name, fn) {
@@ -174,7 +152,7 @@ test("Host mode: startHost transitions correctly", async () => {
   const transport = new PeerJsRoomTransport(handlers);
   await transport.startHost("ROOM123");
 
-  assert.equal(stateChanges, ["starting", "ready"]);
+  assert.deepEqual(stateChanges, ["starting", "ready"]);
   assert.equal(transport.state, "ready");
   assert.equal(transport.myId, "ROOM123");
   assert.equal(transport.roomCode, "ROOM123");
@@ -183,35 +161,32 @@ test("Host mode: startHost transitions correctly", async () => {
 
 test("Host mode: startHost rejects on PeerJS error", async () => {
   const stateChanges = [];
-  const errors = [];
   const handlers = {
     onStateChange: (s) => stateChanges.push(s),
     onMessage: () => {},
     onPeerConnected: () => {},
     onPeerDisconnected: () => {},
-    onError: (e) => errors.push(e),
+    onError: () => {},
   };
 
-  // Mock to emit error immediately
   const errorPeer = class extends MockPeer {
     constructor(...args) {
       super(...args);
       setTimeout(() => {
-        this.emit("error", new Error("unavailable-id"));
+        const err = new Error("unavailable-id");
+        err.type = "unavailable-id";
+        this.emit("error", err);
       }, 1);
     }
   };
 
-  // @ts-ignore
+  PeerJsRoomTransport.setPeerConstructorForTests(errorPeer);
   const transport = new PeerJsRoomTransport(handlers);
-  // @ts-ignore
-  transport.peer = new errorPeer("ROOM123");
-
   try {
-    await transport.startHost("ROOM123");
-    assert.fail("Should have thrown");
-  } catch (err) {
-    assert.ok(err instanceof Error);
+    await assert.rejects(() => transport.startHost("ROOM123"), /unavailable-id/);
+    assert.deepEqual(stateChanges, ["starting", "disconnected", "failed"]);
+  } finally {
+    PeerJsRoomTransport.setPeerConstructorForTests(MockPeer);
   }
 });
 
@@ -229,7 +204,7 @@ test("Player mode: joinRoom transitions correctly", async () => {
   const transport = new PeerJsRoomTransport(handlers);
   await transport.joinRoom("ROOM123", { name: "Test Player" });
 
-  assert.equal(stateChanges, ["starting", "connected"]);
+  assert.deepEqual(stateChanges, ["starting", "connected"]);
   assert.equal(transport.state, "connected");
   assert.equal(transport.myId, "mock-peer-id");
   assert.equal(transport.roomCode, "ROOM123");
@@ -237,11 +212,10 @@ test("Player mode: joinRoom transitions correctly", async () => {
   assert.ok(peerConnected.includes("ROOM123"));
 });
 
-test("sendTo sends message to specific peer", async () => {
-  const messages = [];
+test("sendTo sends message to specific peer connection", async () => {
   const handlers = {
     onStateChange: () => {},
-    onMessage: (peer, msg) => messages.push({ peer, msg }),
+    onMessage: () => {},
     onPeerConnected: () => {},
     onPeerDisconnected: () => {},
     onError: () => {},
@@ -252,12 +226,12 @@ test("sendTo sends message to specific peer", async () => {
 
   transport.sendTo("ROOM123", { type: "TEST", data: "hello" });
 
-  assert.equal(messages.length, 1);
-  assert.equal(messages[0].peer, "ROOM123");
-  assert.equal(messages[0].msg.type, "TEST");
+  const conn = transport.peer.connections.get("ROOM123");
+  assert.equal(conn.sendCalls.length, 1);
+  assert.deepEqual(conn.sendCalls[0], { type: "TEST", data: "hello" });
 });
 
-test("sendTo does nothing if connection not open", () => {
+test("sendTo throws if connection is missing or closed", () => {
   const handlers = {
     onStateChange: () => {},
     onMessage: () => {},
@@ -267,27 +241,31 @@ test("sendTo does nothing if connection not open", () => {
   };
 
   const transport = new PeerJsRoomTransport(handlers);
-  transport.sendTo("NONEXISTENT", { type: "TEST" });
+  assert.throws(
+    () => transport.sendTo("NONEXISTENT", { type: "TEST" }),
+    /not open: NONEXISTENT/,
+  );
 });
 
-test("broadcast sends to all connected peers", async () => {
-  const messages = [];
+test("waitForAutoJoinAnswer rejects superseded waits and resolves latest", async () => {
   const handlers = {
     onStateChange: () => {},
-    onMessage: (peer, msg) => messages.push({ peer, msg }),
+    onMessage: () => {},
     onPeerConnected: () => {},
     onPeerDisconnected: () => {},
     onError: () => {},
   };
 
   const transport = new PeerJsRoomTransport(handlers);
-  await transport.startHost("ROOM123");
+  await transport.joinRoom("ROOM123");
 
-  transport.sendTo("peer1", { type: "TEST" });
-  transport.sendTo("peer2", { type: "TEST" });
-  transport.broadcast({ type: "BROADCAST", data: "to all" });
+  const first = transport.waitForAutoJoinAnswer(1000);
+  const second = transport.waitForAutoJoinAnswer(1000);
+  await assert.rejects(first, /superseded/);
 
-  assert.equal(messages.length, 3);
+  const conn = transport.peer.connections.get("ROOM123");
+  conn.emit("data", { type: AUTO_JOIN_WEBRTC_ANSWER, answer: "answer-token" });
+  assert.equal(await second, "answer-token");
 });
 
 test("disconnectPeer removes connection", async () => {
@@ -302,9 +280,13 @@ test("disconnectPeer removes connection", async () => {
 
   const transport = new PeerJsRoomTransport(handlers);
   await transport.startHost("ROOM123");
+  const conn = new MockDataConnection("peer1");
+  transport.peer.emit("connection", conn);
+  await new Promise((r) => setTimeout(r, 10));
 
   transport.disconnectPeer("peer1");
 
+  assert.equal(transport.connectedPeerIds.includes("peer1"), false);
   assert.ok(disconnectedPeers.includes("peer1"));
 });
 
@@ -336,7 +318,7 @@ test("close cleans up all connections", async () => {
 
   transport.close();
 
-  assert.equal(stateChanges, ["starting", "ready", "idle"]);
+  assert.deepEqual(stateChanges, ["starting", "ready", "disconnected", "idle"]);
   assert.equal(transport.state, "idle");
   assert.equal(transport.connectedPeerIds.length, 0);
 });
