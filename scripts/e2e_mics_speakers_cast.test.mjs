@@ -7,7 +7,6 @@ import {
   addPlayer,
   assignSingers,
   queueRequest,
-  acceptQueue,
 } from "../src/state.ts";
 import {
   encodeSignalPayload,
@@ -461,18 +460,17 @@ test("E2E: Full room with 3 singers, 2 listeners, and Chromecast", async () => {
   // Setup: Simulate queue request (Design Req #10)
   const queueItem = queueRequest("song_001", [1, 2], participants[0].playerId);
   room.queue.push(queueItem);
-  acceptQueue(room, queueItem.queueItemId);
 
-  assert.equal(room.queue[0].status, "queued", "Queue item should be accepted");
+  assert.equal(room.queue[0].status, "queued", "Queue item should be immediately queued");
   assert.ok(
     room.queue[0].acceptedAt,
-    "Queue item should have accepted timestamp",
+    "Queue item should carry self-serve queued timestamp",
   );
 
-  // Design Req #11: Host assigns singer
+  // Design Req #11: Singers can self-serve active singing without host approval
   assert.ok(
     singers.some((p) => p.isSingerForCurrentSong),
-    "Host should assign singers",
+    "Room should have active self-serve singers",
   );
 
   // Design Req #16: TV continues to show lyrics/video/backing track
@@ -694,7 +692,7 @@ test("E2E: Full room with 3 singers, 2 listeners, and Chromecast", async () => {
   console.log(
     "✓ Design Req #10: Queue request flows participant → host → all peers",
   );
-  console.log("✓ Design Req #11: Host assigns singer");
+  console.log("✓ Design Req #11: Singers can self-serve active singing");
   console.log("✓ Design Req #12: Singer enables mic with explicit permission");
   console.log("✓ Design Req #13: Listener phone hears singer mic over WebRTC");
   console.log("✓ Design Req #14: Singer does not hear own mic by default");

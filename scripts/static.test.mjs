@@ -174,7 +174,8 @@ checks.push([
   "players can set their own name and publish mic directly",
   app.includes('id="displayName"') &&
     hasCompactAppSource("normalizeDisplayName") &&
-    !app.includes("Mic blocked: ask the host to assign you as a singer"),
+    !app.includes("Mic blocked: ask the host to assign you as a singer") &&
+    app.includes("Tap Enable My Mic to sing."),
 ]);
 checks.push([
   "host can start next queued song",
@@ -187,13 +188,11 @@ checks.push([
     app.includes("currentQueueItemId"),
 ]);
 checks.push([
-  "queue can recover rejected items only by re-accepting before start",
-  hasAppSource('class="acceptItem"') &&
+  "queue requests are self-serve and not blocked by host approval",
+  state.includes('status: "queued"') &&
+    !hasAppSource('class="acceptItem"') &&
+    !app.includes("Approve Waiting") &&
     hasAppSource('class="startItem"') &&
-    (hasCompactAppSource('["requested", "rejected"]') ||
-      hasCompactAppSource("['requested','rejected']")) &&
-    (hasCompactAppSource('queueItem.status === "queued"') ||
-      hasCompactAppSource("q.status==='queued'")) &&
     app.includes("nextQueuedItem(room)"),
 ]);
 checks.push([
@@ -216,8 +215,17 @@ checks.push([
   "host tracks MIC_ENABLED from players",
   hasCompactAppSource("msg.type === RPC.MIC_ENABLED") &&
     app.includes("updateRoomMicState") &&
+    hasCompactAppSource("const sender = findRoomPlayerByMessage(remotePeerId, msg.playerId)") &&
+    hasCompactAppSource("addSelfServeSinger(sender)") &&
+    hasCompactAppSource("p.playerId===playerId&&p.peerId===remotePeerId") &&
     app.includes("broadcastRoom(RPC.ROOM_STATE_SNAPSHOT)") &&
     app.includes("publishReceiverState()"),
+]);
+checks.push([
+  "host Show QR renders a real QR code",
+  app.includes('import { qrSvg } from "./qr.ts";') &&
+    app.includes("showQrContainer") &&
+    app.includes("qrSvg(peerJsUrl"),
 ]);
 checks.push([
   "host relays MIC_MUTED and MIC_UNMUTED to room state",
@@ -227,11 +235,11 @@ checks.push([
     app.includes("muted: !!msg.muted"),
 ]);
 checks.push([
-  "host has reject/remove queue controls",
-  app.includes("rejectQueue") &&
+  "host has reorder/remove queue controls without approval gating",
+  !app.includes("rejectQueue") &&
     app.includes("removeQueueItem") &&
     app.includes("moveQueueItem") &&
-    hasAppSource('class="rejectItem"') &&
+    !hasAppSource('class="rejectItem"') &&
     hasAppSource('class="moveUpItem"') &&
     hasAppSource('class="moveDownItem"'),
 ]);

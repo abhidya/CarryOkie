@@ -7,8 +7,6 @@ import {
   loadRoom,
   type QueueItem,
   queueRequest,
-  acceptQueue,
-  rejectQueue,
   removeQueueItem,
   moveQueueItem,
   nextQueuedItem,
@@ -35,6 +33,7 @@ import {
 } from "./signaling.ts";
 import { PhoneAudio, singerWarning } from "./audio.ts";
 import { CastController, receiverApp } from "./cast.ts";
+import { qrSvg } from "./qr.ts";
 import { deriveTvMediaPositionMs } from "./sync.ts";
 import { resolvePlayableMediaUrl, isProtectedMedia } from "./protectedMedia.ts";
 import { $, commonChrome, hostShell, playerShell, receiverShell, escapeHtml, logToPage } from "./app/dom.ts";
@@ -158,7 +157,7 @@ async function updateHostMicLatencyStats() {
 const peerCloseTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function deriveMicLabel(p) {
-  if (!p?.isSingerForCurrentSong) return "Mic muted until enabled.";
+  if (!p?.isSingerForCurrentSong) return "Tap Enable My Mic to sing.";
   if (!audio?.localStream) return "Needs microphone permission.";
   if (p.micState?.muted) return "Ready, muted.";
   if (!audioPipeline.hostRemoteAudioTracks) return "Sending to host.";
@@ -206,8 +205,8 @@ function deriveShowReadiness() {
 }
 
 function deriveMicLabelForPlayer(p) {
-  if (!p.isSingerForCurrentSong) return "off";
   const playerInRoom = room?.players?.find(rp => rp.playerId === p.playerId);
+  if (!p.isSingerForCurrentSong && !playerInRoom?.micState?.enabled) return "ready";
   if (!playerInRoom?.micState?.enabled) return "permission_needed";
   if (playerInRoom.micState.muted) return "muted";
   if (!audioPipeline.hostRemoteAudioTracks) return "sending";
@@ -415,7 +414,7 @@ function sendCastRoomUpdate(type, payload = {}) {
 function findRoomPlayerByMessage(remotePeerId, playerId) {
   if (!room?.players?.length) return null;
   return (
-    room.players.find((p) => p.playerId === playerId) ||
+    room.players.find((p) => p.playerId === playerId && p.peerId === remotePeerId) ||
     room.players.find((p) => p.peerId === remotePeerId) ||
     null
   );
@@ -439,6 +438,22 @@ function updateRoomMicState(remotePeerId, playerId, patch) {
 
   persist();
   return target;
+}
+function addSelfServeSinger(target) {
+  if (!room || !target?.playerId) return false;
+  if (!target.isSingerForCurrentSong) {
+    const singers = [
+      ...new Set([
+        ...room.players
+          .filter((p) => p.isSingerForCurrentSong)
+          .map((p) => p.playerId),
+        target.playerId,
+      ]),
+    ].slice(0, MAX_SINGERS);
+    assignSingers(room, singers);
+    return true;
+  }
+  return false;
 }
 function publishMicStateChange(target) {
   if (!target) return;
@@ -779,11 +794,11 @@ function resumeCurrentPlayback() {
 }
 function startQueueItem(item) {
   if (!item) {
-    log("Queue is empty. Add or accept a song first.");
+    log("Queue is empty. Singers can add a song from their phones.");
     return;
   }
   if (item.status !== "queued") {
-    log("Accept the queue item before starting it.");
+    log("Only queued songs can be started.");
     return;
   }
   room.currentSongId = item.songId;
@@ -951,12 +966,19 @@ function handleRpc(remotePeerId, msg) {
     );
   }
   if (player?.isHost && msg.type === RPC.MIC_ENABLED) {
-    const target = updateRoomMicState(remotePeerId, msg.playerId, {
+    const sender = findRoomPlayerByMessage(remotePeerId, msg.playerId);
+    const singerAdded = addSelfServeSinger(sender);
+    const target = updateRoomMicState(remotePeerId, sender?.playerId, {
       enabled: true,
       publishing: true,
       muted: !!msg.muted,
     });
     if (target) {
+      if (singerAdded) {
+        sendCastRoomUpdate("CAST_SET_SINGERS", {
+          players: room.players.filter((p) => p.isSingerForCurrentSong),
+        });
+      }
       publishMicStateChange(target);
       log(
         `#${target.playerNumber} ${target.displayName} enabled mic${target.micState?.muted ? " muted" : " live"}.`,
@@ -1104,16 +1126,11 @@ function renderHost(main) {
   if (panels) {
     const setupComplete = room.players.length > 1 && room.queue.length > 0;
     panels.innerHTML = `<div class="host-panels">
-      <details class="card" ${setupComplete ? "" : "open"}><summary>Setup</summary><p>Share the singer link or QR above. Singers scan and join automatically.</p><p class="hint">Chrome tab cast: open TV Stage first, then cast that tab.</p></details>
-      <div class="card queue-card"><h2>Run the Room</h2><div class="button-row"><button id="acceptAll">Approve Waiting</button><button id="startNext" class="primary">Start Next</button><button id="pauseSong">Pause</button><button id="resumeSong">Resume</button></div>${queueHtml(room, "host")}</div>
+      <details class="card" ${setupComplete ? "" : "open"}><summary>Setup</summary><p>Open TV Stage, cast that receiver tab, then let singers scan the receiver QR with any QR app.</p><p class="hint">Singers can join, queue songs, and go live without host approval.</p></details>
+      <div class="card queue-card"><h2>Run the Room</h2><div class="button-row"><button id="startNext" class="primary">Start Next</button><button id="pauseSong">Pause</button><button id="resumeSong">Resume</button></div>${queueHtml(room, "host")}</div>
       <details class="card"><summary>Singers (${activeSingers} active)</summary>${room.players.map(p => `<div class="singer-row"><label class="check"><input type="checkbox" class="singer" value="${p.playerId}" ${p.isSingerForCurrentSong ? "checked" : ""}> #${p.playerNumber || "?"} ${escapeHtml(p.displayName)} ${p.micState?.enabled ? (p.micState.muted ? "(muted)" : "(live)") : ""}</label></div>`).join("")}<div class="button-row"><button id="setSingers" class="primary">Update Singers</button></div></details>
       <details class="card"><summary>Now Playing</summary>${room.currentQueueItemId ? `<p>${escapeHtml(songTitle(room.currentSongId || ""))}</p>` : "<p>No song active</p>"}${room.players.some(p => p.isSingerForCurrentSong) ? '<p class="warn">TV bleed risk: singers should use headphones.</p>' : ""}</details>
     </div>`;
-    $("#acceptAll").onclick = () => {
-      room.queue.filter(q => q.status === "requested").forEach(q => acceptQueue(room, q.queueItemId));
-      publishQueueUpdate();
-      renderHost(main);
-    };
     $("#startNext").onclick = () => { startQueueItem(nextQueuedItem(room)); renderHost(main); };
     $("#pauseSong").onclick = () => { publishReceiverCommand("CAST_PAUSE"); castController?.pause?.(); pauseCurrentPlayback(); renderHost(main); };
     $("#resumeSong").onclick = () => { publishReceiverCommand("CAST_PLAY"); castController?.play?.().catch(e => log(e.message)); resumeCurrentPlayback(); renderHost(main); };
@@ -1124,9 +1141,7 @@ function renderHost(main) {
       persist();
       renderHost(main);
     };
-    document.querySelectorAll(".acceptItem").forEach(b => b.onclick = () => { acceptQueue(room, b.dataset.queueId); publishQueueUpdate(); renderHost(main); });
     document.querySelectorAll(".startItem").forEach(b => b.onclick = () => { startQueueItem(room.queue.find(q => q.queueItemId === b.dataset.queueId)); renderHost(main); });
-    document.querySelectorAll(".rejectItem").forEach(b => b.onclick = () => { rejectQueue(room, b.dataset.queueId); publishQueueUpdate(); renderHost(main); });
     document.querySelectorAll(".removeItem").forEach(b => b.onclick = () => { removeQueueItem(room, b.dataset.queueId); publishQueueUpdate(); renderHost(main); });
     document.querySelectorAll(".moveUpItem").forEach(b => b.onclick = () => { moveQueueItem(room, b.dataset.queueId, -1); publishQueueUpdate(); renderHost(main); });
     document.querySelectorAll(".moveDownItem").forEach(b => b.onclick = () => { moveQueueItem(room, b.dataset.queueId, 1); publishQueueUpdate(); renderHost(main); });
@@ -1313,9 +1328,9 @@ function renderPlayer(main) {
   $("#requestSong").onclick = () => {
     const item = queueRequest($("#song").value, $("#singers").value.split(",").map(s => +s.trim()).filter(Boolean), player.playerId, room?.queue?.length || 0);
     peerNode.broadcast({ type: RPC.QUEUE_ADD_REQUEST, item });
-    log("Queue request sent.");
+    log("Song queued. Host approval not required.");
   };
-  $("#requestSinger").onclick = () => { peerNode.broadcast({ type: RPC.SINGER_JOIN_REQUEST, playerId: player.playerId }); log("Singer slot requested."); };
+  $("#requestSinger").onclick = () => { peerNode.broadcast({ type: RPC.SINGER_JOIN_REQUEST, playerId: player.playerId }); log("Singer slot activated."); };
   document.querySelectorAll(".queueSelf").forEach(b => b.onclick = () => { peerNode.broadcast({ type: RPC.QUEUE_UPDATE_REQUEST, action: b.dataset.action, queueItemId: b.dataset.queueId, playerId: player.playerId }); log("Queue update sent."); });
   $("#voicePreset").onchange = (e) => { const target = e.target; audio?.setVoicePreset(target.value); const status = $("#micStatus"); if (status) status.textContent = `Mic filter: ${target.selectedOptions?.[0]?.textContent || target.value}`; };
   $("#enableMic").onclick = async () => {

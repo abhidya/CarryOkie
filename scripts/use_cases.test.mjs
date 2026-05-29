@@ -10,7 +10,6 @@ import {
   addPlayer,
   assignSingers,
   queueRequest,
-  acceptQueue,
   rejectQueue,
   removeQueueItem,
   moveQueueItem,
@@ -108,15 +107,15 @@ test("singer cap = 5 active singers", () => {
   );
 });
 
-test("queue request is host-accepted before queued", () => {
+test("queue request is immediately queued without host approval", () => {
   const host = makePlayer("host", "Host");
   const room = makeRoom(host);
   const p1 = makePlayer("participant", "P1");
   addPlayer(room, p1);
   const item = queueRequest("song_001", [p1.playerNumber], p1.playerId);
-  assert.equal(item.status, "requested");
+  assert.equal(item.status, "queued");
+  assert.ok(item.acceptedAt);
   room.queue.push(item);
-  acceptQueue(room, item.queueItemId);
   assert.equal(room.queue[0].status, "queued");
   assert.ok(room.queue[0].acceptedAt);
 });
@@ -169,16 +168,15 @@ test("host queue intake replaces unsafe client queue ids", () => {
   assert.match(room.queue[0].queueItemId, /^[a-zA-Z0-9_-]{8,80}$/);
 });
 
-test("host start-next only selects accepted queued items", () => {
+test("host start-next selects self-serve queued items", () => {
   const host = makePlayer("host", "Host");
   const room = makeRoom(host);
-  const requested = queueRequest("song_requested", [1], host.playerId, 0);
+  const firstQueued = queueRequest("song_requested", [1], host.playerId, 0);
   const rejected = queueRequest("song_rejected", [1], host.playerId, 1);
   const queued = queueRequest("song_queued", [1], host.playerId, 2);
-  room.queue.push(requested, rejected, queued);
+  room.queue.push(firstQueued, rejected, queued);
   rejectQueue(room, rejected.queueItemId);
-  acceptQueue(room, queued.queueItemId);
-  assert.equal(nextQueuedItem(room).songId, "song_queued");
+  assert.equal(nextQueuedItem(room).songId, "song_requested");
 });
 
 test("phones can update queue singer slots before a song starts", () => {

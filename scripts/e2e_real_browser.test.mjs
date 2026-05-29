@@ -77,7 +77,7 @@ try {
   await player.fill("#singers", "2");
   await player.click("#requestSong");
   await player.waitForFunction(
-    () => document.querySelector("#log")?.textContent?.includes("Queue request sent."),
+    () => document.querySelector("#log")?.textContent?.includes("Host approval not required."),
     null,
     { timeout: 5000 },
   );
@@ -86,9 +86,6 @@ try {
     null,
     { timeout: 10000 },
   );
-  await host.click("#hostPanels details summary");
-  await host.waitForSelector(".acceptItem", { timeout: 10000 });
-  await host.click(".acceptItem");
   await host.waitForSelector(".startItem", { timeout: 10000 });
   await player.click("#queueSongPanel summary");
   await player.waitForSelector(".queue-status-queued", { timeout: 10000 });
@@ -310,7 +307,7 @@ try {
 
   console.log(`PASS real-browser E2E room ${roomCode}`);
   console.log(`PASS player-host DataChannel opened`);
-  console.log(`PASS queue request accepted and started`);
+  console.log(`PASS self-serve queue request started`);
   console.log(`PASS autotune preset, gain controls, mute/unmute exercised`);
   console.log(
     `PASS mic enabled and receiver live-mic bridge routed audio track`,

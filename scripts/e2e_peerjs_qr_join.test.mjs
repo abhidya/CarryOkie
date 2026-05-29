@@ -293,13 +293,13 @@ try {
       { timeout: 15000 },
     );
 
-    // 11. Queue request/accept/start works
+    // 11. Queue request/start works without host approval
     await playerPage.click("#queueSongPanel summary");
     await playerPage.waitForTimeout(500);
     await playerPage.fill("#singers", "2");
     await playerPage.click("#requestSong");
     await playerPage.waitForFunction(
-      () => document.querySelector("#log")?.textContent?.includes("Queue request sent."),
+      () => document.querySelector("#log")?.textContent?.includes("Host approval not required."),
       null,
       { timeout: 5000 },
     );
@@ -310,11 +310,9 @@ try {
       null,
       { timeout: 10000 },
     );
-    // Accept button appears in the always-visible queue card
-    await hostPage.waitForSelector(".acceptItem", { timeout: 10000 });
-    await hostPage.click(".acceptItem");
-    // After accept, item becomes "queued" and startItem button appears
+    // Item is immediately queued and startItem button appears.
     await hostPage.waitForSelector(".startItem", { timeout: 10000 });
+    assert.equal(await hostPage.locator(".acceptItem").count(), 0, "host approval button must not block song queue");
     // Player state contains queued status (the details panel may be collapsed in normal UX).
     await playerPage.waitForFunction(
       () => document.querySelector(".queue-status-queued"),

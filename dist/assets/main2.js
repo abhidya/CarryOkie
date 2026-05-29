@@ -188,28 +188,16 @@ function queueRequest(songId, singerNumbers, requestedByPlayerId, currentQueueLe
 	if (!requestedByPlayerId) throw new Error("Queue item needs a requesting player.");
 	if (singers.length === 0) throw new Error("Queue item needs at least one singer number.");
 	if (currentQueueLength >= 20) throw new Error(`Queue full: MVP cap is 20 items.`);
+	const createdAt = nowMs();
 	return {
 		queueItemId: uuid(),
 		songId,
 		singerNumbers: singers,
 		requestedByPlayerId,
-		status: "requested",
-		createdAt: nowMs(),
-		acceptedAt: null
+		status: "queued",
+		createdAt,
+		acceptedAt: createdAt
 	};
-}
-function acceptQueue(room, queueItemId) {
-	const item = room.queue.find((q) => q.queueItemId === queueItemId);
-	if (!item || item.status === "active" || item.status === "ended") return room;
-	item.status = "queued";
-	item.acceptedAt = nowMs();
-	return room;
-}
-function rejectQueue(room, queueItemId) {
-	const item = room.queue.find((q) => q.queueItemId === queueItemId);
-	if (!item || item.status === "active" || item.status === "ended") return room;
-	item.status = "rejected";
-	return room;
 }
 function removeQueueItem(room, queueItemId) {
 	room.queue = room.queue.filter((q) => q.queueItemId !== queueItemId);
@@ -248,7 +236,7 @@ function addSingerToQueueItem(room, queueItemId, singerNumber) {
 		if (item.singerNumbers.length >= 5) throw new Error(`Queue item max 5 singers.`);
 		item.singerNumbers.push(singerNumber);
 	}
-	if (item.status === "rejected") item.status = "requested";
+	if (item.status === "rejected") item.status = "queued";
 	return room;
 }
 function removeSingerFromQueueItem(room, queueItemId, singerNumber) {
@@ -473,7 +461,7 @@ function qrMatrix(text) {
 	addFormat(m);
 	return m.map((row) => row.map((v) => !!v));
 }
-function qrSvg$1(text, { scale = 4, quiet = 4, title = "CarryOkie QR" } = {}) {
+function qrSvg(text, { scale = 4, quiet = 4, title = "CarryOkie QR" } = {}) {
 	const m = qrMatrix(text);
 	const n = m.length + quiet * 2;
 	const rects = [];
@@ -653,7 +641,7 @@ function renderPayloadCard(target, encoded, label = "Signal payload") {
 	const renderQr = () => {
 		const qr = target.querySelector("[data-single-qr]");
 		const count = target.querySelector("[data-qr-count]");
-		if (qr) qr.innerHTML = qrSvg$1(encoded.chunks[index]);
+		if (qr) qr.innerHTML = qrSvg(encoded.chunks[index]);
 		if (count) count.textContent = `QR ${index + 1}/${encoded.chunks.length}`;
 	};
 	target.innerHTML = `<div class="payload"><h3>${label}</h3><p>One QR code is shown at a time. Scan it, then use Next only if this payload needs another local chunk. Link/share/copy remains available.</p><figure><figcaption data-qr-count></figcaption><div data-single-qr></div></figure><div class="actions"><button data-prev>Prev QR</button><button data-next>Next QR</button><button data-copy>Copy link</button><button data-share>Share</button></div><textarea readonly>${encoded.url}</textarea><details><summary>Text fallback (${encoded.chunks.length} local chunk${encoded.chunks.length === 1 ? "" : "s"})</summary><textarea readonly>${encoded.chunks.join("\n")}</textarea></details></div>`;
@@ -6240,7 +6228,7 @@ function receiverApp(root) {
 			joinLink.textContent = "Scan to Join Room";
 		}
 		const joinQr = root.querySelector("#receiverJoinQr");
-		if (joinQr) joinQr.innerHTML = state.roomCode === "------" ? "" : qrSvg$1(playerUrl, {
+		if (joinQr) joinQr.innerHTML = state.roomCode === "------" ? "" : qrSvg(playerUrl, {
 			scale: 4,
 			title: "Join CarryOkie room"
 		});
@@ -6732,7 +6720,7 @@ function queueHtml$1(room, mode = "host", songTitle, player) {
 		const queueId = escapeHtml(queueItem.queueItemId);
 		const status = escapeHtml(queueItem.status);
 		const requestedBy = room.players.find((roomPlayer) => roomPlayer.playerId === queueItem.requestedByPlayerId)?.displayName || "Guest";
-		const hostControls = `${["requested", "rejected"].includes(queueItem.status) ? `<button class="acceptItem" data-queue-id="${queueId}" title="Accept/requeue">Approve</button>` : ""} ${queueItem.status === "queued" ? `<button class="startItem" data-queue-id="${queueId}" title="Start on TV">Start now</button>` : ""} ${queueItem.status === "requested" ? `<button class="rejectItem" data-queue-id="${queueId}" title="Reject">Not now</button>` : ""} <button class="moveUpItem" data-queue-id="${queueId}" title="Move earlier">↑</button> <button class="moveDownItem" data-queue-id="${queueId}" title="Move later">↓</button> <button class="removeItem" data-queue-id="${queueId}" title="Remove">Remove</button>`;
+		const hostControls = `${queueItem.status === "queued" ? `<button class="startItem" data-queue-id="${queueId}" title="Start on TV">Start now</button>` : ""} <button class="moveUpItem" data-queue-id="${queueId}" title="Move earlier">↑</button> <button class="moveDownItem" data-queue-id="${queueId}" title="Move later">↓</button> <button class="removeItem" data-queue-id="${queueId}" title="Remove">Remove</button>`;
 		const phoneControls = !["active", "ended"].includes(queueItem.status) ? `<button class="queueSelf" data-action="join" data-queue-id="${queueId}">Add me</button> <button class="queueSelf" data-action="leave" data-queue-id="${queueId}">Leave</button> ${queueItem.requestedByPlayerId === player?.playerId ? `<button class="queueSelf" data-action="remove" data-queue-id="${queueId}">Cancel request</button>` : ""}` : "";
 		return `<li class="queue-item"><div class="queue-top"><strong>${escapeHtml(songTitle(queueItem.songId))}</strong><span class="queue-status queue-status-${status}">${status}</span></div><p class="subtle">Singers: ${escapeHtml(singerNames(room, queueItem.singerNumbers))} · requested by ${escapeHtml(requestedBy)}</p><div class="button-row queue-actions">${mode === "host" ? hostControls : phoneControls}</div></li>`;
 	}).join("")}</ul>`;
@@ -6824,7 +6812,7 @@ async function updateHostMicLatencyStats() {
 }
 var peerCloseTimers = /* @__PURE__ */ new Map();
 function deriveMicLabel(p) {
-	if (!p?.isSingerForCurrentSong) return "Mic muted until enabled.";
+	if (!p?.isSingerForCurrentSong) return "Tap Enable My Mic to sing.";
 	if (!audio?.localStream) return "Needs microphone permission.";
 	if (p.micState?.muted) return "Ready, muted.";
 	if (!audioPipeline.hostRemoteAudioTracks) return "Sending to host.";
@@ -7011,7 +6999,7 @@ function sendCastRoomUpdate(type, payload = {}) {
 }
 function findRoomPlayerByMessage(remotePeerId, playerId) {
 	if (!room?.players?.length) return null;
-	return room.players.find((p) => p.playerId === playerId) || room.players.find((p) => p.peerId === remotePeerId) || null;
+	return room.players.find((p) => p.playerId === playerId && p.peerId === remotePeerId) || room.players.find((p) => p.peerId === remotePeerId) || null;
 }
 function updateRoomMicState(remotePeerId, playerId, patch) {
 	const target = findRoomPlayerByMessage(remotePeerId, playerId);
@@ -7027,6 +7015,15 @@ function updateRoomMicState(remotePeerId, playerId, patch) {
 	};
 	persist();
 	return target;
+}
+function addSelfServeSinger(target) {
+	if (!room || !target?.playerId) return false;
+	if (!target.isSingerForCurrentSong) {
+		const singers = [...new Set([...room.players.filter((p) => p.isSingerForCurrentSong).map((p) => p.playerId), target.playerId])].slice(0, 5);
+		assignSingers(room, singers);
+		return true;
+	}
+	return false;
 }
 function publishMicStateChange(target) {
 	if (!target) return;
@@ -7324,11 +7321,11 @@ function resumeCurrentPlayback() {
 }
 function startQueueItem(item) {
 	if (!item) {
-		log("Queue is empty. Add or accept a song first.");
+		log("Queue is empty. Singers can add a song from their phones.");
 		return;
 	}
 	if (item.status !== "queued") {
-		log("Accept the queue item before starting it.");
+		log("Only queued songs can be started.");
 		return;
 	}
 	room.currentSongId = item.songId;
@@ -7467,12 +7464,15 @@ function handleRpc(remotePeerId, msg) {
 		log(msg.type === RPC.MIC_MUTED ? "Host muted your mic." : "Host unmuted your mic.");
 	}
 	if (player?.isHost && msg.type === RPC.MIC_ENABLED) {
-		const target = updateRoomMicState(remotePeerId, msg.playerId, {
+		const sender = findRoomPlayerByMessage(remotePeerId, msg.playerId);
+		const singerAdded = addSelfServeSinger(sender);
+		const target = updateRoomMicState(remotePeerId, sender?.playerId, {
 			enabled: true,
 			publishing: true,
 			muted: !!msg.muted
 		});
 		if (target) {
+			if (singerAdded) sendCastRoomUpdate("CAST_SET_SINGERS", { players: room.players.filter((p) => p.isSingerForCurrentSong) });
 			publishMicStateChange(target);
 			log(`#${target.playerNumber} ${target.displayName} enabled mic${target.micState?.muted ? " muted" : " live"}.`);
 		}
@@ -7602,16 +7602,11 @@ function renderHost(main) {
 	const panels = $("#hostPanels");
 	if (panels) {
 		panels.innerHTML = `<div class="host-panels">
-      <details class="card" ${room.players.length > 1 && room.queue.length > 0 ? "" : "open"}><summary>Setup</summary><p>Share the singer link or QR above. Singers scan and join automatically.</p><p class="hint">Chrome tab cast: open TV Stage first, then cast that tab.</p></details>
-      <div class="card queue-card"><h2>Run the Room</h2><div class="button-row"><button id="acceptAll">Approve Waiting</button><button id="startNext" class="primary">Start Next</button><button id="pauseSong">Pause</button><button id="resumeSong">Resume</button></div>${queueHtml(room, "host")}</div>
+      <details class="card" ${room.players.length > 1 && room.queue.length > 0 ? "" : "open"}><summary>Setup</summary><p>Open TV Stage, cast that receiver tab, then let singers scan the receiver QR with any QR app.</p><p class="hint">Singers can join, queue songs, and go live without host approval.</p></details>
+      <div class="card queue-card"><h2>Run the Room</h2><div class="button-row"><button id="startNext" class="primary">Start Next</button><button id="pauseSong">Pause</button><button id="resumeSong">Resume</button></div>${queueHtml(room, "host")}</div>
       <details class="card"><summary>Singers (${activeSingers} active)</summary>${room.players.map((p) => `<div class="singer-row"><label class="check"><input type="checkbox" class="singer" value="${p.playerId}" ${p.isSingerForCurrentSong ? "checked" : ""}> #${p.playerNumber || "?"} ${escapeHtml(p.displayName)} ${p.micState?.enabled ? p.micState.muted ? "(muted)" : "(live)" : ""}</label></div>`).join("")}<div class="button-row"><button id="setSingers" class="primary">Update Singers</button></div></details>
       <details class="card"><summary>Now Playing</summary>${room.currentQueueItemId ? `<p>${escapeHtml(songTitle(room.currentSongId || ""))}</p>` : "<p>No song active</p>"}${room.players.some((p) => p.isSingerForCurrentSong) ? "<p class=\"warn\">TV bleed risk: singers should use headphones.</p>" : ""}</details>
     </div>`;
-		$("#acceptAll").onclick = () => {
-			room.queue.filter((q) => q.status === "requested").forEach((q) => acceptQueue(room, q.queueItemId));
-			publishQueueUpdate();
-			renderHost(main);
-		};
 		$("#startNext").onclick = () => {
 			startQueueItem(nextQueuedItem(room));
 			renderHost(main);
@@ -7635,18 +7630,8 @@ function renderHost(main) {
 			persist();
 			renderHost(main);
 		};
-		document.querySelectorAll(".acceptItem").forEach((b) => b.onclick = () => {
-			acceptQueue(room, b.dataset.queueId);
-			publishQueueUpdate();
-			renderHost(main);
-		});
 		document.querySelectorAll(".startItem").forEach((b) => b.onclick = () => {
 			startQueueItem(room.queue.find((q) => q.queueItemId === b.dataset.queueId));
-			renderHost(main);
-		});
-		document.querySelectorAll(".rejectItem").forEach((b) => b.onclick = () => {
-			rejectQueue(room, b.dataset.queueId);
-			publishQueueUpdate();
 			renderHost(main);
 		});
 		document.querySelectorAll(".removeItem").forEach((b) => b.onclick = () => {
@@ -7911,14 +7896,14 @@ function renderPlayer(main) {
 			type: RPC.QUEUE_ADD_REQUEST,
 			item
 		});
-		log("Queue request sent.");
+		log("Song queued. Host approval not required.");
 	};
 	$("#requestSinger").onclick = () => {
 		peerNode.broadcast({
 			type: RPC.SINGER_JOIN_REQUEST,
 			playerId: player.playerId
 		});
-		log("Singer slot requested.");
+		log("Singer slot activated.");
 	};
 	document.querySelectorAll(".queueSelf").forEach((b) => b.onclick = () => {
 		peerNode.broadcast({

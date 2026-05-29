@@ -263,14 +263,15 @@ export function queueRequest(
     throw new Error("Queue item needs at least one singer number.");
   if (currentQueueLength >= MAX_QUEUE_ITEMS)
     throw new Error(`Queue full: MVP cap is ${MAX_QUEUE_ITEMS} items.`);
+  const createdAt = nowMs();
   return {
     queueItemId: uuid(),
     songId,
     singerNumbers: singers,
     requestedByPlayerId,
-    status: "requested",
-    createdAt: nowMs(),
-    acceptedAt: null,
+    status: "queued",
+    createdAt,
+    acceptedAt: createdAt,
   };
 }
 export function acceptQueue(room: Room, queueItemId: string): Room {
@@ -347,7 +348,7 @@ export function addSingerToQueueItem(
       throw new Error(`Queue item max ${MAX_SINGERS} singers.`);
     item.singerNumbers.push(singerNumber);
   }
-  if (item.status === "rejected") item.status = "requested";
+  if (item.status === "rejected") item.status = "queued";
   return room;
 }
 export function removeSingerFromQueueItem(
