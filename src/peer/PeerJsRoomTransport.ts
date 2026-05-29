@@ -8,7 +8,15 @@
 
 import PeerModule, { type DataConnection } from "peerjs";
 
-type PeerConstructor = new (...args: unknown[]) => Peer;
+interface PeerInstance {
+  on(event: string, handler: (...args: any[]) => void): void;
+  off(event: string, handler: (...args: any[]) => void): void;
+  connect(peerId: string, options?: Record<string, unknown>): DataConnection;
+  destroy(): void;
+  reconnect?: () => void;
+}
+
+type PeerConstructor = new (...args: unknown[]) => PeerInstance;
 const DefaultPeer = ((PeerModule as unknown as { default?: PeerConstructor }).default ??
   PeerModule) as PeerConstructor;
 
@@ -54,7 +62,7 @@ export class PeerJsRoomTransport {
     PeerJsRoomTransport.PeerCtor = DefaultPeer;
   }
 
-  private peer: Peer | null = null;
+  private peer: PeerInstance | null = null;
   private connections: Map<string, DataConnection> = new Map();
   private handlers: TransportHandlers;
   private _state: ConnectionState = "idle";
@@ -121,7 +129,7 @@ export class PeerJsRoomTransport {
 
       peer.on("open", onOpen);
       peer.on("error", onError);
-      peer.on("connection", (conn) => this.attachConnection(conn));
+      peer.on("connection", (conn: unknown) => this.attachConnection(conn as DataConnection));
       peer.on("disconnected", () => {
         this.setState("disconnected");
         peer.reconnect?.();
