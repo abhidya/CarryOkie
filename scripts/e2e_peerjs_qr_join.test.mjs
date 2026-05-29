@@ -233,7 +233,7 @@ try {
     await receiverPage.waitForSelector("#receiverJoinLink", { timeout: 5000 });
     const joinLinkHref = await receiverPage.locator("#receiverJoinLink").getAttribute("href");
     assert.ok(joinLinkHref.includes("player"), "Join link points to player route");
-    assert.ok(joinLinkHref.endsWith(`#room=${roomCode.trim()}`), `Join link matches receiver room: ${joinLinkHref}`);
+    assert.ok(joinLinkHref.endsWith(`?room=${roomCode.trim()}`), `Join link matches receiver room: ${joinLinkHref}`);
     await receiverPage.click("#startReceiverAudio");
 
     // 5. Player opens #receiverJoinLink (simulates QR scan)

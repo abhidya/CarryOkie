@@ -5804,7 +5804,8 @@ var PeerJsRoomTransport = class {
 	*/
 	static playerJoinUrl(roomCode) {
 		const base = new URL("../player/", location.href);
-		base.hash = `room=${encodeURIComponent(roomCode)}`;
+		base.searchParams.set("room", roomCode);
+		base.hash = "";
 		return base.toString();
 	}
 };
@@ -6176,7 +6177,7 @@ function receiverApp(root) {
 		audioDiagnostics: null,
 		receiverMicLatencyStats: null
 	};
-	root.innerHTML = `<div id="receiverRoomCode" class="room">${escapeHtml$1(initialRoomCode)}</div><div id="receiverJoinQr"></div><a id="receiverJoinLink" href="#">Scan to Join Room</a><div id="receiverStageStatus"><p class="status-pill">${escapeHtml$1("Waiting for host tab…")}</p></div><section id="receiverActiveSingers"><h2>Singers</h2><p>No active singers</p></section><section id="receiverNowPlaying"><h2>Now Playing</h2><p>Waiting for song…</p></section><section id="receiverMediaRegion"><video id="media" class="castMediaElement" controls playsinline></video><section id="receiverLyricsRegion" class="lyrics big"></section></section><section id="receiverQueuePreview"><h2>Queue</h2><ol></ol></section><section id="receiverLiveMicStatus"><h2>Live Mics</h2><p>Waiting for singer mic…</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button></section>`;
+	root.innerHTML = `<section id="receiverJoinHero" aria-labelledby="receiverJoinTitle"><div class="receiver-code-block"><p class="eyebrow" id="receiverJoinTitle">Scan with any camera app</p><div id="receiverRoomCode" class="room">${escapeHtml$1(initialRoomCode)}</div><p class="receiver-join-help">No app install. No host approval. Scan, enter your name, queue a song, or go live.</p><a id="receiverJoinLink" href="#">Open singer join link</a></div><div id="receiverJoinQr" aria-label="Singer join QR"></div></section><div id="receiverStageStatus"><p class="status-pill">${escapeHtml$1("Waiting for host tab…")}</p></div><section id="receiverActiveSingers"><h2>Singers</h2><p>No active singers</p></section><section id="receiverNowPlaying"><h2>Now Playing</h2><p>Waiting for song…</p></section><section id="receiverMediaRegion"><video id="media" class="castMediaElement" controls playsinline></video><section id="receiverLyricsRegion" class="lyrics big"></section></section><section id="receiverQueuePreview"><h2>Queue</h2><ol></ol></section><section id="receiverLiveMicStatus"><h2>Live Mics</h2><p>Waiting for singer mic…</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button></section>`;
 	const media = root.querySelector("#media");
 	const retryLiveMicsButton = root.querySelector("#retryLiveMics");
 	const startReceiverAudioButton = root.querySelector("#startReceiverAudio");
@@ -6225,11 +6226,12 @@ function receiverApp(root) {
 		const joinLink = root.querySelector("#receiverJoinLink");
 		if (joinLink) {
 			joinLink.href = playerUrl;
-			joinLink.textContent = "Scan to Join Room";
+			joinLink.textContent = playerUrl;
 		}
 		const joinQr = root.querySelector("#receiverJoinQr");
 		if (joinQr) joinQr.innerHTML = state.roomCode === "------" ? "" : qrSvg(playerUrl, {
-			scale: 4,
+			scale: 8,
+			quiet: 6,
 			title: "Join CarryOkie room"
 		});
 		const queueSingerLabel = (queueItem) => (queueItem.singerNames?.length ? queueItem.singerNames : (queueItem.singerNumbers || []).map((singerNumber) => `#${singerNumber}`)).join(", ");
@@ -7583,10 +7585,11 @@ function renderHost(main) {
 			if (panel) {
 				const playerUrl = new URL(`../player/?room=${encodeURIComponent(room.roomCode)}`, location.href).toString();
 				const peerJsUrl = peerJsTransport ? PeerJsRoomTransport.playerJoinUrl(room.roomCode) : playerUrl;
-				panel.innerHTML = `<div class="card"><h2>Singer Join QR</h2><div id="showQrContainer"></div><p><a href="${escapeHtml(peerJsUrl)}" id="singerJoinLink">${escapeHtml(peerJsUrl)}</a></p></div>`;
+				panel.innerHTML = `<div class="card"><h2>Singer Join QR</h2><p class="hint">Scan with any camera app to join, queue songs, or sing live.</p><div id="showQrContainer"></div><p><a href="${escapeHtml(peerJsUrl)}" id="singerJoinLink">${escapeHtml(peerJsUrl)}</a></p></div>`;
 				const qrContainer = $("#showQrContainer");
 				if (qrContainer) qrContainer.innerHTML = qrSvg(peerJsUrl, {
-					scale: 4,
+					scale: 7,
+					quiet: 6,
 					title: "Join CarryOkie room"
 				});
 			}

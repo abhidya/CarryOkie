@@ -152,13 +152,13 @@ test("readRoomCodeFromUrl handles malformed URL", () => {
 test("playerJoinUrl generates correct URL", () => {
   globalThis.location = new URL("http://localhost:5173/host/");
   const url = PeerJsRoomTransport.playerJoinUrl("ROOM123");
-  assert.match(url, /\/player\/#room=ROOM123$/);
+  assert.match(url, /\/player\/\?room=ROOM123$/);
 });
 
 test("playerJoinUrl encodes room code", () => {
   globalThis.location = new URL("http://localhost:5173/host/");
   const url = PeerJsRoomTransport.playerJoinUrl("ROOM 123");
-  assert.match(url, /room=ROOM%20123$/);
+  assert.match(url, /room=ROOM(?:%20|\+)123$/);
 });
 
 test("Host mode: startHost transitions correctly", async () => {

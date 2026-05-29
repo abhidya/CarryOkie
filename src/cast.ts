@@ -443,7 +443,7 @@ export function receiverApp(root: HTMLElement): void {
     audioDiagnostics: null,
     receiverMicLatencyStats: null,
   };
-  root.innerHTML = `<div id="receiverRoomCode" class="room">${escapeHtml(initialRoomCode)}</div><div id="receiverJoinQr"></div><a id="receiverJoinLink" href="#">Scan to Join Room</a><div id="receiverStageStatus"><p class="status-pill">${escapeHtml("Waiting for host tab…")}</p></div><section id="receiverActiveSingers"><h2>Singers</h2><p>No active singers</p></section><section id="receiverNowPlaying"><h2>Now Playing</h2><p>Waiting for song…</p></section><section id="receiverMediaRegion"><video id="media" class="castMediaElement" controls playsinline></video><section id="receiverLyricsRegion" class="lyrics big"></section></section><section id="receiverQueuePreview"><h2>Queue</h2><ol></ol></section><section id="receiverLiveMicStatus"><h2>Live Mics</h2><p>Waiting for singer mic…</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button></section>`;
+  root.innerHTML = `<section id="receiverJoinHero" aria-labelledby="receiverJoinTitle"><div class="receiver-code-block"><p class="eyebrow" id="receiverJoinTitle">Scan with any camera app</p><div id="receiverRoomCode" class="room">${escapeHtml(initialRoomCode)}</div><p class="receiver-join-help">No app install. No host approval. Scan, enter your name, queue a song, or go live.</p><a id="receiverJoinLink" href="#">Open singer join link</a></div><div id="receiverJoinQr" aria-label="Singer join QR"></div></section><div id="receiverStageStatus"><p class="status-pill">${escapeHtml("Waiting for host tab…")}</p></div><section id="receiverActiveSingers"><h2>Singers</h2><p>No active singers</p></section><section id="receiverNowPlaying"><h2>Now Playing</h2><p>Waiting for song…</p></section><section id="receiverMediaRegion"><video id="media" class="castMediaElement" controls playsinline></video><section id="receiverLyricsRegion" class="lyrics big"></section></section><section id="receiverQueuePreview"><h2>Queue</h2><ol></ol></section><section id="receiverLiveMicStatus"><h2>Live Mics</h2><p>Waiting for singer mic…</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button></section>`;
   const media = root.querySelector<HTMLVideoElement>("#media")!;
   const retryLiveMicsButton = root.querySelector<HTMLButtonElement>("#retryLiveMics")!;
   const startReceiverAudioButton = root.querySelector<HTMLButtonElement>("#startReceiverAudio")!;
@@ -524,9 +524,9 @@ export function receiverApp(root: HTMLElement): void {
       ? PeerJsRoomTransport.playerJoinUrl(state.roomCode)
       : new URL(`../player/?room=${encodeURIComponent(state.roomCode)}`, location.href).toString();
     const joinLink = root.querySelector<HTMLAnchorElement>("#receiverJoinLink");
-    if (joinLink) { joinLink.href = playerUrl; joinLink.textContent = "Scan to Join Room"; }
+    if (joinLink) { joinLink.href = playerUrl; joinLink.textContent = playerUrl; }
     const joinQr = root.querySelector("#receiverJoinQr");
-    if (joinQr) joinQr.innerHTML = state.roomCode === "------" ? "" : qrSvg(playerUrl, { scale: 4, title: "Join CarryOkie room" });
+    if (joinQr) joinQr.innerHTML = state.roomCode === "------" ? "" : qrSvg(playerUrl, { scale: 8, quiet: 6, title: "Join CarryOkie room" });
 
     const queueSingerLabel = (queueItem: (typeof state.queue)[number]): string =>
       (queueItem.singerNames?.length ? queueItem.singerNames : (queueItem.singerNumbers || []).map(singerNumber => `#${singerNumber}`)).join(", ");

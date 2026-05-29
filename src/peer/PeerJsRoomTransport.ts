@@ -365,7 +365,8 @@ export class PeerJsRoomTransport {
    */
   static playerJoinUrl(roomCode: string): string {
     const base = new URL("../player/", location.href);
-    base.hash = `room=${encodeURIComponent(roomCode)}`;
+    base.searchParams.set("room", roomCode);
+    base.hash = "";
     return base.toString();
   }
 }

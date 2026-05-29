@@ -277,12 +277,14 @@ try {
   }
 
   // ===== RECEIVER PAGE UX ASSERTIONS =====
+  let receiverContext;
+  let receiverPage;
   try {
-    const receiverContext = await browser.newContext({
+    receiverContext = await browser.newContext({
       viewport: { width: 1440, height: 900 },
       deviceScaleFactor: 1,
     });
-    const receiverPage = await receiverContext.newPage();
+    receiverPage = await receiverContext.newPage();
     await receiverPage.goto(`${baseUrl}/receiver/?room=TESTROOM`, { waitUntil: "networkidle" });
     await receiverPage.waitForSelector("text=CarryOkie TV Stage", { timeout: 10000 });
 
@@ -299,8 +301,10 @@ try {
     // Join link href includes room code and points to player route
     const joinLinkHref = await receiverPage.locator("#receiverJoinLink").getAttribute("href");
     assert.ok(joinLinkHref.includes("player"), "Join link points to player route");
-    assert.ok(joinLinkHref.endsWith("#room=TESTROOM"), `Join link uses displayed room code: ${joinLinkHref}`);
+    assert.ok(joinLinkHref.endsWith("?room=TESTROOM"), `Join link uses displayed room code: ${joinLinkHref}`);
     assert.strictEqual((await receiverPage.locator("#receiverRoomCode").innerText()).trim(), "TESTROOM", "Receiver shows URL room code");
+    await expectVisibleText(receiverPage, /Scan with any camera app/i, "Receiver camera-app instruction");
+    await expectVisibleText(receiverPage, /No app install\. No host approval/i, "Receiver self-serve instruction");
     await receiverPage.evaluate(() => {
       const channel = new BroadcastChannel("carryokie.receiver");
       channel.postMessage({
@@ -311,10 +315,10 @@ try {
     });
     await receiverPage.waitForTimeout(300);
     assert.strictEqual((await receiverPage.locator("#receiverRoomCode").innerText()).trim(), "TESTROOM", "Receiver ignores cross-room BroadcastChannel state");
-    assert.ok((await receiverPage.locator("#receiverJoinLink").getAttribute("href")).endsWith("#room=TESTROOM"), "Join link remains locked to receiver room");
+    assert.ok((await receiverPage.locator("#receiverJoinLink").getAttribute("href")).endsWith("?room=TESTROOM"), "Join link remains locked to receiver room");
 
     // QR min size at 1440x900
-    await expectMinBox(receiverPage, "#receiverJoinQr", 160, 160, "Join QR min size");
+    await expectMinBox(receiverPage, "#receiverJoinQr", 300, 300, "Join QR camera-scannable size");
 
     // Stage sections present
     await expectVisible(receiverPage, "#receiverStageStatus", "Stage status");
@@ -372,9 +376,9 @@ try {
     pass("receiver page UX contract");
     await receiverContext.close();
   } catch (e) {
-    await saveArtifacts(receiverPage, "receiver");
+    if (receiverPage) await saveArtifacts(receiverPage, "receiver");
     fail("receiver page UX contract", e);
-    await receiverContext.close();
+    if (receiverContext) await receiverContext.close();
   }
 
 } catch (e) {

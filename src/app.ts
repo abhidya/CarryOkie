@@ -1108,9 +1108,9 @@ function renderHost(main) {
       if (panel) {
         const playerUrl = new URL(`../player/?room=${encodeURIComponent(room.roomCode)}`, location.href).toString();
         const peerJsUrl = peerJsTransport ? PeerJsRoomTransport.playerJoinUrl(room.roomCode) : playerUrl;
-        panel.innerHTML = `<div class="card"><h2>Singer Join QR</h2><div id="showQrContainer"></div><p><a href="${escapeHtml(peerJsUrl)}" id="singerJoinLink">${escapeHtml(peerJsUrl)}</a></p></div>`;
+        panel.innerHTML = `<div class="card"><h2>Singer Join QR</h2><p class="hint">Scan with any camera app to join, queue songs, or sing live.</p><div id="showQrContainer"></div><p><a href="${escapeHtml(peerJsUrl)}" id="singerJoinLink">${escapeHtml(peerJsUrl)}</a></p></div>`;
         const qrContainer = $("#showQrContainer");
-        if (qrContainer) qrContainer.innerHTML = qrSvg(peerJsUrl, { scale: 4, title: "Join CarryOkie room" });
+        if (qrContainer) qrContainer.innerHTML = qrSvg(peerJsUrl, { scale: 7, quiet: 6, title: "Join CarryOkie room" });
       }
     };
     $("#newRoom").onclick = () => {
