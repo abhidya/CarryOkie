@@ -3365,6 +3365,10 @@ var PeerNode = class extends EventTarget {
 			}));
 			return;
 		}
+		if (msg.type === RPC.SIGNAL_RELAY_ICE && msg.toPeerId === this.localPeerId) {
+			this.acceptRelayedIce(remotePeerId, msg);
+			return;
+		}
 		this.emit("message", {
 			remotePeerId,
 			msg
@@ -3374,6 +3378,42 @@ var PeerNode = class extends EventTarget {
 		const signal = msg.signal;
 		return signal?.description || signal;
 	}
+	signalCandidate(msg) {
+		const signal = msg.signal;
+		if (!signal) return null;
+		return signal.candidate ?? signal;
+	}
+	relayLocalIce(edge, viaPeerId, toPeerId) {
+		edge.relayIceReady = false;
+		edge.relayIceQueue = [];
+		edge.pc.onicecandidate = (event) => {
+			if (!event.candidate) return;
+			const msg = {
+				type: RPC.SIGNAL_RELAY_ICE,
+				fromPeerId: this.localPeerId,
+				toPeerId,
+				signal: event.candidate.toJSON?.() || event.candidate,
+				sentAt: Date.now()
+			};
+			if (edge.relayIceReady) this.send(viaPeerId, msg);
+			else edge.relayIceQueue?.push(msg);
+		};
+	}
+	flushRelayedIce(edge, viaPeerId) {
+		edge.relayIceReady = true;
+		for (const msg of edge.relayIceQueue || []) this.send(viaPeerId, msg);
+		edge.relayIceQueue = [];
+	}
+	async acceptRelayedIce(remotePeerId, msg) {
+		const signalFromPeerId = typeof msg.fromPeerId === "string" ? msg.fromPeerId : remotePeerId;
+		const edge = this.peers.get(signalFromPeerId);
+		const candidate = this.signalCandidate(msg);
+		if (!edge || !candidate) return;
+		await edge.pc.addIceCandidate(candidate).catch((error) => this.emit("error", {
+			message: `Relay ICE failed: ${error.message}`,
+			remotePeerId: signalFromPeerId
+		}));
+	}
 	async acceptRenegotiationOffer(remotePeerId, msg) {
 		const signalFromPeerId = typeof msg.fromPeerId === "string" ? msg.fromPeerId : remotePeerId;
 		const viaPeerId = remotePeerId === signalFromPeerId ? null : remotePeerId;
@@ -3382,10 +3422,10 @@ var PeerNode = class extends EventTarget {
 			initiator: false
 		});
 		if (edge.pc.signalingState === "have-local-offer") await edge.pc.setLocalDescription({ type: "rollback" });
+		if (viaPeerId) this.relayLocalIce(edge, viaPeerId, signalFromPeerId);
 		await edge.pc.setRemoteDescription(this.signalDescription(msg));
 		const answer = await edge.pc.createAnswer();
 		await setLowLatencyLocalDescription(edge.pc, answer);
-		await waitForIceComplete(edge.pc);
 		const answerMsg = {
 			type: RPC.SIGNAL_RELAY_ANSWER,
 			fromPeerId: this.localPeerId,
@@ -3393,6 +3433,7 @@ var PeerNode = class extends EventTarget {
 			signal: edge.pc.localDescription
 		};
 		this.send(viaPeerId || signalFromPeerId, answerMsg);
+		if (viaPeerId) this.flushRelayedIce(edge, viaPeerId);
 	}
 	async acceptRenegotiationAnswer(remotePeerId, msg) {
 		const signalFromPeerId = typeof msg.fromPeerId === "string" ? msg.fromPeerId : remotePeerId;
@@ -3410,15 +3451,16 @@ var PeerNode = class extends EventTarget {
 			initiator: true,
 			replace: false
 		});
+		this.relayLocalIce(edge, viaPeerId, remotePeerId);
 		const offer = await edge.pc.createOffer({ offerToReceiveAudio: true });
 		await setLowLatencyLocalDescription(edge.pc, offer);
-		await waitForIceComplete(edge.pc);
 		this.send(viaPeerId, {
 			type: RPC.SIGNAL_RELAY_OFFER,
 			fromPeerId: this.localPeerId,
 			toPeerId: remotePeerId,
 			signal: edge.pc.localDescription
 		});
+		this.flushRelayedIce(edge, viaPeerId);
 	}
 	requestNegotiation(edge) {
 		if (!edge.dc || edge.dc.readyState !== "open" || edge.negotiating || edge.pc.signalingState !== "stable") {
@@ -3461,6 +3503,39 @@ var PeerNode = class extends EventTarget {
 			edge.negotiating = false;
 			throw err;
 		}
+	}
+	async connectionStats(remotePeerId) {
+		const edge = this.peers.get(remotePeerId);
+		if (!edge?.pc?.getStats) return null;
+		let selectedPair = null;
+		let localCandidate = null;
+		let remoteCandidate = null;
+		let outboundAudio = null;
+		let inboundAudio = null;
+		(await edge.pc.getStats()).forEach((stat) => {
+			const item = stat;
+			if (item.type === "candidate-pair" && item.state === "succeeded") {
+				if (item.selected || !selectedPair) selectedPair = item;
+			}
+			if (item.type === "local-candidate") localCandidate = item;
+			if (item.type === "remote-candidate") remoteCandidate = item;
+			if (item.type === "outbound-rtp" && (item.kind === "audio" || item.mediaType === "audio")) outboundAudio = item;
+			if (item.type === "inbound-rtp" && (item.kind === "audio" || item.mediaType === "audio")) inboundAudio = item;
+		});
+		const getNumber = (item, key) => typeof item?.[key] === "number" ? item[key] : null;
+		const rttSeconds = getNumber(selectedPair, "currentRoundTripTime");
+		return {
+			remotePeerId,
+			connectionState: edge.pc.connectionState,
+			iceConnectionState: edge.pc.iceConnectionState,
+			rttMs: rttSeconds == null ? null : Math.round(rttSeconds * 1e3),
+			availableOutgoingBitrate: getNumber(selectedPair, "availableOutgoingBitrate"),
+			localCandidateType: localCandidate?.["candidateType"] || null,
+			remoteCandidateType: remoteCandidate?.["candidateType"] || null,
+			outboundAudioPacketsSent: getNumber(outboundAudio, "packetsSent"),
+			inboundAudioPacketsReceived: getNumber(inboundAudio, "packetsReceived"),
+			updatedAt: Date.now()
+		};
 	}
 	send(remotePeerId, msg) {
 		const edge = this.peers.get(remotePeerId);
@@ -9262,6 +9337,8 @@ var room = loadRoom();
 var player = JSON.parse(localStorage.getItem("carryokie.player") || "null");
 var peerNode;
 var peerJsTransport = null;
+var directReceiverPrewarmInFlight = false;
+var directReceiverAudioReadyLogged = false;
 var audio;
 var catalog = [];
 var castController;
@@ -9490,18 +9567,35 @@ function broadcastRoom(type = RPC.ROOM_STATE_SNAPSHOT) {
 		room
 	});
 }
+async function updateDirectReceiverRouteStats(receiverPeerId) {
+	const stats = await peerNode?.connectionStats?.(receiverPeerId);
+	if (!stats) return;
+	log(`Direct receiver route stats: ${typeof stats.rttMs === "number" ? `${stats.rttMs} ms RTT` : "RTT collecting"}, ${stats.connectionState}/${stats.iceConnectionState}.`);
+}
 async function connectDirectReceiverIfNeeded() {
 	if (player?.isHost || !peerNode || !room?.directReceiverPeerId || !room?.hostPeerId) return;
-	if (!peerNode.localStreams?.some((stream) => stream?.getAudioTracks?.().length)) return;
 	const receiverPeerId = room.directReceiverPeerId;
 	if (receiverPeerId === peerNode.localPeerId) return;
+	const hasAudio = peerNode.localStreams?.some((stream) => stream?.getAudioTracks?.().length);
 	const edge = peerNode.peers?.get(receiverPeerId);
-	if (edge && !["failed", "closed"].includes(edge.pc?.connectionState || "")) return;
+	if (edge && !["failed", "closed"].includes(edge.pc?.connectionState || "")) {
+		if (hasAudio && !directReceiverAudioReadyLogged) {
+			directReceiverAudioReadyLogged = true;
+			log("Direct receiver audio route ready.");
+		}
+		await updateDirectReceiverRouteStats(receiverPeerId);
+		return;
+	}
+	if (directReceiverPrewarmInFlight) return;
+	directReceiverPrewarmInFlight = true;
 	try {
 		await peerNode.createRelayedOffer(receiverPeerId, room.hostPeerId);
-		log("Direct receiver audio offer sent.");
+		log(hasAudio ? "Direct receiver audio offer sent." : "Direct receiver route prewarmed.");
+		await updateDirectReceiverRouteStats(receiverPeerId);
 	} catch (error) {
 		log(`Direct receiver audio route failed: ${error.message}`);
+	} finally {
+		directReceiverPrewarmInFlight = false;
 	}
 }
 function receiverUrl() {
@@ -9954,6 +10048,7 @@ function handleRpc(remotePeerId, msg) {
 	}
 	if (msg.type === RPC.RECEIVER_PEER_READY && player?.isHost) {
 		const receiverPeerId = msg.receiverPeerId || remotePeerId;
+		if (room.directReceiverPeerId !== receiverPeerId) directReceiverAudioReadyLogged = false;
 		room.directReceiverPeerId = receiverPeerId;
 		audioPipeline.directReceiverPeerId = receiverPeerId;
 		audioPipeline.directReceiverConnected = true;
@@ -10130,22 +10225,26 @@ async function initPeerJsHost() {
 		}
 	});
 	globalThis.__carryokiePeerJsTransport = peerJsTransport;
-	const maxAttempts = 3;
+	const maxAttempts = 5;
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) try {
 		await peerJsTransport.startHost(room.roomCode);
 		log(`PeerJS host ready: room ${room.roomCode}`);
 		break;
 	} catch (e) {
 		const message = e instanceof Error ? e.message : String(e);
-		const type = e?.type || "";
-		if (!(attempt < maxAttempts && (type === "unavailable-id" || /unavailable-id|taken|collision/i.test(message)))) {
+		const roomUnavailable = (e?.type || "") === "unavailable-id" || /unavailable-id|taken|collision/i.test(message);
+		const transientPeerServerError = /lost connection|could not connect|network|server/i.test(message);
+		if (!(attempt < maxAttempts && (roomUnavailable || transientPeerServerError))) {
 			log(`PeerJS host failed: ${message}`);
 			break;
 		}
-		const oldCode = room.roomCode;
-		room.roomCode = makePeerJsRoomCode();
-		persist();
-		log(`PeerJS room ${oldCode} unavailable; retrying with ${room.roomCode}.`);
+		if (roomUnavailable) {
+			const oldCode = room.roomCode;
+			room.roomCode = makePeerJsRoomCode();
+			persist();
+			log(`PeerJS room ${oldCode} unavailable; retrying with ${room.roomCode}.`);
+		} else log(`PeerJS host start lost signaling; retrying room ${room.roomCode}.`);
+		await new Promise((resolve) => setTimeout(resolve, 1200));
 	}
 	renderHost(document.body);
 }

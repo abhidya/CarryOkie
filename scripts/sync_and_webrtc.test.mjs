@@ -46,10 +46,23 @@ class FakePc extends EventTarget {
     this.iceGatheringState = "complete";
     this.signalingState = "have-local-description";
     this.dispatchEvent(new Event("icegatheringstatechange"));
+    this.onicecandidate?.({ candidate: { candidate: "candidate:fake", sdpMid: "0", sdpMLineIndex: 0, toJSON() { return { candidate: this.candidate, sdpMid: this.sdpMid, sdpMLineIndex: this.sdpMLineIndex }; } } });
   }
   async setRemoteDescription(desc) {
     this.remoteDescription = desc;
     this.signalingState = "stable";
+  }
+  async addIceCandidate(candidate) {
+    this.addedIceCandidates = this.addedIceCandidates || [];
+    this.addedIceCandidates.push(candidate);
+  }
+  async getStats() {
+    return new Map([
+      ["pair", { type: "candidate-pair", state: "succeeded", selected: true, currentRoundTripTime: 0.023, availableOutgoingBitrate: 96000 }],
+      ["local", { type: "local-candidate", candidateType: "host" }],
+      ["remote", { type: "remote-candidate", candidateType: "srflx" }],
+      ["out", { type: "outbound-rtp", kind: "audio", packetsSent: 42 }],
+    ]);
   }
   addTrack(track, stream) {
     this.addedTracks = this.addedTracks || [];
@@ -474,6 +487,60 @@ test("mic enabled notification broadcasts to every open DataChannel", () => {
     ),
     true,
   );
+});
+
+
+test("relayed direct receiver offers trickle ICE through host", async () => {
+  const old = globalThis.RTCPeerConnection;
+  globalThis.RTCPeerConnection = FakePc;
+  try {
+    const singer = new PeerNode("singer");
+    singer.makeConnection("host", { initiator: true });
+    await singer.createRelayedOffer("receiver", "host");
+    const hostMessages = singer.peers.get("host").dc.sent;
+    assert.equal(hostMessages[0].type, RPC.SIGNAL_RELAY_OFFER);
+    assert.equal(hostMessages[0].toPeerId, "receiver");
+    assert.equal(hostMessages[1].type, RPC.SIGNAL_RELAY_ICE);
+    assert.equal(hostMessages[1].toPeerId, "receiver");
+  } finally {
+    globalThis.RTCPeerConnection = old;
+  }
+});
+
+test("relayed ICE addressed to this peer is added to the direct edge", async () => {
+  const old = globalThis.RTCPeerConnection;
+  globalThis.RTCPeerConnection = FakePc;
+  try {
+    const receiver = new PeerNode("receiver");
+    receiver.makeConnection("singer", { initiator: false });
+    receiver.handleMessage("host", {
+      type: RPC.SIGNAL_RELAY_ICE,
+      fromPeerId: "singer",
+      toPeerId: "receiver",
+      signal: { candidate: "candidate:fake", sdpMid: "0", sdpMLineIndex: 0 },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(receiver.peers.get("singer").pc.addedIceCandidates.length, 1);
+  } finally {
+    globalThis.RTCPeerConnection = old;
+  }
+});
+
+test("connectionStats summarizes RTT and audio packet stats", async () => {
+  const old = globalThis.RTCPeerConnection;
+  globalThis.RTCPeerConnection = FakePc;
+  try {
+    const node = new PeerNode("singer");
+    node.makeConnection("receiver", { initiator: true });
+    const stats = await node.connectionStats("receiver");
+    assert.equal(stats.rttMs, 23);
+    assert.equal(stats.availableOutgoingBitrate, 96000);
+    assert.equal(stats.localCandidateType, "host");
+    assert.equal(stats.remoteCandidateType, "srflx");
+    assert.equal(stats.outboundAudioPacketsSent, 42);
+  } finally {
+    globalThis.RTCPeerConnection = old;
+  }
 });
 
 test("failed ICE emits no-TURN network guidance", () => {

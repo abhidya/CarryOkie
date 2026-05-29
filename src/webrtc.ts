@@ -110,6 +110,8 @@ interface PeerEdge {
   negotiating?: boolean;
   needsNegotiation?: boolean;
   negotiationTimer?: ReturnType<typeof setTimeout>;
+  relayIceReady?: boolean;
+  relayIceQueue?: Record<string, unknown>[];
 }
 
 interface RelayedStream {
@@ -318,6 +320,13 @@ export class PeerNode extends EventTarget {
       );
       return;
     }
+    if (
+      msg.type === RPC.SIGNAL_RELAY_ICE &&
+      msg.toPeerId === this.localPeerId
+    ) {
+      void this.acceptRelayedIce(remotePeerId, msg);
+      return;
+    }
     this.emit("message", { remotePeerId, msg });
   }
   signalDescription(msg: Record<string, unknown>): RTCSessionDescriptionInit {
@@ -326,6 +335,49 @@ export class PeerNode extends EventTarget {
       | { description?: RTCSessionDescriptionInit };
     return ((signal as { description?: RTCSessionDescriptionInit })
       ?.description || signal) as RTCSessionDescriptionInit;
+  }
+  signalCandidate(msg: Record<string, unknown>): RTCIceCandidateInit | null {
+    const signal = msg.signal as
+      | RTCIceCandidateInit
+      | { candidate?: RTCIceCandidateInit | null }
+      | null;
+    if (!signal) return null;
+    return ((signal as { candidate?: RTCIceCandidateInit | null }).candidate ??
+      signal) as RTCIceCandidateInit | null;
+  }
+  relayLocalIce(edge: PeerEdge, viaPeerId: string, toPeerId: string): void {
+    edge.relayIceReady = false;
+    edge.relayIceQueue = [];
+    edge.pc.onicecandidate = (event) => {
+      if (!event.candidate) return;
+      const msg = {
+        type: RPC.SIGNAL_RELAY_ICE,
+        fromPeerId: this.localPeerId,
+        toPeerId,
+        signal: event.candidate.toJSON?.() || event.candidate,
+        sentAt: Date.now(),
+      };
+      if (edge.relayIceReady) this.send(viaPeerId, msg);
+      else edge.relayIceQueue?.push(msg);
+    };
+  }
+  flushRelayedIce(edge: PeerEdge, viaPeerId: string): void {
+    edge.relayIceReady = true;
+    for (const msg of edge.relayIceQueue || []) this.send(viaPeerId, msg);
+    edge.relayIceQueue = [];
+  }
+  async acceptRelayedIce(remotePeerId: string, msg: Record<string, unknown>): Promise<void> {
+    const signalFromPeerId =
+      typeof msg.fromPeerId === "string" ? msg.fromPeerId : remotePeerId;
+    const edge = this.peers.get(signalFromPeerId);
+    const candidate = this.signalCandidate(msg);
+    if (!edge || !candidate) return;
+    await edge.pc.addIceCandidate(candidate).catch((error) =>
+      this.emit("error", {
+        message: `Relay ICE failed: ${(error as Error).message}`,
+        remotePeerId: signalFromPeerId,
+      }),
+    );
   }
   async acceptRenegotiationOffer(
     remotePeerId: string,
@@ -339,10 +391,10 @@ export class PeerNode extends EventTarget {
       this.makeConnection(signalFromPeerId, { manual: false, initiator: false });
     if (edge.pc.signalingState === "have-local-offer")
       await edge.pc.setLocalDescription({ type: "rollback" });
+    if (viaPeerId) this.relayLocalIce(edge, viaPeerId, signalFromPeerId);
     await edge.pc.setRemoteDescription(this.signalDescription(msg));
     const answer = await edge.pc.createAnswer();
     await setLowLatencyLocalDescription(edge.pc, answer);
-    await waitForIceComplete(edge.pc);
     const answerMsg = {
       type: RPC.SIGNAL_RELAY_ANSWER,
       fromPeerId: this.localPeerId,
@@ -350,6 +402,7 @@ export class PeerNode extends EventTarget {
       signal: edge.pc.localDescription,
     };
     this.send(viaPeerId || signalFromPeerId, answerMsg);
+    if (viaPeerId) this.flushRelayedIce(edge, viaPeerId);
   }
   async acceptRenegotiationAnswer(
     remotePeerId: string,
@@ -376,15 +429,16 @@ export class PeerNode extends EventTarget {
       initiator: true,
       replace: false,
     });
+    this.relayLocalIce(edge, viaPeerId, remotePeerId);
     const offer = await edge.pc.createOffer({ offerToReceiveAudio: true });
     await setLowLatencyLocalDescription(edge.pc, offer);
-    await waitForIceComplete(edge.pc);
     this.send(viaPeerId, {
       type: RPC.SIGNAL_RELAY_OFFER,
       fromPeerId: this.localPeerId,
       toPeerId: remotePeerId,
       signal: edge.pc.localDescription,
     });
+    this.flushRelayedIce(edge, viaPeerId);
   }
   requestNegotiation(edge: PeerEdge): void {
     if (
@@ -442,6 +496,43 @@ export class PeerNode extends EventTarget {
       edge.negotiating = false;
       throw err;
     }
+  }
+  async connectionStats(remotePeerId: string): Promise<Record<string, unknown> | null> {
+    const edge = this.peers.get(remotePeerId);
+    if (!edge?.pc?.getStats) return null;
+    let selectedPair: Record<string, unknown> | null = null;
+    let localCandidate: Record<string, unknown> | null = null;
+    let remoteCandidate: Record<string, unknown> | null = null;
+    let outboundAudio: Record<string, unknown> | null = null;
+    let inboundAudio: Record<string, unknown> | null = null;
+    const report = await edge.pc.getStats();
+    report.forEach((stat: RTCStats) => {
+      const item = stat as unknown as Record<string, unknown>;
+      if (item.type === "candidate-pair" && item.state === "succeeded") {
+        if (item.selected || !selectedPair) selectedPair = item;
+      }
+      if (item.type === "local-candidate") localCandidate = item;
+      if (item.type === "remote-candidate") remoteCandidate = item;
+      if (item.type === "outbound-rtp" && (item.kind === "audio" || item.mediaType === "audio"))
+        outboundAudio = item;
+      if (item.type === "inbound-rtp" && (item.kind === "audio" || item.mediaType === "audio"))
+        inboundAudio = item;
+    });
+    const getNumber = (item: Record<string, unknown> | null, key: string) =>
+      typeof item?.[key] === "number" ? (item[key] as number) : null;
+    const rttSeconds = getNumber(selectedPair, "currentRoundTripTime");
+    return {
+      remotePeerId,
+      connectionState: edge.pc.connectionState,
+      iceConnectionState: edge.pc.iceConnectionState,
+      rttMs: rttSeconds == null ? null : Math.round(rttSeconds * 1000),
+      availableOutgoingBitrate: getNumber(selectedPair, "availableOutgoingBitrate"),
+      localCandidateType: localCandidate?.["candidateType"] || null,
+      remoteCandidateType: remoteCandidate?.["candidateType"] || null,
+      outboundAudioPacketsSent: getNumber(outboundAudio, "packetsSent"),
+      inboundAudioPacketsReceived: getNumber(inboundAudio, "packetsReceived"),
+      updatedAt: Date.now(),
+    };
   }
   send(remotePeerId: string, msg: Record<string, unknown>): void {
     const edge = this.peers.get(remotePeerId);

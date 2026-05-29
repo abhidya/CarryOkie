@@ -384,7 +384,7 @@ try {
       { timeout: 30000 },
     );
     await playerPage.waitForFunction(
-      () => /Direct receiver audio offer sent/.test(document.querySelector("#log")?.textContent || ""),
+      () => /Direct receiver (audio offer sent|audio route ready|route prewarmed)/.test(document.querySelector("#log")?.textContent || ""),
       null,
       { timeout: 30000 },
     );

@@ -57,6 +57,8 @@ let room = loadRoom();
 let player = JSON.parse(localStorage.getItem("carryokie.player") || "null");
 let peerNode;
 let peerJsTransport: PeerJsRoomTransport | null = null;
+let directReceiverPrewarmInFlight = false;
+let directReceiverAudioReadyLogged = false;
 let audio;
 let catalog = [];
 let castController;
@@ -378,20 +380,38 @@ function handlePlayerLeft(remotePeerId) {
 function broadcastRoom(type = RPC.ROOM_STATE_SNAPSHOT) {
   peerNode?.broadcast({ type, room });
 }
+async function updateDirectReceiverRouteStats(receiverPeerId) {
+  const stats = await peerNode?.connectionStats?.(receiverPeerId);
+  if (!stats) return;
+  const rtt = typeof stats.rttMs === "number" ? `${stats.rttMs} ms RTT` : "RTT collecting";
+  log(`Direct receiver route stats: ${rtt}, ${stats.connectionState}/${stats.iceConnectionState}.`);
+}
 async function connectDirectReceiverIfNeeded() {
   if (player?.isHost || !peerNode || !room?.directReceiverPeerId || !room?.hostPeerId)
     return;
-  if (!peerNode.localStreams?.some((stream) => stream?.getAudioTracks?.().length))
-    return;
   const receiverPeerId = room.directReceiverPeerId;
   if (receiverPeerId === peerNode.localPeerId) return;
+  const hasAudio = peerNode.localStreams?.some((stream) => stream?.getAudioTracks?.().length);
   const edge = peerNode.peers?.get(receiverPeerId);
-  if (edge && !["failed", "closed"].includes(edge.pc?.connectionState || "")) return;
+  const usableEdge = edge && !["failed", "closed"].includes(edge.pc?.connectionState || "");
+  if (usableEdge) {
+    if (hasAudio && !directReceiverAudioReadyLogged) {
+      directReceiverAudioReadyLogged = true;
+      log("Direct receiver audio route ready.");
+    }
+    await updateDirectReceiverRouteStats(receiverPeerId);
+    return;
+  }
+  if (directReceiverPrewarmInFlight) return;
+  directReceiverPrewarmInFlight = true;
   try {
     await peerNode.createRelayedOffer(receiverPeerId, room.hostPeerId);
-    log("Direct receiver audio offer sent.");
+    log(hasAudio ? "Direct receiver audio offer sent." : "Direct receiver route prewarmed.");
+    await updateDirectReceiverRouteStats(receiverPeerId);
   } catch (error) {
     log(`Direct receiver audio route failed: ${error.message}`);
+  } finally {
+    directReceiverPrewarmInFlight = false;
   }
 }
 function receiverUrl() {
@@ -903,6 +923,7 @@ function handleRpc(remotePeerId, msg) {
   }
   if (msg.type === RPC.RECEIVER_PEER_READY && player?.isHost) {
     const receiverPeerId = msg.receiverPeerId || remotePeerId;
+    if (room.directReceiverPeerId !== receiverPeerId) directReceiverAudioReadyLogged = false;
     room.directReceiverPeerId = receiverPeerId;
     audioPipeline.directReceiverPeerId = receiverPeerId;
     audioPipeline.directReceiverConnected = true;
@@ -1116,7 +1137,7 @@ async function initPeerJsHost() {
     },
   });
   globalThis.__carryokiePeerJsTransport = peerJsTransport;
-  const maxAttempts = 3;
+  const maxAttempts = 5;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       await peerJsTransport.startHost(room.roomCode);
@@ -1125,17 +1146,24 @@ async function initPeerJsHost() {
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       const type = e?.type || "";
-      const canRetry =
-        attempt < maxAttempts &&
-        (type === "unavailable-id" || /unavailable-id|taken|collision/i.test(message));
+      const roomUnavailable =
+        type === "unavailable-id" || /unavailable-id|taken|collision/i.test(message);
+      const transientPeerServerError =
+        /lost connection|could not connect|network|server/i.test(message);
+      const canRetry = attempt < maxAttempts && (roomUnavailable || transientPeerServerError);
       if (!canRetry) {
         log(`PeerJS host failed: ${message}`);
         break;
       }
-      const oldCode = room.roomCode;
-      room.roomCode = makePeerJsRoomCode();
-      persist();
-      log(`PeerJS room ${oldCode} unavailable; retrying with ${room.roomCode}.`);
+      if (roomUnavailable) {
+        const oldCode = room.roomCode;
+        room.roomCode = makePeerJsRoomCode();
+        persist();
+        log(`PeerJS room ${oldCode} unavailable; retrying with ${room.roomCode}.`);
+      } else {
+        log(`PeerJS host start lost signaling; retrying room ${room.roomCode}.`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1200));
     }
   }
   renderHost(document.body);
