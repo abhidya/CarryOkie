@@ -1,2 +1,2 @@
-import "./main-BnNY1JwD.js";
+import "./main-Bi8NYNFc.js";
 /* empty css                */

@@ -127,6 +127,29 @@ try {
     args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"],
   });
 
+
+  // ===== HOME PAGE UX ASSERTIONS =====
+  try {
+    const homeContext = await browser.newContext({
+      viewport: { width: 1440, height: 900 },
+      deviceScaleFactor: 1,
+    });
+    const homePage = await homeContext.newPage();
+    await homePage.goto(baseUrl, { waitUntil: "networkidle" });
+    await expectVisibleText(homePage, /Start hosting/, "Home primary host CTA");
+    await expectVisible(homePage, "#joinByCode", "Home room-code form");
+    await expectVisible(homePage, "#homeRoomCode", "Home room-code input");
+    await homePage.fill("#homeRoomCode", "kite echo");
+    await Promise.all([
+      homePage.waitForURL(/player\/\?room=KITEECHO$/),
+      homePage.click('#joinByCode button[type="submit"]'),
+    ]);
+    pass("home page UX contract");
+    await homeContext.close();
+  } catch (e) {
+    fail("home page UX contract", e);
+  }
+
   // ===== HOST PAGE UX ASSERTIONS =====
   try {
     const hostContext = await browser.newContext({
@@ -140,6 +163,8 @@ try {
     // Shows the host-first control room title and next-step guidance.
     await expectVisibleText(hostPage, /Host Control Room/, "Host title");
     await expectVisibleText(hostPage, /Next step/i, "Host next step");
+    await expectVisibleText(hostPage, /Host Backup Controls/i, "Host backup controls framing");
+    await expectHiddenText(hostPage, /Press Start Next when a song is queued/i, "Stale host-start guidance");
 
     // Does NOT show "Host Controller"
     await expectHiddenText(hostPage, /Host Controller/, "Old host title");

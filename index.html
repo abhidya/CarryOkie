@@ -18,11 +18,17 @@
           </p>
           <nav class="cards hero-actions" aria-label="CarryOkie pages">
             <a class="primary" href="host/">Start hosting</a>
-            <a href="player/">I have a room code</a>
           </nav>
+          <form id="joinByCode" class="join-code-form" aria-label="Join an existing room">
+            <label for="homeRoomCode">I have a room code</label>
+            <div class="join-code-row">
+              <input id="homeRoomCode" name="room" inputmode="latin" autocomplete="off" placeholder="ROOMCODE" />
+              <button type="submit">Join</button>
+            </div>
+          </form>
           <p class="hint">
-            TV Stage links are generated from the host room so the QR always
-            includes the right room code.
+            The TV Stage creates the QR for this room. Once singers scan it,
+            they can queue, start, and sing without host approval.
           </p>
         </div>
         <div class="stage-art" aria-hidden="true">
@@ -34,5 +40,16 @@
         </div>
       </section>
     </main>
+    <script>
+      document.getElementById("joinByCode")?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const room = String(new FormData(event.currentTarget).get("room") || "")
+          .trim()
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, "");
+        if (!room) return;
+        location.href = `player/?room=${encodeURIComponent(room)}`;
+      });
+    </script>
   </body>
 </html>
