@@ -330,8 +330,7 @@ try {
     );
 
     // 11. Queue request/start works without host approval
-    await playerPage.click("#queueSongPanel summary");
-    await playerPage.waitForTimeout(500);
+    await playerPage.waitForSelector("#singers", { state: "visible", timeout: 5000 });
     await playerPage.fill("#singers", "2");
     await playerPage.click("#requestSong");
     await playerPage.waitForFunction(
