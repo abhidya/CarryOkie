@@ -37,7 +37,7 @@ async function pageLog(page) {
 
 try {
   await host.goto(`${baseUrl}/host/`, { waitUntil: "networkidle" });
-  await host.waitForSelector("text=CarryOkie Show Control");
+  await host.waitForSelector("text=Host Control Room");
   await host.waitForSelector("#hostRoomCode", { timeout: 10000 });
   const roomCode = await host.locator("#hostRoomCode").innerText();
   assert.match(roomCode.trim(), /^[A-Z]+$/);
@@ -111,7 +111,7 @@ try {
   );
   await receiver.waitForFunction(
     () =>
-      /Playing all forwarded singer mics|Playing \d+ unmuted live mic|Muted\.|Tap receiver once to start|Press 'Start receiver audio'/.test(
+      /Playing all forwarded singer mics|Playing \d+ unmuted live mic|Muted\.|Tap receiver once to start|Press 'Start TV audio'/.test(
         document.body.textContent || "",
       ),
     null,
@@ -127,7 +127,7 @@ try {
   );
 
   const receiverText = await receiver.locator("#receiverLiveMicStatus").innerText();
-  assert.match(receiverText, /LIVE MICS|Live mics/);
+  assert.match(receiverText, /LIVE MICS|Live mics|TV AUDIO|TV Audio/);
   assert.doesNotMatch(receiverText, /Waiting for host tab audio/);
   if (useDeterministicFakeMic) {
     const publishedMicRms = await player.evaluate(async () => {

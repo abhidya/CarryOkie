@@ -1081,22 +1081,31 @@ function renderHost(main) {
     : audioPipeline.receiverPcConnectionState === "failed" ? "TV Failed"
     : "TV Tab Open"
     : "TV Not Open";
+  const queuedCount = room.queue.filter(q => q.status === "queued").length;
+  const activeSong = room.currentQueueItemId ? songTitle(room.currentSongId || "") : "";
+  const hostNextStep = !audioPipeline.receiverReady
+    ? "1. Open TV Stage, then cast that tab to the TV."
+    : !room.queue.length
+      ? "2. Ask singers to scan the TV QR and queue a song."
+      : !room.currentQueueItemId
+        ? "3. Press Start Next to load music on the TV tab."
+        : "Show is running. Use pause/resume or start the next queued song.";
 
   const topStatus = $("#hostTopStatus");
   if (topStatus) {
-    topStatus.innerHTML = `<div class="host-status-grid">
+    topStatus.innerHTML = `<div class="host-next-step"><span class="status-label">Next step</span><strong>${escapeHtml(hostNextStep)}</strong></div><div class="host-status-grid">
       <div class="status-item"><span class="status-label">Room</span><span id="hostRoomCode" class="status-value">${escapeHtml(room.roomCode)}</span></div>
       <div class="status-item"><span class="status-label">TV</span><span id="hostTvStatus" class="status-value">${tvStatus}</span></div>
       <div class="status-item"><span class="status-label">QR Join</span><span id="hostQrJoinStatus" class="status-value">${qrStatus}</span></div>
       <div class="status-item"><span class="status-label">Singers</span><span id="hostSingerCount" class="status-value">${room.players.length}/5</span></div>
       <div class="status-item"><span class="status-label">Live Mics</span><span id="hostLiveMicCount" class="status-value">${liveMicCount}</span></div>
-      <div class="status-item"><span class="status-label">Queue</span><span id="hostQueueCount" class="status-value">${room.queue.length}</span></div>
+      <div class="status-item"><span class="status-label">Queue</span><span id="hostQueueCount" class="status-value">${queuedCount} ready</span></div>
     </div>`;
   }
 
   const actions = $("#hostActions");
   if (actions) {
-    actions.innerHTML = `<button id="copySingerLink" class="primary">Copy Singer Link</button><button id="openTvStage">Open TV Stage</button><button id="showJoinQr">Show QR</button><button id="newRoom">Start Over</button>`;
+    actions.innerHTML = `<button id="openTvStage" class="primary">1 Open TV Stage</button><button id="copySingerLink">Copy Singer Link</button><button id="showJoinQr">Show QR Here</button><button id="newRoom">Start Over</button>`;
     $("#copySingerLink").onclick = async () => {
       const link = PeerJsRoomTransport.playerJoinUrl(room.roomCode);
       try { await navigator.clipboard.writeText(link); } catch {}
@@ -1126,8 +1135,13 @@ function renderHost(main) {
   if (panels) {
     const setupComplete = room.players.length > 1 && room.queue.length > 0;
     panels.innerHTML = `<div class="host-panels">
-      <details class="card" ${setupComplete ? "" : "open"}><summary>Setup</summary><p>Open TV Stage, cast that receiver tab, then let singers scan the receiver QR with any QR app.</p><p class="hint">Singers can join, queue songs, and go live without host approval.</p></details>
-      <div class="card queue-card"><h2>Run the Room</h2><div class="button-row"><button id="startNext" class="primary">Start Next</button><button id="pauseSong">Pause</button><button id="resumeSong">Resume</button></div>${queueHtml(room, "host")}</div>
+      <section class="host-journey grid">
+        <div class="card step-card ${audioPipeline.receiverReady ? "step-done" : ""}"><p class="eyebrow">Step 1 · TV</p><h2>Open and cast TV Stage</h2><p>Use the button above. Cast the TV Stage browser tab, not this host control tab.</p></div>
+        <div class="card step-card ${room.players.length > 1 ? "step-done" : ""}"><p class="eyebrow">Step 2 · Singers</p><h2>Singers scan the TV QR</h2><p>They enter a name, queue songs, and can go live without host approval.</p></div>
+        <div class="card step-card ${room.currentQueueItemId ? "step-done" : ""}"><p class="eyebrow">Step 3 · Show</p><h2>${activeSong ? escapeHtml(activeSong) : "Start the first queued song"}</h2><p>${room.queue.length ? `${queuedCount} queued song${queuedCount === 1 ? "" : "s"} ready.` : "Waiting for singers to queue songs."}</p></div>
+      </section>
+      <details class="card" ${setupComplete ? "" : "open"}><summary>Setup help</summary><ol class="quickstart"><li>Click <strong>Open TV Stage</strong>.</li><li>Cast that receiver/TV Stage tab to the TV.</li><li>Click <strong>Start TV audio</strong> on the TV tab once if the browser blocks sound.</li><li>Singers scan the TV QR with any camera app.</li><li>Press <strong>Start Next</strong> when a song is queued.</li></ol></details>
+      <div class="card queue-card"><h2>Run the Room</h2><p class="hint">Starting a queued song loads backing video/audio onto the receiver tab.</p><div class="button-row"><button id="startNext" class="primary">Start Next Queued Song</button><button id="pauseSong">Pause TV</button><button id="resumeSong">Resume TV</button></div>${queueHtml(room, "host")}</div>
       <details class="card"><summary>Singers (${activeSingers} active)</summary>${room.players.map(p => `<div class="singer-row"><label class="check"><input type="checkbox" class="singer" value="${p.playerId}" ${p.isSingerForCurrentSong ? "checked" : ""}> #${p.playerNumber || "?"} ${escapeHtml(p.displayName)} ${p.micState?.enabled ? (p.micState.muted ? "(muted)" : "(live)") : ""}</label></div>`).join("")}<div class="button-row"><button id="setSingers" class="primary">Update Singers</button></div></details>
       <details class="card"><summary>Now Playing</summary>${room.currentQueueItemId ? `<p>${escapeHtml(songTitle(room.currentSongId || ""))}</p>` : "<p>No song active</p>"}${room.players.some(p => p.isSingerForCurrentSong) ? '<p class="warn">TV bleed risk: singers should use headphones.</p>' : ""}</details>
     </div>`;

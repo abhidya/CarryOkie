@@ -443,7 +443,7 @@ export function receiverApp(root: HTMLElement): void {
     audioDiagnostics: null,
     receiverMicLatencyStats: null,
   };
-  root.innerHTML = `<section id="receiverJoinHero" aria-labelledby="receiverJoinTitle"><div class="receiver-code-block"><p class="eyebrow" id="receiverJoinTitle">Scan with any camera app</p><div id="receiverRoomCode" class="room">${escapeHtml(initialRoomCode)}</div><p class="receiver-join-help">No app install. No host approval. Scan, enter your name, queue a song, or go live.</p><a id="receiverJoinLink" href="#">Open singer join link</a></div><div id="receiverJoinQr" aria-label="Singer join QR"></div></section><div id="receiverStageStatus"><p class="status-pill">${escapeHtml("Waiting for host tab…")}</p></div><section id="receiverActiveSingers"><h2>Singers</h2><p>No active singers</p></section><section id="receiverNowPlaying"><h2>Now Playing</h2><p>Waiting for song…</p></section><section id="receiverMediaRegion"><video id="media" class="castMediaElement" controls playsinline></video><section id="receiverLyricsRegion" class="lyrics big"></section></section><section id="receiverQueuePreview"><h2>Queue</h2><ol></ol></section><section id="receiverLiveMicStatus"><h2>Live Mics</h2><p>Waiting for singer mic…</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button></section>`;
+  root.innerHTML = `<section id="receiverJoinHero" aria-labelledby="receiverJoinTitle"><div class="receiver-code-block"><p class="eyebrow" id="receiverJoinTitle">Scan with any camera app</p><div id="receiverRoomCode" class="room">${escapeHtml(initialRoomCode)}</div><p class="receiver-join-help">No app install. No host approval. Scan, enter your name, queue a song, or go live.</p><a id="receiverJoinLink" href="#">Open singer join link</a></div><div id="receiverJoinQr" aria-label="Singer join QR"></div></section><div id="receiverStageStatus"><p class="status-pill">${escapeHtml("Waiting for host tab…")}</p></div><section id="receiverActiveSingers"><h2>Singers</h2><p>No active singers</p></section><section id="receiverNowPlaying"><h2>Now Playing</h2><p>Waiting for song…</p></section><section id="receiverMediaRegion"><video id="media" class="castMediaElement" controls playsinline></video><section id="receiverLyricsRegion" class="lyrics big"></section></section><section id="receiverQueuePreview"><h2>Queue</h2><ol></ol></section><section id="receiverLiveMicStatus"><h2>TV Audio</h2><p>Click once after opening/casting this tab so browser audio can play.</p><button id="startReceiverAudio" class="primary">Start TV audio</button><button id="retryLiveMics">Retry live mics</button></section>`;
   const media = root.querySelector<HTMLVideoElement>("#media")!;
   const retryLiveMicsButton = root.querySelector<HTMLButtonElement>("#retryLiveMics")!;
   const startReceiverAudioButton = root.querySelector<HTMLButtonElement>("#startReceiverAudio")!;
@@ -451,6 +451,24 @@ export function receiverApp(root: HTMLElement): void {
   let loadedSongId = "";
   let mediaReady = false;
   let pendingPlay = false;
+  async function startReceiverAudio(): Promise<void> {
+    state.audioOutputUnlocked = true;
+    if (media.src) {
+      try {
+        await media.play();
+        if (!liveMicTrackIds.size) state.status = "Backing track playing.";
+      } catch (error) {
+        state.status = `Tap the video play button if audio is still blocked: ${(error as Error).message}`;
+      }
+    } else {
+      pendingPlay = true;
+      state.status = state.song
+        ? "Audio unlocked. Loading backing track…"
+        : "Audio unlocked. Waiting for host to start a song.";
+    }
+    if (liveMicTrackIds.size) await tryPlayLiveMics();
+    render();
+  }
   function activeLine(): (typeof state.lines)[0] | undefined {
     const t = state.mediaTimeMs;
     return (
@@ -546,8 +564,8 @@ export function receiverApp(root: HTMLElement): void {
     const liveMicStatusEl = root.querySelector("#receiverLiveMicStatus");
     if (liveMicStatusEl) {
       const { audible, muted, publishing } = singerMicSummary();
-      liveMicStatusEl.innerHTML = `<h2>Live Mics</h2><p class="subtle">${audible.length ? `Playing ${audible.length} unmuted live mic${audible.length === 1 ? "" : "s"}.` : muted.length ? "Muted." : "Waiting for singer mic…"}</p><p class="subtle">Publishing: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>`;
-      liveMicStatusEl.querySelector("#startReceiverAudio")?.addEventListener("click", () => { state.audioOutputUnlocked = true; void tryPlayLiveMics(); });
+      liveMicStatusEl.innerHTML = `<h2>TV Audio</h2><p class="subtle">${state.audioOutputUnlocked ? "Receiver audio is unlocked for backing track and live mics." : "Click once after opening/casting this tab so browser audio can play."}</p><p class="subtle">${audible.length ? `Playing ${audible.length} unmuted live mic${audible.length === 1 ? "" : "s"}.` : muted.length ? "Live mic muted." : "Waiting for singer mic…"}</p><p class="subtle">Publishing: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p><button id="startReceiverAudio" class="primary">Start TV audio</button><button id="retryLiveMics">Retry live mics</button>`;
+      liveMicStatusEl.querySelector("#startReceiverAudio")?.addEventListener("click", () => { void startReceiverAudio(); });
       liveMicStatusEl.querySelector("#retryLiveMics")?.addEventListener("click", () => { void tryPlayLiveMics(); });
     }
 
@@ -617,6 +635,7 @@ export function receiverApp(root: HTMLElement): void {
             render();
           })
           .catch(() => {
+            pendingPlay = true;
             attemptPlay();
             if (!liveMicTrackIds.size)
               state.status = "Tap receiver once to start backing track/audio.";
@@ -750,12 +769,11 @@ export function receiverApp(root: HTMLElement): void {
     }
     const liveMicSection = root.querySelector<HTMLElement>("#receiverLiveMicStatus");
     if (liveMicSection) {
-      liveMicSection.innerHTML = `<h2>Live Mics</h2>${liveMicSummaryHtml()}<button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>`;
+      liveMicSection.innerHTML = `<h2>TV Audio</h2>${liveMicSummaryHtml()}<button id="startReceiverAudio" class="primary">Start TV audio</button><button id="retryLiveMics">Retry live mics</button>`;
       liveMicSection
         .querySelector("#startReceiverAudio")
         ?.addEventListener("click", () => {
-          state.audioOutputUnlocked = true;
-          void tryPlayLiveMics();
+          void startReceiverAudio();
         });
       liveMicSection.querySelector("#retryLiveMics")?.addEventListener("click", () => {
         void tryPlayLiveMics();
@@ -813,7 +831,7 @@ export function receiverApp(root: HTMLElement): void {
   async function tryPlayLiveMics(): Promise<void> {
     if (!state.audioOutputUnlocked) {
       state.liveMicStatus =
-        "Press 'Start receiver audio' to enable live mic audio.";
+        "Press 'Start TV audio' to enable live mic audio.";
       render();
       return;
     }
@@ -830,7 +848,7 @@ export function receiverApp(root: HTMLElement): void {
     } catch (error) {
       liveMicLastPlayError = (error as Error).message;
       state.liveMicStatus =
-        "Tap receiver once or press Start / retry live mics.";
+        "Tap receiver once or press Retry live mics.";
       render();
     }
   }
@@ -981,13 +999,13 @@ export function receiverApp(root: HTMLElement): void {
     void tryPlayLiveMics();
   });
   startReceiverAudioButton.addEventListener("click", () => {
-    state.audioOutputUnlocked = true;
-    void tryPlayLiveMics();
+    void startReceiverAudio();
   });
   root.addEventListener("pointerdown", () => {
-    if (!state.audioOutputUnlocked && liveMicTrackIds.size) {
+    if (!state.audioOutputUnlocked) {
       state.audioOutputUnlocked = true;
     }
+    if (media.src) void media.play().catch(() => {});
     if (liveMicTrackIds.size) void tryPlayLiveMics();
   });
   window.addEventListener("message", (ev) => handle(ev.data));

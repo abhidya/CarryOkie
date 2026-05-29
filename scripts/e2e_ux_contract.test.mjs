@@ -135,10 +135,11 @@ try {
     });
     const hostPage = await hostContext.newPage();
     await hostPage.goto(`${baseUrl}/host/`, { waitUntil: "networkidle" });
-    await hostPage.waitForSelector("text=CarryOkie Show Control", { timeout: 10000 });
+    await hostPage.waitForSelector("text=Host Control Room", { timeout: 10000 });
 
-    // Shows "CarryOkie Show Control"
-    await expectVisibleText(hostPage, /CarryOkie Show Control/, "Host title");
+    // Shows the host-first control room title and next-step guidance.
+    await expectVisibleText(hostPage, /Host Control Room/, "Host title");
+    await expectVisibleText(hostPage, /Next step/i, "Host next step");
 
     // Does NOT show "Host Controller"
     await expectHiddenText(hostPage, /Host Controller/, "Old host title");
@@ -200,7 +201,7 @@ try {
     }
     // Diagnostics still collapsed after resize
     await hostPage.reload({ waitUntil: "networkidle" });
-    await hostPage.waitForSelector("text=CarryOkie Show Control", { timeout: 10000 });
+    await hostPage.waitForSelector("text=Host Control Room", { timeout: 10000 });
     assert.strictEqual(await hostPage.locator("#diagnosticsToggle").getAttribute("open"), null, "Diagnostics collapsed on mobile");
     assert.strictEqual(await hostPage.locator("#manualPairingToggle").getAttribute("open"), null, "Manual collapsed on mobile");
 

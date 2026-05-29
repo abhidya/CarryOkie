@@ -8532,13 +8532,28 @@ function receiverApp(root) {
 		audioDiagnostics: null,
 		receiverMicLatencyStats: null
 	};
-	root.innerHTML = `<section id="receiverJoinHero" aria-labelledby="receiverJoinTitle"><div class="receiver-code-block"><p class="eyebrow" id="receiverJoinTitle">Scan with any camera app</p><div id="receiverRoomCode" class="room">${escapeHtml$1(initialRoomCode)}</div><p class="receiver-join-help">No app install. No host approval. Scan, enter your name, queue a song, or go live.</p><a id="receiverJoinLink" href="#">Open singer join link</a></div><div id="receiverJoinQr" aria-label="Singer join QR"></div></section><div id="receiverStageStatus"><p class="status-pill">${escapeHtml$1("Waiting for host tab…")}</p></div><section id="receiverActiveSingers"><h2>Singers</h2><p>No active singers</p></section><section id="receiverNowPlaying"><h2>Now Playing</h2><p>Waiting for song…</p></section><section id="receiverMediaRegion"><video id="media" class="castMediaElement" controls playsinline></video><section id="receiverLyricsRegion" class="lyrics big"></section></section><section id="receiverQueuePreview"><h2>Queue</h2><ol></ol></section><section id="receiverLiveMicStatus"><h2>Live Mics</h2><p>Waiting for singer mic…</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button></section>`;
+	root.innerHTML = `<section id="receiverJoinHero" aria-labelledby="receiverJoinTitle"><div class="receiver-code-block"><p class="eyebrow" id="receiverJoinTitle">Scan with any camera app</p><div id="receiverRoomCode" class="room">${escapeHtml$1(initialRoomCode)}</div><p class="receiver-join-help">No app install. No host approval. Scan, enter your name, queue a song, or go live.</p><a id="receiverJoinLink" href="#">Open singer join link</a></div><div id="receiverJoinQr" aria-label="Singer join QR"></div></section><div id="receiverStageStatus"><p class="status-pill">${escapeHtml$1("Waiting for host tab…")}</p></div><section id="receiverActiveSingers"><h2>Singers</h2><p>No active singers</p></section><section id="receiverNowPlaying"><h2>Now Playing</h2><p>Waiting for song…</p></section><section id="receiverMediaRegion"><video id="media" class="castMediaElement" controls playsinline></video><section id="receiverLyricsRegion" class="lyrics big"></section></section><section id="receiverQueuePreview"><h2>Queue</h2><ol></ol></section><section id="receiverLiveMicStatus"><h2>TV Audio</h2><p>Click once after opening/casting this tab so browser audio can play.</p><button id="startReceiverAudio" class="primary">Start TV audio</button><button id="retryLiveMics">Retry live mics</button></section>`;
 	const media = root.querySelector("#media");
 	const retryLiveMicsButton = root.querySelector("#retryLiveMics");
 	const startReceiverAudioButton = root.querySelector("#startReceiverAudio");
 	const receiverId = crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
 	let loadedSongId = "";
 	let pendingPlay = false;
+	async function startReceiverAudio() {
+		state.audioOutputUnlocked = true;
+		if (media.src) try {
+			await media.play();
+			if (!liveMicTrackIds.size) state.status = "Backing track playing.";
+		} catch (error) {
+			state.status = `Tap the video play button if audio is still blocked: ${error.message}`;
+		}
+		else {
+			pendingPlay = true;
+			state.status = state.song ? "Audio unlocked. Loading backing track…" : "Audio unlocked. Waiting for host to start a song.";
+		}
+		if (liveMicTrackIds.size) await tryPlayLiveMics();
+		render();
+	}
 	function activeLine() {
 		const t = state.mediaTimeMs;
 		return state.lines.findLast?.((l) => t >= l.startMs) || state.lines.filter((l) => t >= l.startMs).pop() || state.lines[0];
@@ -8602,10 +8617,9 @@ function receiverApp(root) {
 		const liveMicStatusEl = root.querySelector("#receiverLiveMicStatus");
 		if (liveMicStatusEl) {
 			const { audible, muted, publishing } = singerMicSummary();
-			liveMicStatusEl.innerHTML = `<h2>Live Mics</h2><p class="subtle">${audible.length ? `Playing ${audible.length} unmuted live mic${audible.length === 1 ? "" : "s"}.` : muted.length ? "Muted." : "Waiting for singer mic…"}</p><p class="subtle">Publishing: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p><button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>`;
+			liveMicStatusEl.innerHTML = `<h2>TV Audio</h2><p class="subtle">${state.audioOutputUnlocked ? "Receiver audio is unlocked for backing track and live mics." : "Click once after opening/casting this tab so browser audio can play."}</p><p class="subtle">${audible.length ? `Playing ${audible.length} unmuted live mic${audible.length === 1 ? "" : "s"}.` : muted.length ? "Live mic muted." : "Waiting for singer mic…"}</p><p class="subtle">Publishing: ${publishing.length} · Unmuted: ${audible.length} · Muted: ${muted.length}</p><button id="startReceiverAudio" class="primary">Start TV audio</button><button id="retryLiveMics">Retry live mics</button>`;
 			liveMicStatusEl.querySelector("#startReceiverAudio")?.addEventListener("click", () => {
-				state.audioOutputUnlocked = true;
-				tryPlayLiveMics();
+				startReceiverAudio();
 			});
 			liveMicStatusEl.querySelector("#retryLiveMics")?.addEventListener("click", () => {
 				tryPlayLiveMics();
@@ -8661,6 +8675,7 @@ function receiverApp(root) {
 				attemptPlay();
 				render();
 			}).catch(() => {
+				pendingPlay = true;
 				attemptPlay();
 				if (!liveMicTrackIds.size) state.status = "Tap receiver once to start backing track/audio.";
 				render();
@@ -8751,10 +8766,9 @@ function receiverApp(root) {
 		}
 		const liveMicSection = root.querySelector("#receiverLiveMicStatus");
 		if (liveMicSection) {
-			liveMicSection.innerHTML = `<h2>Live Mics</h2>${liveMicSummaryHtml()}<button id="startReceiverAudio">Start receiver audio</button><button id="retryLiveMics">Start / retry live mics</button>`;
+			liveMicSection.innerHTML = `<h2>TV Audio</h2>${liveMicSummaryHtml()}<button id="startReceiverAudio" class="primary">Start TV audio</button><button id="retryLiveMics">Retry live mics</button>`;
 			liveMicSection.querySelector("#startReceiverAudio")?.addEventListener("click", () => {
-				state.audioOutputUnlocked = true;
-				tryPlayLiveMics();
+				startReceiverAudio();
 			});
 			liveMicSection.querySelector("#retryLiveMics")?.addEventListener("click", () => {
 				tryPlayLiveMics();
@@ -8796,7 +8810,7 @@ function receiverApp(root) {
 	}
 	async function tryPlayLiveMics() {
 		if (!state.audioOutputUnlocked) {
-			state.liveMicStatus = "Press 'Start receiver audio' to enable live mic audio.";
+			state.liveMicStatus = "Press 'Start TV audio' to enable live mic audio.";
 			render();
 			return;
 		}
@@ -8812,7 +8826,7 @@ function receiverApp(root) {
 			ensureLiveMicAudio();
 		} catch (error) {
 			liveMicLastPlayError = error.message;
-			state.liveMicStatus = "Tap receiver once or press Start / retry live mics.";
+			state.liveMicStatus = "Tap receiver once or press Retry live mics.";
 			render();
 		}
 	}
@@ -8918,11 +8932,11 @@ function receiverApp(root) {
 		tryPlayLiveMics();
 	});
 	startReceiverAudioButton.addEventListener("click", () => {
-		state.audioOutputUnlocked = true;
-		tryPlayLiveMics();
+		startReceiverAudio();
 	});
 	root.addEventListener("pointerdown", () => {
-		if (!state.audioOutputUnlocked && liveMicTrackIds.size) state.audioOutputUnlocked = true;
+		if (!state.audioOutputUnlocked) state.audioOutputUnlocked = true;
+		if (media.src) media.play().catch(() => {});
 		if (liveMicTrackIds.size) tryPlayLiveMics();
 	});
 	window.addEventListener("message", (ev) => handle(ev.data));
@@ -8984,7 +8998,7 @@ function commonChrome(root, title) {
 	root.innerHTML = `<main class="shell"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>${title}</h1>${localHttpWarning()}</div><div class="mini-stage" aria-hidden="true"><span></span><span></span><span></span></div></header><section id="main"></section><section class="activity-card"><h2>Log</h2><div id="log" class="log"></div></section></main>`;
 }
 function hostShell(root) {
-	root.innerHTML = `<div id="appShell"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>CarryOkie Show Control</h1></div><div class="mini-stage" aria-hidden="true"><span></span><span></span><span></span></div></header><div id="hostShowControl"><div id="hostTopStatus" class="card"></div><div id="hostActions" class="button-row"></div><div id="hostPanels"></div><details id="manualPairingToggle" class="card"><summary>Manual Pairing Fallback</summary><div id="manualPairingPanel"></div></details><details id="diagnosticsToggle" class="card"><summary>Diagnostics</summary><div id="diagnosticsPanel"><pre id="audioPipelineStatus"></pre><div id="log" class="log"></div></div></details></div></div>`;
+	root.innerHTML = `<main id="appShell" class="shell host-shell"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>Host Control Room</h1><p class="hint">Open the TV Stage first, cast that tab, then run the queue.</p></div><div class="mini-stage" aria-hidden="true"><span></span><span></span><span></span></div></header><div id="hostShowControl"><div id="hostTopStatus" class="card"></div><div id="hostActions" class="button-row host-actions"></div><div id="hostPanels"></div><details id="manualPairingToggle" class="card"><summary>Manual Pairing Fallback</summary><div id="manualPairingPanel"></div></details><details id="diagnosticsToggle" class="card"><summary>Diagnostics</summary><div id="diagnosticsPanel"><pre id="audioPipelineStatus"></pre><div id="log" class="log"></div></div></details></div></main>`;
 }
 function playerShell(root) {
 	root.innerHTML = `<div id="playerSingerRemote"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>CarryOkie Singer Remote</h1></div><div class="mini-stage" aria-hidden="true"><span></span><span></span><span></span></div></header><section id="main"></section><details id="playerManualFallbackToggle" class="card"><summary>Manual Pairing Fallback</summary><div id="playerManualFallbackPanel"></div></details><details id="diagnosticsToggle" class="card"><summary>Diagnostics</summary><div id="diagnosticsPanel"><pre id="audioPipelineStatus"></pre><div id="log" class="log"></div></div></details></div>`;
@@ -9915,18 +9929,21 @@ function renderHost(main) {
 	const liveMicCount = room.players.filter((p) => p.isSingerForCurrentSong && p.micState?.enabled && !p.micState?.muted).length;
 	const qrStatus = peerJsTransport ? peerJsTransport.state === "ready" ? "QR Join Ready" : peerJsTransport.state === "starting" ? "Starting..." : peerJsTransport.state === "failed" ? "Unavailable — manual fallback ready" : "Manual only" : "Manual only";
 	const tvStatus = audioPipeline.receiverReady ? audioPipeline.receiverPcConnectionState === "connected" ? "TV Connected" : audioPipeline.receiverPcConnectionState === "failed" ? "TV Failed" : "TV Tab Open" : "TV Not Open";
+	const queuedCount = room.queue.filter((q) => q.status === "queued").length;
+	const activeSong = room.currentQueueItemId ? songTitle(room.currentSongId || "") : "";
+	const hostNextStep = !audioPipeline.receiverReady ? "1. Open TV Stage, then cast that tab to the TV." : !room.queue.length ? "2. Ask singers to scan the TV QR and queue a song." : !room.currentQueueItemId ? "3. Press Start Next to load music on the TV tab." : "Show is running. Use pause/resume or start the next queued song.";
 	const topStatus = $("#hostTopStatus");
-	if (topStatus) topStatus.innerHTML = `<div class="host-status-grid">
+	if (topStatus) topStatus.innerHTML = `<div class="host-next-step"><span class="status-label">Next step</span><strong>${escapeHtml(hostNextStep)}</strong></div><div class="host-status-grid">
       <div class="status-item"><span class="status-label">Room</span><span id="hostRoomCode" class="status-value">${escapeHtml(room.roomCode)}</span></div>
       <div class="status-item"><span class="status-label">TV</span><span id="hostTvStatus" class="status-value">${tvStatus}</span></div>
       <div class="status-item"><span class="status-label">QR Join</span><span id="hostQrJoinStatus" class="status-value">${qrStatus}</span></div>
       <div class="status-item"><span class="status-label">Singers</span><span id="hostSingerCount" class="status-value">${room.players.length}/5</span></div>
       <div class="status-item"><span class="status-label">Live Mics</span><span id="hostLiveMicCount" class="status-value">${liveMicCount}</span></div>
-      <div class="status-item"><span class="status-label">Queue</span><span id="hostQueueCount" class="status-value">${room.queue.length}</span></div>
+      <div class="status-item"><span class="status-label">Queue</span><span id="hostQueueCount" class="status-value">${queuedCount} ready</span></div>
     </div>`;
 	const actions = $("#hostActions");
 	if (actions) {
-		actions.innerHTML = `<button id="copySingerLink" class="primary">Copy Singer Link</button><button id="openTvStage">Open TV Stage</button><button id="showJoinQr">Show QR</button><button id="newRoom">Start Over</button>`;
+		actions.innerHTML = `<button id="openTvStage" class="primary">1 Open TV Stage</button><button id="copySingerLink">Copy Singer Link</button><button id="showJoinQr">Show QR Here</button><button id="newRoom">Start Over</button>`;
 		$("#copySingerLink").onclick = async () => {
 			const link = PeerJsRoomTransport.playerJoinUrl(room.roomCode);
 			try {
@@ -9959,9 +9976,15 @@ function renderHost(main) {
 	}
 	const panels = $("#hostPanels");
 	if (panels) {
+		const setupComplete = room.players.length > 1 && room.queue.length > 0;
 		panels.innerHTML = `<div class="host-panels">
-      <details class="card" ${room.players.length > 1 && room.queue.length > 0 ? "" : "open"}><summary>Setup</summary><p>Open TV Stage, cast that receiver tab, then let singers scan the receiver QR with any QR app.</p><p class="hint">Singers can join, queue songs, and go live without host approval.</p></details>
-      <div class="card queue-card"><h2>Run the Room</h2><div class="button-row"><button id="startNext" class="primary">Start Next</button><button id="pauseSong">Pause</button><button id="resumeSong">Resume</button></div>${queueHtml(room, "host")}</div>
+      <section class="host-journey grid">
+        <div class="card step-card ${audioPipeline.receiverReady ? "step-done" : ""}"><p class="eyebrow">Step 1 · TV</p><h2>Open and cast TV Stage</h2><p>Use the button above. Cast the TV Stage browser tab, not this host control tab.</p></div>
+        <div class="card step-card ${room.players.length > 1 ? "step-done" : ""}"><p class="eyebrow">Step 2 · Singers</p><h2>Singers scan the TV QR</h2><p>They enter a name, queue songs, and can go live without host approval.</p></div>
+        <div class="card step-card ${room.currentQueueItemId ? "step-done" : ""}"><p class="eyebrow">Step 3 · Show</p><h2>${activeSong ? escapeHtml(activeSong) : "Start the first queued song"}</h2><p>${room.queue.length ? `${queuedCount} queued song${queuedCount === 1 ? "" : "s"} ready.` : "Waiting for singers to queue songs."}</p></div>
+      </section>
+      <details class="card" ${setupComplete ? "" : "open"}><summary>Setup help</summary><ol class="quickstart"><li>Click <strong>Open TV Stage</strong>.</li><li>Cast that receiver/TV Stage tab to the TV.</li><li>Click <strong>Start TV audio</strong> on the TV tab once if the browser blocks sound.</li><li>Singers scan the TV QR with any camera app.</li><li>Press <strong>Start Next</strong> when a song is queued.</li></ol></details>
+      <div class="card queue-card"><h2>Run the Room</h2><p class="hint">Starting a queued song loads backing video/audio onto the receiver tab.</p><div class="button-row"><button id="startNext" class="primary">Start Next Queued Song</button><button id="pauseSong">Pause TV</button><button id="resumeSong">Resume TV</button></div>${queueHtml(room, "host")}</div>
       <details class="card"><summary>Singers (${activeSingers} active)</summary>${room.players.map((p) => `<div class="singer-row"><label class="check"><input type="checkbox" class="singer" value="${p.playerId}" ${p.isSingerForCurrentSong ? "checked" : ""}> #${p.playerNumber || "?"} ${escapeHtml(p.displayName)} ${p.micState?.enabled ? p.micState.muted ? "(muted)" : "(live)" : ""}</label></div>`).join("")}<div class="button-row"><button id="setSingers" class="primary">Update Singers</button></div></details>
       <details class="card"><summary>Now Playing</summary>${room.currentQueueItemId ? `<p>${escapeHtml(songTitle(room.currentSongId || ""))}</p>` : "<p>No song active</p>"}${room.players.some((p) => p.isSingerForCurrentSong) ? "<p class=\"warn\">TV bleed risk: singers should use headphones.</p>" : ""}</details>
     </div>`;

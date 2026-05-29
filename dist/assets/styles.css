@@ -67,6 +67,53 @@ textarea {
   padding-top: max(14px, env(safe-area-inset-top));
   padding-bottom: max(24px, env(safe-area-inset-bottom));
 }
+.host-shell {
+  width: min(1240px, 100%);
+}
+#hostShowControl {
+  display: grid;
+  gap: 14px;
+}
+.host-actions {
+  grid-template-columns: minmax(220px, 1.3fr) repeat(3, minmax(140px, 1fr));
+}
+.host-next-step {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border: 1px solid #00ffff;
+  background:
+    linear-gradient(90deg, #00ffff18, transparent),
+    #090014;
+  box-shadow: 0 0 20px #00ffff22;
+}
+.host-next-step strong {
+  color: var(--text);
+  font-size: clamp(1.05rem, 2.2vw, 1.35rem);
+}
+.host-journey {
+  margin-bottom: 14px;
+}
+.step-card {
+  position: relative;
+  overflow: hidden;
+}
+.step-card::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, #ff00ff, #00ffff);
+}
+.step-done {
+  border-color: #00ffffaa;
+  box-shadow: 0 0 26px #00ffff30;
+}
+.step-done h2::before {
+  content: "✓ ";
+  color: var(--accent);
+}
 
 header {
   position: relative;
@@ -544,6 +591,9 @@ pre {
     margin-right: 14px;
   }
   .button-row {
+    grid-template-columns: 1fr;
+  }
+  .host-actions {
     grid-template-columns: 1fr;
   }
   a,
