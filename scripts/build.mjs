@@ -46,7 +46,16 @@ if (badHtmlRefs.length) {
   process.exit(1);
 }
 
-const builtJs = fs.readFileSync("dist/assets/main2.js", "utf8");
+const builtJsPath = fs
+  .readdirSync("dist/assets")
+  .filter((name) => name.endsWith(".js"))
+  .map((name) => `dist/assets/${name}`)
+  .find((path) => fs.readFileSync(path, "utf8").includes("LOW_LATENCY_AUDIO_FMTP"));
+if (!builtJsPath) {
+  console.error("Missing built shared app JavaScript bundle in dist/assets");
+  process.exit(1);
+}
+const builtJs = fs.readFileSync(builtJsPath, "utf8");
 const badPublicRefs = [
   "/public/protected",
   "/public/cast",
