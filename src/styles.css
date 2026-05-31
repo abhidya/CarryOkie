@@ -206,6 +206,11 @@ h2 {
   width: min(100%, 520px);
   margin: 0 auto;
 }
+#app[data-page="player"] details.card {
+  width: min(100%, 560px);
+  margin-left: auto;
+  margin-right: auto;
+}
 .primary-actions.mic-needs-enable button:not(#enableMic) {
   display: none;
 }

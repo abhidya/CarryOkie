@@ -87,6 +87,12 @@ async function expectMinBox(page, selector, minWidth, minHeight, label) {
   assert.ok(box.height >= minHeight, `${label} height ${box.height} should be >= ${minHeight}`);
 }
 
+async function expectMaxBox(page, selector, maxWidth, label) {
+  const box = await page.locator(selector).first().boundingBox();
+  assert.ok(box, `${label} should have a bounding box`);
+  assert.ok(box.width <= maxWidth, `${label} width ${box.width} should be <= ${maxWidth}`);
+}
+
 async function expectNoHorizontalOverflow(page, label) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert.ok(overflow <= 4, `${label} has horizontal overflow: ${overflow}px`);
@@ -362,6 +368,8 @@ try {
     // Desktop viewport pass
     await playerPage.setViewportSize({ width: 1440, height: 900 });
     await expectNoHorizontalOverflow(playerPage, "Player desktop horizontal overflow");
+    await expectMaxBox(playerPage, "#diagnosticsToggle", 620, "Player desktop diagnostics panel");
+    await expectMaxBox(playerPage, "#playerManualFallbackToggle", 620, "Player desktop manual fallback panel");
     await saveArtifacts(playerPage, "player-desktop");
 
     // Mobile pass
