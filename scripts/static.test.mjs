@@ -407,6 +407,11 @@ checks.push([
   "PeerRelaySignalingAdapter exists",
   signaling.includes("class PeerRelaySignalingAdapter"),
 ]);
+checks.push([
+  "no unused remote signaling adapter",
+  !signaling.includes("OptionalRemoteSignalingAdapter") &&
+    !signaling.includes("apiBaseUrl"),
+]);
 const protectedCatalog = JSON.parse(
   fs.readFileSync("public/protected/catalog.json", "utf8"),
 );

@@ -1,0 +1,45 @@
+<!DOCTYPE html><html><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>CarryOkie host</title>
+    <script type="module" crossorigin="" src="../assets/host.js"></script>
+    <link rel="modulepreload" crossorigin="" href="../assets/main-BJUheBMH.js">
+    <link rel="stylesheet" crossorigin="" href="../assets/styles.css">
+  </head>
+  <body>
+    <div id="app" data-page="host"><main id="appShell" class="shell host-shell"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>Host Control Room</h1><p class="hint">Open the TV Stage first, cast that tab, then run the queue.</p></div><div class="mini-stage" aria-hidden="true"><span></span><span></span><span></span></div></header><div id="hostShowControl"><div id="hostTopStatus" class="card"><div class="host-next-step"><span class="status-label">Next step</span><strong>Open TV Stage, then cast that tab.</strong></div><div class="host-status-grid">
+      <div class="status-item"><span class="status-label">Room</span><span id="hostRoomCode" class="status-value">BIRDWAVE</span></div>
+      <div class="status-item"><span class="status-label">TV</span><span id="hostTvStatus" class="status-value">TV Not Open</span></div>
+      <div class="status-item"><span class="status-label">QR Join</span><span id="hostQrJoinStatus" class="status-value">QR Join Ready</span></div>
+      <div class="status-item"><span class="status-label">Singers</span><span id="hostSingerCount" class="status-value">0/4</span></div>
+      <div class="status-item"><span class="status-label">Live Mics</span><span id="hostLiveMicCount" class="status-value">0</span></div>
+      <div class="status-item"><span class="status-label">Queue</span><span id="hostQueueCount" class="status-value">0 ready</span></div>
+    </div></div><div id="hostActions" class="button-row host-actions"><button id="openTvStage" class="primary">Open TV Stage</button><button id="copySingerLink">Copy Singer Link</button><button id="showJoinQr">Show QR Here</button><button id="newRoom">Start Over</button></div><div id="hostPanels"><div class="host-panels">
+      <section class="host-journey grid">
+        <div class="card step-card "><p class="eyebrow">TV</p><h2>Open TV Stage</h2><p>Cast that tab to the TV.</p></div>
+        <div class="card step-card "><p class="eyebrow">Room</p><h2>Waiting for singers</h2><p>They scan the TV QR.</p></div>
+        <div class="card step-card "><p class="eyebrow">Song</p><h2>Waiting for a song</h2><p>Singers queue from their phones.</p></div>
+      </section>
+      <details class="card" open=""><summary>Setup help</summary><ol class="quickstart"><li>Open and cast the TV Stage.</li><li>Singers scan the TV QR.</li><li>Singers queue, start, enable mic, and sing.</li></ol></details>
+      <details class="card queue-card"><summary>Host Backup Controls</summary><p class="hint">Use only to recover or override the room.</p><div class="button-row"><button id="startNext" class="primary">Start Next Queued Song</button><button id="pauseSong">Pause TV</button><button id="resumeSong">Resume TV</button></div><p class="subtle">No songs queued yet.</p></details>
+      <details class="card"><summary>Singers (0 active)</summary><div class="singer-row"><label class="check"><input type="checkbox" class="singer" value="db96448d-77ec-42af-a168-a3bc37b906be" style=""> #1 Host </label></div><div class="button-row"><button id="setSingers" class="primary">Update Singers</button></div></details>
+      <details class="card"><summary>Now Playing</summary><p>No song active</p></details>
+    </div></div><details id="manualPairingToggle" class="card"><summary>Manual Pairing Fallback</summary><div id="manualPairingPanel"><p>Player creates a join code. Paste or scan it here, then send back the host answer.</p><textarea id="offer" placeholder="Paste player offer/link/chunks" style=""></textarea><div class="button-row"><button id="scanOfferQr">Scan player QR</button><button id="answerOffer" class="primary">Create host answer</button></div><div id="answerOut"></div></div></details><details id="diagnosticsToggle" class="card"><summary>Diagnostics</summary><div id="diagnosticsPanel"><pre id="audioPipelineStatus"></pre><div id="log" class="log"><div>12:06:48 AM PeerJS host ready: room BIRDWAVE</div></div></div></details></div></main></div>
+    <script data-gh-pages-bootstrap="">
+      (() => {
+        const hostname = location.hostname;
+        const parts = location.pathname
+          .replace(/\/index\.html$/, "/")
+          .split("/")
+          .filter(Boolean);
+        if (!hostname.endsWith("github.io") || parts.includes("dist")) return;
+        const page = parts.at(-1);
+        if (!page) return;
+        location.replace(
+          `${location.origin}/${[...parts.slice(0, -1), "dist", page, ""].join("/")}${location.search}${location.hash}`,
+        );
+      })();
+    </script>
+  
+
+</body></html>

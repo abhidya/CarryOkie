@@ -49,6 +49,7 @@ try { mkdirSync(ARTIFACTS_DIR, { recursive: true }); } catch {}
 
 async function saveArtifacts(page, role) {
   try {
+    await page.evaluate(() => document.activeElement?.blur?.());
     await page.screenshot({ path: `${ARTIFACTS_DIR}/ux-${role}.png`, fullPage: true });
     const html = await page.content();
     writeFileSync(`${ARTIFACTS_DIR}/ux-${role}.html`, html);
@@ -106,6 +107,78 @@ async function expectNoIntersection(page, aSelector, bSelector, label) {
   assert.equal(intersects, false, `${label} should not overlap`);
 }
 
+async function expectFocusVisible(page, selector, label) {
+  await page.focus(selector);
+  const focusStyle = await page.evaluate((selector) => {
+    const el = document.querySelector(selector);
+    if (!el) return null;
+    const style = getComputedStyle(el);
+    return {
+      outlineStyle: style.outlineStyle,
+      outlineWidth: Number.parseFloat(style.outlineWidth) || 0,
+      boxShadow: style.boxShadow,
+    };
+  }, selector);
+  assert.ok(focusStyle, `${label} focus target should exist`);
+  assert.ok(
+    focusStyle.outlineWidth >= 2 ||
+      focusStyle.outlineStyle !== "none" ||
+      focusStyle.boxShadow !== "none",
+    `${label} should expose visible keyboard focus`,
+  );
+}
+
+async function expectContrastAtLeast(page, selector, minimum, label) {
+  const ratio = await page.evaluate((selector) => {
+    const parseRgb = (value) => {
+      const match = value.match(/rgba?\(([^)]+)\)/);
+      if (!match) return null;
+      const parts = match[1].split(",").map((part) => Number.parseFloat(part));
+      if (parts.length < 3 || parts.some((part) => Number.isNaN(part))) return null;
+      return { r: parts[0], g: parts[1], b: parts[2], a: parts[3] ?? 1 };
+    };
+    const luminance = ({ r, g, b }) => {
+      const linear = [r, g, b].map((channel) => {
+        const value = channel / 255;
+        return value <= 0.03928
+          ? value / 12.92
+          : ((value + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+    };
+    const contrast = (fg, bg) => {
+      const lighter = Math.max(luminance(fg), luminance(bg));
+      const darker = Math.min(luminance(fg), luminance(bg));
+      return (lighter + 0.05) / (darker + 0.05);
+    };
+    const el = document.querySelector(selector);
+    if (!el) return null;
+    const foreground = parseRgb(getComputedStyle(el).color);
+    let node = el;
+    let background = null;
+    while (node && !background) {
+      const candidate = parseRgb(getComputedStyle(node).backgroundColor);
+      if (candidate && candidate.a > 0.2) background = candidate;
+      node = node.parentElement;
+    }
+    background ||= { r: 7, g: 16, b: 24 };
+    return foreground ? contrast(foreground, background) : null;
+  }, selector);
+  assert.ok(ratio, `${label} contrast target should exist`);
+  assert.ok(ratio >= minimum, `${label} contrast ${ratio.toFixed(2)} should be >= ${minimum}`);
+}
+
+async function expectTouchTargets(page, selector, label, limit = 8) {
+  const loc = page.locator(selector);
+  const count = await loc.count();
+  for (let i = 0; i < Math.min(count, limit); i++) {
+    const item = loc.nth(i);
+    if (!(await item.isVisible())) continue;
+    const box = await item.boundingBox();
+    if (box) assert.ok(box.height >= 44, `${label} ${i} height ${box.height} should be >= 44px`);
+  }
+}
+
 let browser;
 let passed = 0;
 let failed = 0;
@@ -139,6 +212,10 @@ try {
     await expectVisibleText(homePage, /Start hosting/, "Home primary host CTA");
     await expectVisible(homePage, "#joinByCode", "Home room-code form");
     await expectVisible(homePage, "#homeRoomCode", "Home room-code input");
+    await expectFocusVisible(homePage, ".hero-actions .primary", "Home primary CTA");
+    await expectContrastAtLeast(homePage, ".hero-copy p:not(.eyebrow)", 4.5, "Home hero supporting copy");
+    await expectTouchTargets(homePage, "a, button", "Home interactive control");
+    await saveArtifacts(homePage, "home");
     await homePage.fill("#homeRoomCode", "kite echo");
     await Promise.all([
       homePage.waitForURL(/player\/\?room=KITEECHO$/),
@@ -151,12 +228,14 @@ try {
   }
 
   // ===== HOST PAGE UX ASSERTIONS =====
+  let hostContext;
+  let hostPage;
   try {
-    const hostContext = await browser.newContext({
+    hostContext = await browser.newContext({
       viewport: { width: 1440, height: 900 },
       deviceScaleFactor: 1,
     });
-    const hostPage = await hostContext.newPage();
+    hostPage = await hostContext.newPage();
     await hostPage.goto(`${baseUrl}/host/`, { waitUntil: "networkidle" });
     await hostPage.waitForSelector("text=Host Control Room", { timeout: 10000 });
 
@@ -182,6 +261,10 @@ try {
 
     // #showJoinQr visible (in hostActions)
     await expectVisible(hostPage, "#showJoinQr", "Show QR button");
+    await expectFocusVisible(hostPage, "#openTvStage", "Host primary action");
+    await expectContrastAtLeast(hostPage, "#hostRoomCode", 4.5, "Host room code");
+    await expectTouchTargets(hostPage, "button, summary", "Host desktop interactive control");
+    await saveArtifacts(hostPage, "host");
 
     // Manual pairing collapsed by default
     const manualToggle = hostPage.locator("#manualPairingToggle");
@@ -215,36 +298,31 @@ try {
     // Mobile pass
     await hostPage.setViewportSize({ width: 390, height: 844 });
     await expectNoHorizontalOverflow(hostPage, "Host mobile horizontal overflow");
-    // Primary buttons at least 44px tall (skip in headless where rendering may differ)
-    if (!headless) {
-      const primaryBtns = hostPage.locator("button.primary");
-      const count = await primaryBtns.count();
-      for (let i = 0; i < Math.min(count, 3); i++) {
-        const box = await primaryBtns.nth(i).boundingBox();
-        if (box) assert.ok(box.height >= 44, `Host mobile button height ${box.height} >= 44px`);
-      }
-    }
+    await expectTouchTargets(hostPage, "button.primary", "Host mobile primary button", 3);
     // Diagnostics still collapsed after resize
     await hostPage.reload({ waitUntil: "networkidle" });
     await hostPage.waitForSelector("text=Host Control Room", { timeout: 10000 });
     assert.strictEqual(await hostPage.locator("#diagnosticsToggle").getAttribute("open"), null, "Diagnostics collapsed on mobile");
     assert.strictEqual(await hostPage.locator("#manualPairingToggle").getAttribute("open"), null, "Manual collapsed on mobile");
+    await saveArtifacts(hostPage, "host-mobile");
 
     pass("host page UX contract");
     await hostContext.close();
   } catch (e) {
-    await saveArtifacts(hostPage, "host");
+    if (hostPage) await saveArtifacts(hostPage, "host");
     fail("host page UX contract", e);
-    await hostContext.close();
+    if (hostContext) await hostContext.close();
   }
 
   // ===== PLAYER PAGE UX ASSERTIONS =====
+  let playerContext;
+  let playerPage;
   try {
-    const playerContext = await browser.newContext({
+    playerContext = await browser.newContext({
       viewport: { width: 390, height: 844 },
       deviceScaleFactor: 1,
     });
-    const playerPage = await playerContext.newPage();
+    playerPage = await playerContext.newPage();
     await playerPage.goto(`${baseUrl}/player/#room=TESTROOM`, { waitUntil: "networkidle" });
     await playerPage.waitForSelector("text=CarryOkie Singer Remote", { timeout: 10000 });
 
@@ -259,6 +337,10 @@ try {
     assert.strictEqual((await playerPage.locator("#playerRoomCode").innerText()).trim(), "TESTROOM", "Player reads hash room code");
     await expectVisible(playerPage, "#playerDisplayName", "Display name input");
     await expectVisible(playerPage, "#joinRoom", "Join Room button");
+    await expectFocusVisible(playerPage, "#joinRoom", "Player join button");
+    await expectContrastAtLeast(playerPage, "#playerRoomCode", 4.5, "Player room code");
+    await expectTouchTargets(playerPage, "button, summary", "Player mobile interactive control");
+    await saveArtifacts(playerPage, "player");
 
     // Manual fallback collapsed by default
     const manualToggle = playerPage.locator("#playerManualFallbackToggle");
@@ -280,26 +362,19 @@ try {
     // Desktop viewport pass
     await playerPage.setViewportSize({ width: 1440, height: 900 });
     await expectNoHorizontalOverflow(playerPage, "Player desktop horizontal overflow");
+    await saveArtifacts(playerPage, "player-desktop");
 
     // Mobile pass
     await playerPage.setViewportSize({ width: 390, height: 844 });
     await expectNoHorizontalOverflow(playerPage, "Player mobile horizontal overflow");
-    // Primary buttons at least 44px tall (skip in headless where rendering may differ)
-    if (!headless) {
-      const primaryBtns = playerPage.locator("button.primary");
-      const count = await primaryBtns.count();
-      for (let i = 0; i < Math.min(count, 3); i++) {
-        const box = await primaryBtns.nth(i).boundingBox();
-        if (box) assert.ok(box.height >= 44, `Player mobile button height ${box.height} >= 44px`);
-      }
-    }
+    await expectTouchTargets(playerPage, "button.primary", "Player mobile primary button", 3);
 
     pass("player page UX contract");
     await playerContext.close();
   } catch (e) {
-    await saveArtifacts(playerPage, "player");
+    if (playerPage) await saveArtifacts(playerPage, "player");
     fail("player page UX contract", e);
-    await playerContext.close();
+    if (playerContext) await playerContext.close();
   }
 
   // ===== RECEIVER PAGE UX ASSERTIONS =====
@@ -323,6 +398,10 @@ try {
     // Shows QR and join link
     await expectVisible(receiverPage, "#receiverJoinQr", "Join QR visible");
     await expectVisible(receiverPage, "#receiverJoinLink", "Join link visible");
+    await expectFocusVisible(receiverPage, "#receiverJoinLink", "Receiver join link");
+    await expectContrastAtLeast(receiverPage, "#receiverRoomCode", 4.5, "Receiver room code");
+    await expectTouchTargets(receiverPage, "a, button, summary", "Receiver desktop interactive control");
+    await saveArtifacts(receiverPage, "receiver");
 
     // Join link href includes room code and points to player route
     const joinLinkHref = await receiverPage.locator("#receiverJoinLink").getAttribute("href");
@@ -398,6 +477,7 @@ try {
     await receiverPage.reload({ waitUntil: "networkidle" });
     await receiverPage.waitForSelector("text=CarryOkie TV Stage", { timeout: 10000 });
     assert.strictEqual(await receiverPage.locator("#receiverDiagnosticsToggle").getAttribute("open"), null, "Diagnostics collapsed on mobile");
+    await saveArtifacts(receiverPage, "receiver-mobile");
 
     pass("receiver page UX contract");
     await receiverContext.close();

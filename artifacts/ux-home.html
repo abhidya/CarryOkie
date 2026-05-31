@@ -1,0 +1,54 @@
+<!DOCTYPE html><html><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>CarryOkie</title>
+    <link rel="stylesheet" crossorigin="" href="./assets/styles.css">
+  </head>
+  <body>
+    <main class="shell landing-shell">
+      <section class="app-hero card">
+        <div class="hero-copy">
+          <p class="eyebrow">Static karaoke room</p>
+          <h1>CarryOkie</h1>
+          <p>
+            Start from the host screen. The host opens the TV Stage, casts that
+            tab, and singers scan the TV QR to join.
+          </p>
+          <nav class="cards hero-actions" aria-label="CarryOkie pages">
+            <a class="primary" href="host/">Start hosting</a>
+          </nav>
+          <form id="joinByCode" class="join-code-form" aria-label="Join an existing room">
+            <label for="homeRoomCode">I have a room code</label>
+            <div class="join-code-row">
+              <input id="homeRoomCode" name="room" inputmode="latin" autocomplete="off" placeholder="ROOMCODE" style="">
+              <button type="submit">Join</button>
+            </div>
+          </form>
+          <p class="hint">
+            The TV Stage creates the QR for this room. Once singers scan it,
+            they can queue, start, and sing without host approval.
+          </p>
+        </div>
+        <div class="stage-art" aria-hidden="true">
+          <div class="stage-orb"></div>
+          <div class="stage-mic"></div>
+          <div class="soundwave">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script>
+      document.getElementById("joinByCode")?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const room = String(new FormData(event.currentTarget).get("room") || "")
+          .trim()
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, "");
+        if (!room) return;
+        location.href = `player/?room=${encodeURIComponent(room)}`;
+      });
+    </script>
+  
+
+</body></html>

@@ -10,20 +10,20 @@
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-  color: #e0e0e0;
-  background: #090014;
-  --bg: #090014;
-  --panel: #1a103c;
-  --panel-2: #241253;
-  --line: #2d1b4e;
-  --text: #e0e0e0;
-  --muted: #bcaee6;
-  --accent: #00ffff;
-  --accent-2: #ff00ff;
-  --warn: #ff9900;
-  --danger: #ff3d7f;
-  --shadow: 0 0 34px #00ffff22, 0 18px 50px #0009;
-  --radius: 0;
+  color: #f4f7fb;
+  background: #071018;
+  --bg: #071018;
+  --panel: #111c2a;
+  --panel-2: #172638;
+  --line: #2d4054;
+  --text: #f4f7fb;
+  --muted: #b7c6d8;
+  --accent: #54d6e8;
+  --accent-2: #7ddc9a;
+  --warn: #f4b85d;
+  --danger: #ff6b83;
+  --shadow: 0 14px 34px #0008;
+  --radius: 8px;
   --tap: 48px;
 }
 
@@ -39,10 +39,8 @@ body {
   min-height: 100%;
   overflow-x: hidden;
   background:
-    linear-gradient(rgba(18, 16, 20, 0) 50%, rgba(0, 0, 0, 0.28) 50%) 0 0 / 100% 4px fixed,
-    radial-gradient(circle at 72% 8%, #ff990044 0, transparent 20rem),
-    radial-gradient(circle at 16% 0, #ff00ff33 0, transparent 34rem),
-    linear-gradient(135deg, #090014 0%, #14012e 52%, #022638 100%);
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px) 0 0 / 100% 32px fixed,
+    linear-gradient(135deg, #071018 0%, #0d1723 50%, #092235 100%);
   -webkit-font-smoothing: antialiased;
 }
 body,
@@ -82,11 +80,11 @@ textarea {
   gap: 6px;
   margin-bottom: 12px;
   padding: 14px 16px;
-  border: 1px solid #00ffff;
+  border: 1px solid var(--accent);
   background:
-    linear-gradient(90deg, #00ffff18, transparent),
-    #090014;
-  box-shadow: 0 0 20px #00ffff22;
+    linear-gradient(90deg, #54d6e824, transparent),
+    #0b1722;
+  box-shadow: inset 4px 0 0 var(--accent);
 }
 .host-next-step strong {
   color: var(--text);
@@ -104,11 +102,11 @@ textarea {
   position: absolute;
   inset: 0 0 auto;
   height: 3px;
-  background: linear-gradient(90deg, #ff00ff, #00ffff);
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
 }
 .step-done {
-  border-color: #00ffffaa;
-  box-shadow: 0 0 26px #00ffff30;
+  border-color: #70d494aa;
+  box-shadow: 0 14px 30px #0007;
 }
 .step-done h2::before {
   content: "✓ ";
@@ -189,7 +187,7 @@ h2 {
   border-left: 5px solid var(--warn);
   background: #2b240c;
   padding: 12px 14px;
-  border-radius: 16px;
+  border-radius: var(--radius);
 }
 .warn.compact {
   font-size: 0.88rem;
@@ -216,9 +214,9 @@ h2 {
 .payload {
   width: 100%;
   max-width: 100%;
-  background: linear-gradient(180deg, rgba(26, 16, 60, 0.9), rgba(9, 0, 20, 0.92));
-  border: 1px solid #ff00ff55;
-  border-top: 2px solid var(--accent);
+  background: linear-gradient(180deg, rgba(17, 28, 42, 0.96), rgba(9, 18, 28, 0.96));
+  border: 1px solid #2d4054;
+  border-top: 2px solid #54d6e8aa;
   border-radius: var(--radius);
   padding: 16px;
   box-shadow: var(--shadow);
@@ -233,8 +231,8 @@ h2 {
 .queue-item {
   padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 16px;
-  background: #0f1a2d;
+  border-radius: var(--radius);
+  background: #0b1724;
 }
 .queue-top {
   display: flex;
@@ -259,7 +257,7 @@ h2 {
 .queue-status-queued,
 .queue-status-active {
   color: var(--accent-2);
-  border-color: #2f7f64;
+  border-color: #3c8051;
 }
 .queue-actions {
   margin-top: 10px;
@@ -267,8 +265,8 @@ h2 {
 .phone-hero {
   position: relative;
   z-index: 0;
-  border-color: #2e7198;
-  background: linear-gradient(165deg, #142b47, #0e1b30 60%, #0a1627);
+  border-color: #3c6e81;
+  background: linear-gradient(165deg, #143044, #0e1b2a 60%, #091621);
 }
 
 details.card {
@@ -313,10 +311,10 @@ a,
 button {
   min-height: var(--tap);
   max-width: 100%;
-  color: #e8f8ff;
-  background: #173655;
-  border: 1px solid #2d6f9f;
-  border-radius: 14px;
+  color: #f4f9ff;
+  background: #173149;
+  border: 1px solid #3b6887;
+  border-radius: var(--radius);
   padding: 12px 14px;
   text-decoration: none;
   display: inline-flex;
@@ -333,21 +331,21 @@ button {
 }
 button.primary,
 a.primary {
-  background: transparent;
+  background: #102836;
   border-color: var(--accent);
   color: var(--accent);
-  box-shadow: 0 0 14px #00ffff33;
+  box-shadow: inset 0 -2px 0 #0004;
 }
 .danger {
-  background: #4c1724;
-  border-color: #9d3148;
+  background: #4f1c2a;
+  border-color: #b84b5f;
 }
 .hold-button {
   min-height: 68px;
   font-size: 1.05rem;
   color: white;
-  background: linear-gradient(180deg, #208b58, #115f3a);
-  border-color: #63e8a8;
+  background: linear-gradient(180deg, #258a55, #146139);
+  border-color: #75d795;
 }
 .primary-actions,
 .button-row {
@@ -374,7 +372,7 @@ select {
   min-height: var(--tap);
   margin: 6px 0 12px;
   padding: 12px 14px;
-  border-radius: 14px;
+  border-radius: var(--radius);
   border: 1px solid #43617f;
   background: #07101d;
   color: #eef;
@@ -384,7 +382,13 @@ input:focus,
 textarea:focus,
 select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px #66d9ff22;
+  box-shadow: 0 0 0 3px #54d6e83d;
+}
+
+:where(a, button, summary, input, textarea, select):focus-visible {
+  outline: 3px solid #f4b85d;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px #071018, 0 0 0 8px #f4b85d66;
 }
 textarea {
   min-height: 112px;
@@ -402,7 +406,7 @@ label {
   gap: 10px;
   background: #0b1728;
   border: 1px solid #213b5a;
-  border-radius: 14px;
+  border-radius: var(--radius);
   padding: 10px 12px;
 }
 .check input {
@@ -417,8 +421,8 @@ label {
   align-items: center;
   max-width: 100%;
   min-height: 36px;
-  border: 1px solid #31506e;
-  background: #09182a;
+  border: 1px solid #3a5369;
+  background: #0b1b2b;
   color: #dff7ff;
   border-radius: 999px;
   padding: 7px 12px;
@@ -436,11 +440,11 @@ label {
   gap: 4px;
   min-height: 72px;
   padding: 12px 14px;
-  border: 1px solid #31506e;
-  border-radius: 16px;
+  border: 1px solid #3a5369;
+  border-radius: var(--radius);
   background:
-    linear-gradient(180deg, #0c1b30dd, #081526ee),
-    radial-gradient(circle at 100% 0, #66d9ff22, transparent 8rem);
+    linear-gradient(180deg, #0f2132dd, #0a1724ee),
+    linear-gradient(90deg, #54d6e812, transparent);
 }
 .status-label {
   color: var(--muted);
@@ -477,7 +481,7 @@ li {
 }
 .queueSelf {
   width: 100%;
-  min-height: 42px;
+  min-height: 44px;
   font-size: 0.88rem;
   padding: 9px 10px;
   margin: 0;
@@ -486,7 +490,7 @@ li {
 video#phoneVideo {
   width: 100%;
   max-height: 38vh;
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: #02060a;
 }
 .log {
@@ -496,7 +500,7 @@ video#phoneVideo {
   overflow: auto;
   background: #050b13;
   padding: 10px;
-  border-radius: 14px;
+  border-radius: var(--radius);
   border: 1px solid #1c3148;
 }
 .lyrics p {
@@ -516,14 +520,14 @@ pre {
   white-space: pre-wrap;
   word-break: break-word;
   background: #050b13;
-  border-radius: 14px;
+  border-radius: var(--radius);
   padding: 12px;
   color: #cfe;
 }
 .qr {
   background: white;
   border: 10px solid white;
-  border-radius: 12px;
+  border-radius: var(--radius);
   max-width: min(260px, 100%);
   height: auto;
   image-rendering: pixelated;
@@ -541,7 +545,7 @@ pre {
 
 .tv {
   min-height: 100vh;
-  background: linear-gradient(135deg, #110b2d, #062537);
+  background: linear-gradient(135deg, #071018, #0b2537);
   display: grid;
   grid-template-columns: 1fr 1.5fr;
   gap: 24px;
@@ -550,7 +554,7 @@ pre {
 }
 .tv video {
   width: 100%;
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: #000;
 }
 .room {
@@ -564,7 +568,7 @@ pre {
 
 @media (max-width: 520px) {
   :root {
-    --radius: 20px;
+    --radius: 8px;
     --tap: 50px;
   }
   .shell {
@@ -624,10 +628,10 @@ pre {
   }
 }
 
-/* Alive UI layer: code-native stage imagery and responsive motion. */
+/* Code-native stage imagery and responsive motion. */
 body::before,
 body::after {
-  content: "";
+  content: none;
   position: fixed;
   inset: auto;
   pointer-events: none;
@@ -639,12 +643,7 @@ body::before {
   height: 46vw;
   top: -18vw;
   right: -14vw;
-  background: radial-gradient(
-    circle,
-    #1f9cff55 0,
-    #1f9cff16 34%,
-    transparent 68%
-  );
+  background: none;
   animation: driftGlow 14s ease-in-out infinite alternate;
 }
 body::after {
@@ -652,12 +651,7 @@ body::after {
   height: 36vw;
   left: -16vw;
   bottom: -16vw;
-  background: radial-gradient(
-    circle,
-    #7cf3b244 0,
-    #7cf3b216 38%,
-    transparent 70%
-  );
+  background: none;
   animation: driftGlow 18s ease-in-out infinite alternate-reverse;
 }
 
@@ -674,10 +668,10 @@ body::after {
   gap: 16px;
   padding: 18px;
   border: 1px solid #274b70;
-  border-radius: calc(var(--radius) + 4px);
+  border-radius: var(--radius);
   background:
-    linear-gradient(135deg, #122a47cc, #0a1627dd),
-    radial-gradient(circle at 85% 20%, #66d9ff44, transparent 26rem);
+    linear-gradient(135deg, #10263acc, #0b1724dd),
+    linear-gradient(90deg, #54d6e812, transparent);
   box-shadow: var(--shadow);
 }
 .landing-shell {
@@ -694,8 +688,8 @@ body::after {
   min-height: min(680px, calc(100vh - 48px));
   padding: clamp(18px, 5vw, 42px);
   background:
-    linear-gradient(135deg, #10233d, #091321 62%),
-    radial-gradient(circle at 72% 24%, #66d9ff55, transparent 28rem);
+    linear-gradient(135deg, #10263a, #091722 62%),
+    linear-gradient(90deg, #54d6e814, transparent);
 }
 .room-spotlight {
   min-height: 0;
@@ -749,19 +743,12 @@ body::after {
 .stage-orb {
   width: min(64vw, 320px);
   aspect-ratio: 1;
-  border-radius: 50%;
+  border-radius: var(--radius);
   background:
-    radial-gradient(
-      circle at 50% 42%,
-      #ffffff 0 5%,
-      #66d9ff 6% 16%,
-      #1d8fb7 17% 31%,
-      #10243e 32% 48%,
-      transparent 49%
-    ),
-    conic-gradient(from 180deg, #66d9ff, #7cf3b2, #ffd166, #ff6b7a, #66d9ff);
+    linear-gradient(135deg, #f4f7fb 0 7%, #54d6e8 8% 23%, #1c6d83 24% 42%, #10243e 43% 100%),
+    linear-gradient(180deg, #54d6e8, #7ddc9a);
   box-shadow:
-    0 0 80px #66d9ff44,
+    0 20px 46px #0008,
     inset 0 0 48px #0008;
   animation: floatStage 5.5s ease-in-out infinite;
 }
@@ -774,7 +761,7 @@ body::after {
   height: 128px;
   border-radius: 999px 999px 18px 18px;
   background: linear-gradient(180deg, #e9fbff, #66d9ff 35%, #173655 36% 100%);
-  box-shadow: 0 18px 40px #0009;
+  box-shadow: 0 18px 34px #0008;
   transform: rotate(-18deg) translateY(12px);
 }
 .stage-mic::before {
@@ -804,7 +791,7 @@ body::after {
   height: 18px;
   border-radius: 999px;
   background: linear-gradient(180deg, var(--accent-2), var(--accent));
-  box-shadow: 0 0 18px #66d9ff88;
+  box-shadow: 0 0 10px #54d6e84d;
   animation: waveBeat 1.05s ease-in-out infinite;
 }
 .soundwave span:nth-child(2),
@@ -852,20 +839,19 @@ select {
 .payload:hover {
   border-color: #4f8fbc;
   transform: translateY(-1px);
-  box-shadow: 0 22px 60px #0008;
+  box-shadow: 0 16px 38px #0008;
 }
 button:hover,
 a:hover {
-  transform: translateY(-1px) skewX(-6deg);
+  transform: translateY(-1px);
   box-shadow:
-    0 10px 24px #0005,
-    0 0 0 3px #00ffff24,
-    0 0 22px #00ffff55;
+    0 10px 22px #0005,
+    0 0 0 3px #54d6e82e;
 }
 button.primary:hover,
 a.primary:hover {
   background: var(--accent);
-  color: #090014;
+  color: #071018;
 }
 button:active,
 a:active,
@@ -877,7 +863,7 @@ a:active,
   overflow: hidden;
 }
 .hold-button::after {
-  content: "";
+  content: none;
   position: absolute;
   inset: -35% -20%;
   background: linear-gradient(90deg, transparent, #ffffff30, transparent);
@@ -890,14 +876,14 @@ a:active,
   height: 0.65em;
   border-radius: 50%;
   background: var(--accent-2);
-  box-shadow: 0 0 0 0 #7cf3b266;
+  box-shadow: 0 0 0 0 #7ddc9a66;
   animation: pulseDot 1.8s ease-out infinite;
 }
 .queue-card li,
 #queue li {
   padding: 10px 12px;
   border: 1px solid #213b5a;
-  border-radius: 14px;
+  border-radius: var(--radius);
   background: #081526;
   list-style-position: inside;
 }
@@ -906,7 +892,7 @@ a:active,
 #liveMics p {
   padding: 10px 12px;
   border: 1px solid #213b5a;
-  border-radius: 14px;
+  border-radius: var(--radius);
   background: #081526;
 }
 
@@ -915,13 +901,11 @@ a:active,
   overflow: hidden;
 }
 .tv::before {
-  content: "";
+  content: none;
   position: absolute;
   inset: -20% -10% auto;
   height: 70%;
-  background:
-    radial-gradient(circle at 20% 30%, #66d9ff44, transparent 24rem),
-    radial-gradient(circle at 80% 10%, #7cf3b233, transparent 22rem);
+  background: none;
   pointer-events: none;
   animation: driftGlow 16s ease-in-out infinite alternate;
 }
@@ -935,11 +919,11 @@ a:active,
 }
 .tv-stage video {
   box-shadow:
-    0 30px 90px #000b,
-    0 0 0 1px #66d9ff33;
+    0 20px 54px #000b,
+    0 0 0 1px #54d6e833;
 }
 .lyrics p.active {
-  text-shadow: 0 0 22px #7cf3b288;
+  text-shadow: 0 0 14px #7ddc9a66;
   animation: lyricLift 800ms ease both;
 }
 
@@ -1033,7 +1017,7 @@ a:active,
 
 #receiverTvStage {
   min-height: 100vh;
-  background: linear-gradient(135deg, #110b2d, #062537);
+  background: linear-gradient(135deg, #071018, #0b2537);
   color: white;
   padding: 32px 48px;
   display: flex;
@@ -1055,12 +1039,12 @@ a:active,
   letter-spacing: 0.08em;
 }
 #receiverRoomCode.room {
-  font-size: clamp(4.5rem, 11vw, 10.5rem);
+  font-size: clamp(3.6rem, 7vw, 7rem);
   font-weight: 900;
-  letter-spacing: 0.08em;
-  line-height: 0.9;
+  letter-spacing: 0.05em;
+  line-height: 1;
   margin: 0;
-  text-shadow: 0 0 34px #ff00ff55;
+  text-shadow: 0 8px 26px #0009;
 }
 #receiverJoinHero {
   display: grid;
@@ -1068,13 +1052,13 @@ a:active,
   gap: clamp(20px, 4vw, 48px);
   align-items: center;
   padding: clamp(22px, 4vw, 42px);
-  border: 2px solid #00ffff;
-  border-left-color: #ff00ff;
-  border-right-color: #ff00ff;
+  border: 2px solid var(--accent);
+  border-left-color: var(--accent-2);
+  border-right-color: var(--accent-2);
   background:
-    radial-gradient(circle at 85% 50%, #00ffff24, transparent 22rem),
-    linear-gradient(135deg, rgba(26, 16, 60, 0.92), rgba(9, 0, 20, 0.84));
-  box-shadow: 0 0 42px #00ffff26;
+    linear-gradient(90deg, #54d6e818, transparent),
+    linear-gradient(135deg, rgba(17, 28, 42, 0.95), rgba(9, 18, 28, 0.9));
+  box-shadow: 0 18px 44px #0009;
 }
 .receiver-code-block {
   display: grid;
@@ -1096,9 +1080,8 @@ a:active,
   background: #fff;
   border: 8px solid #fff;
   box-shadow:
-    0 0 0 3px #00ffff,
-    0 0 42px #00ffff88,
-    0 0 78px #ff00ff44;
+    0 0 0 3px var(--accent),
+    0 16px 34px #0008;
 }
 #receiverJoinQr .qr {
   width: clamp(320px, 27vw, 420px);
@@ -1109,11 +1092,11 @@ a:active,
   display: inline-flex;
   justify-self: start;
   max-width: min(100%, 56ch);
-  min-height: 0;
-  padding: 8px 12px;
-  color: #00ffff;
-  border: 1px solid #00ffff88;
-  background: #090014;
+  min-height: 44px;
+  padding: 10px 12px;
+  color: var(--accent);
+  border: 1px solid #54d6e888;
+  background: #071018;
   text-decoration: none;
   font-size: clamp(0.8rem, 1.4vw, 1rem);
   font-weight: 800;
@@ -1142,7 +1125,7 @@ a:active,
 #receiverLiveMicStatus {
   background: #0a1525;
   border: 1px solid #1a2a4a;
-  border-radius: 16px;
+  border-radius: var(--radius);
   padding: 16px 20px;
 }
 #receiverActiveSingers h2,
@@ -1179,15 +1162,15 @@ a:active,
 }
 #receiverMediaRegion .castMediaElement {
   width: 100%;
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: #000;
-  box-shadow: 0 30px 90px #000b, 0 0 0 1px #66d9ff33;
+  box-shadow: 0 20px 54px #000b, 0 0 0 1px #54d6e833;
 }
 #receiverLyricsRegion.lyrics.big {
   min-height: 120px;
   padding: 16px;
   background: #0a1020;
-  border-radius: 14px;
+  border-radius: var(--radius);
   border: 1px solid #1a2a4a;
 }
 #receiverLyricsRegion p {
@@ -1198,7 +1181,7 @@ a:active,
 }
 #receiverLyricsRegion p.active {
   opacity: 1;
-  text-shadow: 0 0 22px #7cf3b288;
+  text-shadow: 0 0 14px #7ddc9a66;
   animation: lyricLift 800ms ease both;
 }
 #receiverLiveMicStatus .subtle {
@@ -1208,8 +1191,9 @@ a:active,
 }
 #receiverLiveMicStatus button {
   margin: 8px 8px 0 0;
+  min-height: 44px;
   padding: 8px 16px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   border: 1px solid #2a3f6a;
   background: #1a2744;
   color: white;
@@ -1223,7 +1207,7 @@ a:active,
 #receiverDiagnosticsToggle {
   margin-top: 16px;
   border: 1px solid #1a2a4a;
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: #0a1020;
 }
 .diagnostics summary,
