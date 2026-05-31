@@ -609,7 +609,13 @@ export function receiverApp(root: HTMLElement): void {
       ? PeerJsRoomTransport.playerJoinUrl(state.roomCode)
       : new URL(`../player/?room=${encodeURIComponent(state.roomCode)}`, location.href).toString();
     const joinLink = root.querySelector<HTMLAnchorElement>("#receiverJoinLink");
-    if (joinLink) { joinLink.href = playerUrl; joinLink.textContent = playerUrl; }
+    if (joinLink) {
+      joinLink.href = playerUrl;
+      joinLink.title = playerUrl;
+      joinLink.textContent = state.roomCode === "------"
+        ? "Waiting for singer link"
+        : `Open singer link for ${state.roomCode}`;
+    }
     const joinQr = root.querySelector("#receiverJoinQr");
     if (joinQr) joinQr.innerHTML = state.roomCode === "------" ? "" : qrSvg(playerUrl, { scale: 8, quiet: 6, title: "Join CarryOkie room" });
 
