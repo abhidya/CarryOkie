@@ -1242,8 +1242,9 @@ a:active,
     overflow-x: hidden;
   }
   #receiverRoomCode.room {
-    font-size: 14vw;
-    word-break: break-all;
+    font-size: clamp(3.2rem, 12vw, 4.8rem);
+    word-break: normal;
+    overflow-wrap: anywhere;
     max-width: 100%;
   }
   #receiverLyricsRegion p {
