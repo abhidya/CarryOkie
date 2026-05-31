@@ -8865,7 +8865,8 @@ function receiverApp(root) {
 		const joinLink = root.querySelector("#receiverJoinLink");
 		if (joinLink) {
 			joinLink.href = playerUrl;
-			joinLink.textContent = playerUrl;
+			joinLink.title = playerUrl;
+			joinLink.textContent = state.roomCode === "------" ? "Waiting for singer link" : `Open singer link for ${state.roomCode}`;
 		}
 		const joinQr = root.querySelector("#receiverJoinQr");
 		if (joinQr) joinQr.innerHTML = state.roomCode === "------" ? "" : qrSvg(playerUrl, {

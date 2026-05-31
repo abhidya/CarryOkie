@@ -3,14 +3,14 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>CarryOkie host</title>
     <script type="module" crossorigin="" src="../assets/host.js"></script>
-    <link rel="modulepreload" crossorigin="" href="../assets/main-BJUheBMH.js">
+    <link rel="modulepreload" crossorigin="" href="../assets/main-C3AgE7bQ.js">
     <link rel="stylesheet" crossorigin="" href="../assets/styles.css">
   </head>
   <body>
     <div id="app" data-page="host"><main id="appShell" class="shell host-shell"><header class="page-hero"><div><p class="eyebrow">CarryOkie</p><h1>Host Control Room</h1><p class="hint">Open the TV Stage first, cast that tab, then run the queue.</p></div><div class="mini-stage" aria-hidden="true"><span></span><span></span><span></span></div></header><div id="hostShowControl"><div id="hostTopStatus" class="card"><div class="host-next-step"><span class="status-label">Next step</span><strong>Open TV Stage, then cast that tab.</strong></div><div class="host-status-grid">
-      <div class="status-item"><span class="status-label">Room</span><span id="hostRoomCode" class="status-value">BIRDWAVE</span></div>
+      <div class="status-item"><span class="status-label">Room</span><span id="hostRoomCode" class="status-value">STARSTAR</span></div>
       <div class="status-item"><span class="status-label">TV</span><span id="hostTvStatus" class="status-value">TV Not Open</span></div>
-      <div class="status-item"><span class="status-label">QR Join</span><span id="hostQrJoinStatus" class="status-value">QR Join Ready</span></div>
+      <div class="status-item"><span class="status-label">QR Join</span><span id="hostQrJoinStatus" class="status-value">Starting...</span></div>
       <div class="status-item"><span class="status-label">Singers</span><span id="hostSingerCount" class="status-value">0/4</span></div>
       <div class="status-item"><span class="status-label">Live Mics</span><span id="hostLiveMicCount" class="status-value">0</span></div>
       <div class="status-item"><span class="status-label">Queue</span><span id="hostQueueCount" class="status-value">0 ready</span></div>
@@ -22,9 +22,9 @@
       </section>
       <details class="card" open=""><summary>Setup help</summary><ol class="quickstart"><li>Open and cast the TV Stage.</li><li>Singers scan the TV QR.</li><li>Singers queue, start, enable mic, and sing.</li></ol></details>
       <details class="card queue-card"><summary>Host Backup Controls</summary><p class="hint">Use only to recover or override the room.</p><div class="button-row"><button id="startNext" class="primary">Start Next Queued Song</button><button id="pauseSong">Pause TV</button><button id="resumeSong">Resume TV</button></div><p class="subtle">No songs queued yet.</p></details>
-      <details class="card"><summary>Singers (0 active)</summary><div class="singer-row"><label class="check"><input type="checkbox" class="singer" value="db96448d-77ec-42af-a168-a3bc37b906be" style=""> #1 Host </label></div><div class="button-row"><button id="setSingers" class="primary">Update Singers</button></div></details>
+      <details class="card"><summary>Singers (0 active)</summary><div class="singer-row"><label class="check"><input type="checkbox" class="singer" value="d190d198-50a6-4194-99c2-1e2c0ef464d9" style=""> #1 Host </label></div><div class="button-row"><button id="setSingers" class="primary">Update Singers</button></div></details>
       <details class="card"><summary>Now Playing</summary><p>No song active</p></details>
-    </div></div><details id="manualPairingToggle" class="card"><summary>Manual Pairing Fallback</summary><div id="manualPairingPanel"><p>Player creates a join code. Paste or scan it here, then send back the host answer.</p><textarea id="offer" placeholder="Paste player offer/link/chunks" style=""></textarea><div class="button-row"><button id="scanOfferQr">Scan player QR</button><button id="answerOffer" class="primary">Create host answer</button></div><div id="answerOut"></div></div></details><details id="diagnosticsToggle" class="card"><summary>Diagnostics</summary><div id="diagnosticsPanel"><pre id="audioPipelineStatus"></pre><div id="log" class="log"><div>12:06:47 AM PeerJS host ready: room BIRDWAVE</div></div></div></details></div></main></div>
+    </div></div><details id="manualPairingToggle" class="card"><summary>Manual Pairing Fallback</summary><div id="manualPairingPanel"><p>Player creates a join code. Paste or scan it here, then send back the host answer.</p><textarea id="offer" placeholder="Paste player offer/link/chunks" style=""></textarea><div class="button-row"><button id="scanOfferQr">Scan player QR</button><button id="answerOffer" class="primary">Create host answer</button></div><div id="answerOut"></div></div></details><details id="diagnosticsToggle" class="card"><summary>Diagnostics</summary><div id="diagnosticsPanel"><pre id="audioPipelineStatus"></pre><div id="log" class="log"></div></div></details></div></main></div>
     <script data-gh-pages-bootstrap="">
       (() => {
         const hostname = location.hostname;
