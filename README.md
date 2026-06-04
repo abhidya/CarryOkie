@@ -75,6 +75,12 @@ npm run preview
 # http://localhost:5173/debug/
 ```
 
+### Demo quick start
+
+For a low-friction browser demo, run `npm install`, `npm run build`, then `npm run preview` and open `/host/`. Use **Open TV Stage** to launch `/receiver/`, then join from `/player/` with the displayed room code or QR link.
+
+For event demos, use a hosted PeerServer via `peerHost`, `peerPort`, `peerPath`, and `peerSecure` query parameters so every device uses the same rendezvous broker. Manual pairing remains the fallback when PeerJS signaling is unavailable.
+
 ## User flow
 
 1. **Host** opens `/host/` → "CarryOkie Show Control" appears with room code.
