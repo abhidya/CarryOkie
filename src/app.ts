@@ -807,6 +807,7 @@ function pauseCurrentPlayback() {
     status: "paused",
     pausedAtSongMs: derived.positionMs,
     tvMediaTimeMs: derived.positionMs,
+    seekOffsetMs: 0,
     lastUpdatedAtHostMs: Date.now(),
   };
   publishReceiverPlayback(room.playbackState);

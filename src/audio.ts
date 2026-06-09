@@ -136,8 +136,7 @@ export class PhoneAudio {
       });
     }
     this.applyGate();
-    this.buildMicFilterStream(this.localStream);
-    this.publishedStream = this.localStream;
+    this.publishedStream = this.buildMicFilterStream(this.localStream);
     this.setMicMuted(pushToSing);
     return this.publishedStream;
   }
